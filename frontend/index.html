@@ -704,11 +704,15 @@ async function initPlaidLink(){
     Plaid.create({
       token:link_token,
       onSuccess:async(pt)=>{
+        alert('Plaid onSuccess fired! Exchanging token…');
         showSync('Connecting bank…');
-        const er=await fetch(`${API}/api/exchange_public_token`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token:pt,userId:currentUser})});
-        if(er.ok){setConnected(true);await loadData();hideSync('✓ Bank connected and synced!');}
-        else hideSync('✗ Connection failed');
-      },onExit:(err,metadata)=>{if(err)alert('Plaid error: '+JSON.stringify(err));console.log('Plaid exit:',err,metadata);}
+        try{
+          const er=await fetch(`${API}/api/exchange_public_token`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token:pt,userId:currentUser})});
+          const body=await er.text();
+          if(er.ok){setConnected(true);await loadData();hideSync('✓ Bank connected and synced!');}
+          else{alert('Exchange failed: '+body);hideSync('✗ Connection failed');}
+        }catch(ex){alert('Exchange error: '+ex.message);}
+      },onExit:(err,metadata)=>{alert('Plaid onExit: err='+JSON.stringify(err)+' status='+metadata?.status);}
     }).open();
   }catch(e){alert('⚠ '+e.message);}
 }

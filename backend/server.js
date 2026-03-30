@@ -126,14 +126,16 @@ app.get('/api/users', (req, res) => {
 
 app.post('/api/create_link_token', async (req, res) => {
   try {
-    const resp = await plaid.linkTokenCreate({
+    const linkConfig = {
       user: { client_user_id: req.body.userId || 'christian' },
       client_name: 'Ledger — Household Finance',
       products: [Products.Transactions],
       country_codes: [CountryCode.Us],
       language: 'en',
       webhook: process.env.WEBHOOK_URL || undefined,
-    });
+    };
+    if (process.env.PLAID_REDIRECT_URI) linkConfig.redirect_uri = process.env.PLAID_REDIRECT_URI;
+    const resp = await plaid.linkTokenCreate(linkConfig);
     res.json({ link_token: resp.data.link_token });
   } catch (err) {
     console.error('create_link_token:', err.response?.data || err.message);
