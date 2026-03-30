@@ -8,6 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 const { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } = require('plaid');
 const Anthropic = require('@anthropic-ai/sdk');
 
@@ -17,6 +18,8 @@ app.use(cors({ origin: '*' }));
 
 // ─── DATABASE ────────────────────────────────────────────────────
 const dbPath = process.env.DB_PATH || path.join(__dirname, 'ledger.db');
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 console.log(`  DB: ${dbPath} opened`);

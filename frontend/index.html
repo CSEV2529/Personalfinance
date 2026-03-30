@@ -875,11 +875,11 @@ function stats(txs){
   const inc=txs.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0);
   const exp=txs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
   const refunds=txs.filter(t=>t.type==='refund').reduce((a,t)=>a+t.amount,0);
-  return{income:inc,expenses:exp-refunds,net:inc-(exp-refunds),refunds};
+  return{income:inc+refunds,expenses:exp,net:(inc+refunds)-exp,refunds};
 }
 function monthTxs(txs,y,m){return txs.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});}
 function currentMonth(){return monthTxs(transactions,selectedMonth.getFullYear(),selectedMonth.getMonth());}
-function catBreak(txs){const m={};txs.filter(t=>t.type==='expense').forEach(t=>{m[t.cat]=(m[t.cat]||0)+t.amount;});txs.filter(t=>t.type==='refund').forEach(t=>{m[t.cat]=(m[t.cat]||0)-t.amount;});return m;}
+function catBreak(txs){const m={};txs.filter(t=>t.type==='expense').forEach(t=>{m[t.cat]=(m[t.cat]||0)+t.amount;});return m;}
 function userName(id){return users.find(u=>u.id===id)?.name||id;}
 
 // ─── ONLINE/OFFLINE ───────────────────────────────────────────────
