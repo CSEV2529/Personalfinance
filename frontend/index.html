@@ -17,9 +17,11 @@
   --border:#222; --border2:#2a2a2a;
   --text:#e8e4dc; --text-muted:#5a5a5a; --text-dim:#888880;
   --gold:#c9a84c; --green:#4caf7d; --red:#c95a5a; --blue:#5a8fc9;
+  --purple:#9b6dff; --teal:#2dd4bf; --orange:#f59e0b; --pink:#ec4899;
   --tab-h:68px;
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-t:env(safe-area-inset-top,0px);
+  --sidebar-w:0px;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;overscroll-behavior:none;}
@@ -28,7 +30,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");}
 
 /* ─── APP SHELL ─────────────────────────────────────────────── */
-.app{display:flex;flex-direction:column;height:100vh;height:100dvh;padding-top:var(--safe-t);}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh;padding-top:var(--safe-t);padding-left:var(--sidebar-w);}
 
 /* ─── TOPBAR ────────────────────────────────────────────────── */
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:20;}
@@ -61,6 +63,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--tab-h) + var(--safe-b) + 12px);}
 .scroll::-webkit-scrollbar{display:none;}
 
+/* ─── DESKTOP CONTAINER ─────────────────────────────────────── */
+.desktop-container{max-width:100%;margin:0 auto;}
+
 /* ─── BOTTOM TABS ───────────────────────────────────────────── */
 .tabs{position:fixed;bottom:0;left:0;right:0;height:calc(var(--tab-h) + var(--safe-b));padding-bottom:var(--safe-b);background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:flex-start;z-index:100;}
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding-top:10px;cursor:pointer;color:var(--text-muted);transition:color .2s;min-height:var(--tab-h);position:relative;}
@@ -76,34 +81,46 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 @keyframes fadeUp{from{transform:translateY(8px);opacity:0;}to{transform:none;opacity:1;}}
 
 /* ─── HERO ──────────────────────────────────────────────────── */
-.hero{padding:24px 18px 18px;background:linear-gradient(180deg,var(--surface) 0%,var(--bg) 100%);border-bottom:1px solid var(--border);margin-bottom:14px;}
+.hero{padding:24px 18px 18px;background:linear-gradient(135deg,rgba(201,168,76,.06) 0%,var(--surface) 40%,rgba(90,143,201,.04) 100%);border-bottom:1px solid var(--border);margin-bottom:14px;position:relative;overflow:hidden;}
+.hero::after{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(201,168,76,.08) 0%,transparent 70%);pointer-events:none;}
 .hero-who{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
 .hero-amt{font-family:'Playfair Display',serif;font-size:40px;line-height:1;transition:color .3s;}
 .hero-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:6px;letter-spacing:1px;}
 .hero-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px;}
-.hstat{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+.hstat{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;position:relative;overflow:hidden;}
+.hstat:nth-child(1){border-left:3px solid var(--green);background:linear-gradient(135deg,rgba(76,175,125,.08) 0%,var(--surface2) 100%);}
+.hstat:nth-child(2){border-left:3px solid var(--red);background:linear-gradient(135deg,rgba(201,90,90,.08) 0%,var(--surface2) 100%);}
+.hstat:nth-child(3){border-left:3px solid var(--blue);background:linear-gradient(135deg,rgba(90,143,201,.08) 0%,var(--surface2) 100%);}
 .hstat-lbl{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;}
 .hstat-val{font-family:'Playfair Display',serif;font-size:16px;}
 
 /* ─── SECTION ───────────────────────────────────────────────── */
-.sec-head{display:flex;align-items:center;justify-content:space-between;padding:0 18px;margin-bottom:8px;}
-.sec-title{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:3px;text-transform:uppercase;}
+.sec-head{display:flex;align-items:center;justify-content:space-between;padding:0 18px;margin-bottom:10px;}
+.sec-title{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:3px;text-transform:uppercase;font-weight:500;}
 .sec-link{font-family:'DM Mono',monospace;font-size:9px;color:var(--gold);letter-spacing:1px;cursor:pointer;}
 
-/* ─── HSCROLL CARDS ─────────────────────────────────────────── */
+/* ─── HSCROLL CARDS (mobile) / KPI GRID (desktop) ──────────── */
 .hscroll-outer{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 18px 4px;margin-bottom:18px;}
 .hscroll-outer::-webkit-scrollbar{display:none;}
 .hscroll{display:flex;gap:10px;width:max-content;}
-.kcard{width:144px;background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:14px;position:relative;overflow:hidden;flex-shrink:0;}
-.kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc,var(--gold));border-radius:13px 13px 0 0;}
-.kcard-lbl{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:7px;}
-.kcard-val{font-family:'Playfair Display',serif;font-size:20px;color:var(--kc,var(--text));}
-.kcard-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:3px;}
+.kcard{width:144px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;position:relative;overflow:hidden;flex-shrink:0;transition:transform .15s,box-shadow .15s;}
+.kcard:hover{transform:translateY(-2px);}
+.kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--kc,var(--gold));border-radius:16px 16px 0 0;}
+.kcard::after{content:'';position:absolute;inset:0;border-radius:16px;opacity:.06;pointer-events:none;background:linear-gradient(135deg,var(--kc,var(--gold)) 0%,transparent 60%);}
+.kcard-lbl{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:7px;position:relative;}
+.kcard-val{font-family:'Playfair Display',serif;font-size:22px;color:var(--kc,var(--text));position:relative;}
+.kcard-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:4px;position:relative;}
+
+/* ─── DASHBOARD GRID (desktop) ─────────────────────────────── */
+.dashboard-grid{display:block;}
+.dashboard-charts{display:block;}
+.dashboard-recent-col{display:block;}
 
 /* ─── TRANSACTION ROWS ──────────────────────────────────────── */
 .tx-list{padding:0 14px;}
-.tx-row{display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:7px;transition:transform .1s;position:relative;}
+.tx-row{display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:7px;transition:transform .1s,box-shadow .15s;position:relative;}
 .tx-row:active{transform:scale(.98);}
+.tx-row:hover{box-shadow:0 2px 12px rgba(0,0,0,.3);}
 .tx-ico{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
 .tx-body{flex:1;min-width:0;}
 .tx-desc{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
@@ -117,7 +134,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .tx-del{padding:6px;color:var(--text-muted);font-size:11px;cursor:pointer;flex-shrink:0;}
 
 /* ─── BUDGET CARDS ──────────────────────────────────────────── */
-.bcard{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:14px;margin:0 14px 8px;}
+.bcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;margin:0 14px 8px;}
 .bcard-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
 .bcard-left{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;}
 .bcard-dot{width:8px;height:8px;border-radius:3px;flex-shrink:0;}
@@ -127,7 +144,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .bar-fill{height:100%;border-radius:3px;transition:width .7s cubic-bezier(.4,0,.2,1);}
 
 /* ─── DONUT ─────────────────────────────────────────────────── */
-.donut-card{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:18px;margin:0 14px 18px;}
+.donut-card{background:linear-gradient(135deg,rgba(155,109,255,.05) 0%,var(--surface) 100%);border:1px solid var(--border);border-radius:16px;padding:18px;margin:0 14px 18px;border-top:3px solid var(--purple);box-shadow:0 4px 20px rgba(155,109,255,.06);}
 .donut-inner{display:flex;align-items:center;gap:18px;}
 .dlegend{}
 .dleg-row{display:flex;align-items:center;gap:7px;margin-bottom:8px;}
@@ -137,7 +154,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .dleg-pct{font-family:'DM Mono',monospace;font-size:11px;color:var(--text);}
 
 /* ─── BAR CHART ─────────────────────────────────────────────── */
-.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:18px;margin:0 14px 18px;}
+.chart-card{background:linear-gradient(135deg,rgba(45,212,191,.04) 0%,var(--surface) 100%);border:1px solid var(--border);border-radius:16px;padding:18px;margin:0 14px 18px;border-top:3px solid var(--teal);box-shadow:0 4px 20px rgba(45,212,191,.06);}
 .chart-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;}
 .barchart{display:flex;align-items:flex-end;gap:7px;height:64px;}
 .bcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;}
@@ -149,7 +166,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .chart-leg-dot{width:7px;height:7px;border-radius:2px;}
 
 /* ─── REPORTS ───────────────────────────────────────────────── */
-.report-panel{background:var(--surface);border:1px solid var(--border);border-radius:13px;overflow:hidden;margin:0 14px 14px;}
+.report-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin:0 14px 14px;border-left:3px solid var(--orange);box-shadow:0 4px 20px rgba(245,158,11,.05);}
 .rrow{display:flex;align-items:center;padding:13px 16px;border-bottom:1px solid var(--border);}
 .rrow:last-child{border-bottom:none;}
 .rmonth{flex:1;font-size:13px;font-weight:500;}
@@ -170,7 +187,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .connect-note{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);letter-spacing:1px;}
 
 /* ─── SETTINGS ──────────────────────────────────────────────── */
-.scard{background:var(--surface);border:1px solid var(--border);border-radius:13px;overflow:hidden;margin:0 14px 14px;}
+.scard{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin:0 14px 14px;}
 .srow{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);}
 .srow:last-child{border-bottom:none;}
 .srow-left{display:flex;align-items:center;gap:12px;}
@@ -239,8 +256,143 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .upick-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:2px;}
 .upick-check{color:var(--gold);font-size:16px;margin-left:auto;}
 
-.spacer{height:14px;}
+.spacer{height:18px;}
+.sidebar-brand{display:none;}
 .empty-msg{text-align:center;padding:40px 20px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;}
+
+/* ─── BUDGET GRID (desktop) ─────────────────────────────────── */
+.budget-cats-grid{display:block;}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABLET BREAKPOINT (>=768px)
+   ═══════════════════════════════════════════════════════════════ */
+@media (min-width:768px){
+  .desktop-container{max-width:1200px;padding:0 8px;}
+
+  .hero{padding:28px 28px 22px;margin-bottom:18px;}
+  .hero-amt{font-size:48px;}
+  .hero-stats{gap:12px;margin-top:18px;}
+  .hstat{padding:14px 16px;}
+  .hstat-val{font-size:20px;}
+
+  /* KPI grid instead of horizontal scroll */
+  .hscroll-outer{overflow:visible;padding:0 14px 4px;margin-bottom:22px;}
+  .hscroll{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:auto;}
+  .kcard{width:auto;}
+  .kcard-val{font-size:26px;}
+
+  /* Transaction list */
+  .tx-list{padding:0 14px;}
+
+  /* Charts side by side */
+  .dashboard-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 14px;margin-bottom:18px;}
+  .dashboard-charts .donut-card,
+  .dashboard-charts .chart-card{margin:0;}
+
+  /* Section heads */
+  .sec-head{padding:0 18px;margin-bottom:12px;}
+  .sec-title{font-size:11px;}
+
+  /* Budget grid */
+  .budget-cats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 14px;}
+  .budget-cats-grid .bcard{margin:0;}
+
+  /* Reports */
+  .report-panel{margin:0 14px 14px;}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DESKTOP SIDEBAR BREAKPOINT (>=1024px)
+   ═══════════════════════════════════════════════════════════════ */
+@media (min-width:1024px){
+  :root{--sidebar-w:220px;}
+
+  /* Convert bottom tabs to left sidebar */
+  .tabs{
+    position:fixed;top:0;left:0;bottom:0;right:auto;
+    width:var(--sidebar-w);height:100vh;
+    flex-direction:column;align-items:stretch;
+    border-top:none;border-right:1px solid var(--border);
+    padding:0;padding-top:24px;
+    background:linear-gradient(180deg,var(--surface) 0%,#0d0d0d 100%);
+    z-index:100;
+  }
+
+  .tab{
+    flex:none;flex-direction:row;justify-content:flex-start;
+    gap:12px;padding:14px 24px;min-height:auto;
+    border-radius:0;margin:0;
+    transition:background .15s,color .2s;
+  }
+  .tab:hover{background:var(--surface2);}
+  .tab.on{background:rgba(201,168,76,.08);}
+  .tab-pip{display:none;}
+  .tab.on::before{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:var(--gold);border-radius:0 3px 3px 0;
+  }
+  .tab-icon{font-size:20px;width:24px;text-align:center;}
+  .tab-lbl{font-size:10px;letter-spacing:2px;}
+
+  /* Sidebar logo area */
+  .sidebar-brand{
+    display:block;padding:0 24px 24px;
+    font-family:'Playfair Display',serif;font-size:22px;color:var(--gold);
+    letter-spacing:3px;border-bottom:1px solid var(--border);margin-bottom:12px;
+  }
+
+  /* Adjust scroll for no bottom tab */
+  .scroll{padding-bottom:24px;}
+  .app{padding-left:var(--sidebar-w);}
+
+  /* Install bar */
+  .install-bar{left:calc(var(--sidebar-w) + 14px);}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   WIDE DESKTOP BREAKPOINT (>=1200px)
+   ═══════════════════════════════════════════════════════════════ */
+@media (min-width:1200px){
+  .desktop-container{max-width:1200px;padding:0 16px;}
+
+  .hero{padding:32px 32px 26px;border-radius:0 0 20px 20px;margin-bottom:22px;}
+  .hero-amt{font-size:54px;}
+  .hstat{padding:16px 18px;}
+  .hstat-val{font-size:22px;}
+
+  /* 4-col KPI */
+  .hscroll{grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;}
+  .kcard{padding:20px;}
+  .kcard-val{font-size:28px;}
+
+  /* Dashboard 3-col layout */
+  .dashboard-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+    padding:0 14px;
+    align-items:start;
+  }
+  .dashboard-recent-col{
+    grid-column:1;
+  }
+  .dashboard-charts-col{
+    grid-column:2;
+  }
+
+  /* Charts stacked in right column */
+  .dashboard-charts{display:block;padding:0;margin-bottom:0;}
+  .dashboard-charts .donut-card,
+  .dashboard-charts .chart-card{margin:0 0 14px 0;}
+
+  /* Budget 3-col grid */
+  .budget-cats-grid{grid-template-columns:1fr 1fr 1fr;}
+
+  /* Reports layout */
+  .reports-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 14px;}
+  .reports-grid .report-panel,
+  .reports-grid .chart-card{margin:0;}
+}
 </style>
 </head>
 <body>
@@ -257,7 +409,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
         <div class="user-avatar" id="chip-avatar" style="background:var(--gold)">C</div>
         <div class="user-name-sm" id="chip-name">CHRISTIAN</div>
       </div>
-      <div class="icon-btn" id="sync-btn" onclick="syncAll()" style="display:none" title="Sync">↻</div>
+      <div class="icon-btn" id="sync-btn" onclick="syncAll()" style="display:none" title="Sync">&#x21bb;</div>
       <div class="icon-btn gold" onclick="openSheet()" title="Add">+</div>
     </div>
   </div>
@@ -265,10 +417,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
   <!-- BANNERS -->
   <div class="sync-banner" id="sync-banner">
     <div class="spinner"></div>
-    <span id="sync-msg">Syncing…</span>
+    <span id="sync-msg">Syncing&#x2026;</span>
   </div>
   <div class="offline-banner" id="offline-banner">
-    ⚡ Offline — showing cached data
+    &#x26A1; Offline &#x2014; showing cached data
   </div>
 
   <!-- SCROLL AREA -->
@@ -276,77 +428,106 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 
     <!-- ── DASHBOARD ── -->
     <div class="view on" id="v-home">
-      <div class="hero">
-        <div class="hero-who" id="hero-who">Household · This Month</div>
-        <div class="hero-amt" id="hero-amt">$0.00</div>
-        <div class="hero-sub" id="hero-sub">Net Cash Flow</div>
-        <div class="hero-stats">
-          <div class="hstat"><div class="hstat-lbl">Income</div><div class="hstat-val" id="hs-income" style="color:var(--green)">—</div></div>
-          <div class="hstat"><div class="hstat-lbl">Expenses</div><div class="hstat-val" id="hs-expenses" style="color:var(--red)">—</div></div>
-          <div class="hstat"><div class="hstat-lbl">Saved</div><div class="hstat-val" id="hs-saved" style="color:var(--blue)">—</div></div>
+      <div class="desktop-container">
+        <div class="hero">
+          <div class="hero-who" id="hero-who">Household &middot; This Month</div>
+          <div class="hero-amt" id="hero-amt">$0.00</div>
+          <div class="hero-sub" id="hero-sub">Net Cash Flow</div>
+          <div class="hero-stats">
+            <div class="hstat"><div class="hstat-lbl">Income</div><div class="hstat-val" id="hs-income" style="color:var(--green)">&mdash;</div></div>
+            <div class="hstat"><div class="hstat-lbl">Expenses</div><div class="hstat-val" id="hs-expenses" style="color:var(--red)">&mdash;</div></div>
+            <div class="hstat"><div class="hstat-lbl">Saved</div><div class="hstat-val" id="hs-saved" style="color:var(--blue)">&mdash;</div></div>
+          </div>
+        </div>
+        <div class="hscroll-outer"><div class="hscroll" id="kpi-cards"></div></div>
+
+        <div class="dashboard-grid">
+          <div class="dashboard-recent-col">
+            <div class="sec-head"><div class="sec-title">Recent</div><div class="sec-link" onclick="go('ledger')">All &rarr;</div></div>
+            <div class="tx-list" id="recent-list"></div>
+            <div class="spacer"></div>
+          </div>
+          <div class="dashboard-charts-col">
+            <div class="dashboard-charts">
+              <div>
+                <div class="sec-head"><div class="sec-title">Spending</div></div>
+                <div class="donut-card" id="donut-card"></div>
+              </div>
+              <div>
+                <div class="sec-head"><div class="sec-title">6-Month Flow</div></div>
+                <div class="chart-card" id="chart-card"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="hscroll-outer"><div class="hscroll" id="kpi-cards"></div></div>
-      <div class="sec-head"><div class="sec-title">Recent</div><div class="sec-link" onclick="go('ledger')">All →</div></div>
-      <div class="tx-list" id="recent-list"></div>
-      <div class="spacer"></div>
-      <div class="sec-head"><div class="sec-title">Spending</div></div>
-      <div class="donut-card" id="donut-card"></div>
-      <div class="spacer"></div>
-      <div class="sec-head"><div class="sec-title">6-Month Flow</div></div>
-      <div class="chart-card" id="chart-card"></div>
     </div>
 
     <!-- ── LEDGER (ALL TXS) ── -->
     <div class="view" id="v-ledger">
-      <div style="padding:14px 14px 0">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px" id="ledger-kpis"></div>
+      <div class="desktop-container">
+        <div style="padding:14px 14px 0">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px" id="ledger-kpis"></div>
+        </div>
+        <div class="sec-head"><div class="sec-title" id="ledger-count">Transactions</div></div>
+        <div class="tx-list" id="ledger-list"></div>
+        <div class="spacer"></div>
       </div>
-      <div class="sec-head"><div class="sec-title" id="ledger-count">Transactions</div></div>
-      <div class="tx-list" id="ledger-list"></div>
-      <div class="spacer"></div>
     </div>
 
     <!-- ── BUDGET ── -->
     <div class="view" id="v-budget">
-      <div style="padding:14px 14px 0">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px" id="budget-kpis"></div>
+      <div class="desktop-container">
+        <div style="padding:14px 14px 0">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px" id="budget-kpis"></div>
+        </div>
+        <div class="sec-head"><div class="sec-title">Categories</div></div>
+        <div class="budget-cats-grid" id="budget-cats"></div>
+        <div class="spacer"></div>
       </div>
-      <div class="sec-head"><div class="sec-title">Categories</div></div>
-      <div id="budget-cats"></div>
-      <div class="spacer"></div>
     </div>
 
     <!-- ── REPORTS ── -->
     <div class="view" id="v-reports">
-      <div class="sec-head" style="padding-top:14px"><div class="sec-title">Monthly P&L</div></div>
-      <div class="report-panel" id="report-panel"></div>
-      <div class="sec-head"><div class="sec-title">Cash Flow</div></div>
-      <div class="chart-card" id="report-chart"></div>
-      <div class="spacer"></div>
+      <div class="desktop-container">
+        <div class="reports-grid">
+          <div>
+            <div class="sec-head" style="padding-top:14px"><div class="sec-title">Monthly P&amp;L</div></div>
+            <div class="report-panel" id="report-panel"></div>
+          </div>
+          <div>
+            <div class="sec-head" style="padding-top:14px"><div class="sec-title">Cash Flow</div></div>
+            <div class="chart-card" id="report-chart"></div>
+          </div>
+        </div>
+        <div class="spacer"></div>
+      </div>
     </div>
 
     <!-- ── ACCOUNTS ── -->
     <div class="view" id="v-accounts">
-      <div id="accounts-body"></div>
+      <div class="desktop-container">
+        <div id="accounts-body"></div>
+      </div>
     </div>
 
   </div><!-- /scroll -->
 
-  <!-- BOTTOM TABS -->
+  <!-- BOTTOM TABS / SIDEBAR -->
   <nav class="tabs">
-    <div class="tab on" id="tab-home" onclick="go('home')"><div class="tab-pip"></div><div class="tab-icon">◈</div><div class="tab-lbl">Home</div></div>
-    <div class="tab" id="tab-ledger" onclick="go('ledger')"><div class="tab-pip"></div><div class="tab-icon">⇄</div><div class="tab-lbl">Ledger</div></div>
-    <div class="tab" id="tab-budget" onclick="go('budget')"><div class="tab-pip"></div><div class="tab-icon">▦</div><div class="tab-lbl">Budget</div></div>
-    <div class="tab" id="tab-reports" onclick="go('reports')"><div class="tab-pip"></div><div class="tab-icon">∿</div><div class="tab-lbl">Reports</div></div>
-    <div class="tab" id="tab-accounts" onclick="go('accounts')"><div class="tab-pip"></div><div class="tab-icon">◉</div><div class="tab-lbl">Accounts</div></div>
+    <div class="sidebar-brand">Ledger</div>
+    <div class="tab on" id="tab-home" onclick="go('home')"><div class="tab-pip"></div><div class="tab-icon">&#x25C8;</div><div class="tab-lbl">Home</div></div>
+    <div class="tab" id="tab-ledger" onclick="go('ledger')"><div class="tab-pip"></div><div class="tab-icon">&#x21C4;</div><div class="tab-lbl">Ledger</div></div>
+    <div class="tab" id="tab-budget" onclick="go('budget')"><div class="tab-pip"></div><div class="tab-icon">&#x25A6;</div><div class="tab-lbl">Budget</div></div>
+    <div class="tab" id="tab-reports" onclick="go('reports')"><div class="tab-pip"></div><div class="tab-icon">&#x223F;</div><div class="tab-lbl">Reports</div></div>
+    <div class="tab" id="tab-accounts" onclick="go('accounts')"><div class="tab-pip"></div><div class="tab-icon">&#x25C9;</div><div class="tab-lbl">Accounts</div></div>
   </nav>
 
 </div><!-- /app -->
 
 <!-- INSTALL PROMPT -->
 <div class="install-bar" id="install-bar">
-  <div class="install-icon">📲</div>
+  <div class="install-icon">&#x1F4F2;</div>
   <div class="install-text">
     <div class="install-title">Add to Home Screen</div>
     <div class="install-sub">Install Ledger as an app</div>
@@ -399,7 +580,7 @@ const API = window.location.hostname === 'localhost' || window.location.hostname
 
 // ─── CONSTANTS ───────────────────────────────────────────────────
 const CAT_COLORS={Housing:'#c9a84c',Food:'#4caf7d',Transport:'#5a8fc9',Health:'#c95a8f',Entertainment:'#8fc95a',Shopping:'#c97a5a',Utilities:'#5ac9c9',Income:'#4caf7d',Other:'#888880'};
-const CAT_ICONS={Housing:'🏠',Food:'🍽️',Transport:'🚗',Health:'💊',Entertainment:'🎬',Shopping:'🛍️',Utilities:'⚡',Income:'💰',Other:'📌'};
+const CAT_ICONS={Housing:'\u{1F3E0}',Food:'\u{1F37D}\uFE0F',Transport:'\u{1F697}',Health:'\u{1F48A}',Entertainment:'\u{1F3AC}',Shopping:'\u{1F6CD}\uFE0F',Utilities:'\u26A1',Income:'\u{1F4B0}',Other:'\u{1F4CC}'};
 const BUDGET={Housing:2000,Food:800,Transport:400,Health:300,Entertainment:200,Shopping:400,Utilities:250};
 const USER_COLORS={christian:'#c9a84c',wife:'#5a8fc9'};
 const USER_INITIALS={christian:'C',wife:'M'};
@@ -458,14 +639,14 @@ async function loadData(){
 
 async function syncAll(){
   if(!isConnected)return;
-  showSync('Syncing household…');
+  showSync('Syncing household\u2026');
   try{
     const res=await fetch(`${API}/api/sync`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser})});
     if(!res.ok)throw new Error('Sync failed');
     const d=await res.json();
     await loadData();
-    hideSync(`✓ Synced ${d.synced} transactions`);
-  }catch(e){hideSync('✗ '+e.message);}
+    hideSync('\u2713 Synced '+d.synced+' transactions');
+  }catch(e){hideSync('\u2717 '+e.message);}
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────
@@ -495,7 +676,7 @@ function renderHome(){
   const s=stats(mtxs);
   const savings=s.income>0?((s.net/s.income)*100).toFixed(0):0;
 
-  $('hero-who').textContent='Household · '+new Date().toLocaleString('default',{month:'long',year:'numeric'});
+  $('hero-who').textContent='Household \u00B7 '+new Date().toLocaleString('default',{month:'long',year:'numeric'});
   $('hero-amt').textContent=(s.net>=0?'':'-')+money(s.net);
   $('hero-amt').style.color=s.net>=0?'var(--green)':'var(--red)';
   $('hs-income').textContent=money(s.income);
@@ -550,7 +731,7 @@ function renderBudget(){
     return`<div class="bcard">
       <div class="bcard-top">
         <div class="bcard-left"><div class="bcard-dot" style="background:${CAT_COLORS[cat]}"></div>${CAT_ICONS[cat]} ${cat}</div>
-        <div class="bcard-nums"><span>${money(spent)}<span style="color:var(--text-muted)"> / ${money(limit)}</span></span>${over?`<div class="bcard-over">▲ ${money(spent-limit)} over</div>`:''}</div>
+        <div class="bcard-nums"><span>${money(spent)}<span style="color:var(--text-muted)"> / ${money(limit)}</span></span>${over?`<div class="bcard-over">\u25B2 ${money(spent-limit)} over</div>`:''}</div>
       </div>
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
     </div>`;
@@ -568,7 +749,7 @@ function renderReports(){
     rows.push(`<div class="rrow">
       <div class="rmonth">${d.toLocaleString('default',{month:'short'})} ${d.getFullYear()}</div>
       <div class="rbar-wrap"><div class="rbar"><div class="rbar-fill" style="width:${Math.max(0,Math.min(100,rate))}%"></div></div></div>
-      <div class="rright"><div class="rnet" style="color:${s.net>=0?'var(--green)':'var(--red)'}">${s.net>=0?'+':'-'}${money(s.net)}</div><div class="rrate">${s.income>0?rate+'% saved':'—'}</div></div>
+      <div class="rright"><div class="rnet" style="color:${s.net>=0?'var(--green)':'var(--red)'}">${s.net>=0?'+':'-'}${money(s.net)}</div><div class="rrate">${s.income>0?rate+'% saved':'\u2014'}</div></div>
     </div>`);
   }
   $('report-panel').innerHTML=rows.join('');
@@ -587,14 +768,14 @@ function renderAccounts(){
         <div class="kcard" style="--kc:var(--red);width:auto"><div class="kcard-lbl">Credit</div><div class="kcard-val" style="font-size:17px">${money(cred.reduce((a,ac)=>a+(ac.balance||0),0))}</div><div class="kcard-sub">${cred.length} card(s)</div></div>
       </div>
     </div>
-    ${dep.length?`<div class="sec-head"><div class="sec-title">Deposit Accounts</div></div>${dep.map(a=>`<div class="bcard" style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:13px;font-weight:500">${a.name}</div><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted)">••••${a.mask}${a.user_name?' · '+a.user_name:''}</div></div><div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--green)">${money(a.balance)}</div></div>`).join('')}`:''}
-    ${cred.length?`<div class="sec-head" style="margin-top:6px"><div class="sec-title">Credit Cards</div></div>${cred.map(a=>`<div class="bcard" style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:13px;font-weight:500">${a.name}</div><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted)">••••${a.mask}${a.user_name?' · '+a.user_name:''}</div></div><div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--red)">${money(a.balance)}</div></div>`).join('')}`:''}
+    ${dep.length?`<div class="sec-head"><div class="sec-title">Deposit Accounts</div></div>${dep.map(a=>`<div class="bcard" style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:13px;font-weight:500">${a.name}</div><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted)">\u2022\u2022\u2022\u2022${a.mask}${a.user_name?' \u00B7 '+a.user_name:''}</div></div><div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--green)">${money(a.balance)}</div></div>`).join('')}`:''}
+    ${cred.length?`<div class="sec-head" style="margin-top:6px"><div class="sec-title">Credit Cards</div></div>${cred.map(a=>`<div class="bcard" style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:13px;font-weight:500">${a.name}</div><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted)">\u2022\u2022\u2022\u2022${a.mask}${a.user_name?' \u00B7 '+a.user_name:''}</div></div><div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--red)">${money(a.balance)}</div></div>`).join('')}`:''}
   ` : `<div class="connect-screen">
-    <div class="connect-icon">🏦</div>
+    <div class="connect-icon">\u{1F3E6}</div>
     <div class="connect-title">Connect Your Bank</div>
     <div class="connect-sub">Link your bank to see live balances and auto-import transactions.</div>
     <button class="connect-btn" onclick="initPlaidLink()">Connect Bank</button>
-    <div class="connect-note">256-bit encryption · Read-only · 12,000+ banks</div>
+    <div class="connect-note">256-bit encryption \u00B7 Read-only \u00B7 12,000+ banks</div>
   </div>`;
 
   // Household section
@@ -619,14 +800,14 @@ function renderAccounts(){
     <div class="scard">
       <div class="srow">
         <div class="srow-left">
-          <div class="sico" style="background:rgba(201,168,76,.1)">🏦</div>
+          <div class="sico" style="background:rgba(201,168,76,.1)">\u{1F3E6}</div>
           <div><div class="sname">${isConnected?'Bank Connected':'Connect Bank'}</div><div class="ssub">${isConnected?'Tap to refresh link':'Add your bank account'}</div></div>
         </div>
-        <button class="sbtn ${isConnected?'green':'gold'}" onclick="initPlaidLink()">${isConnected?'↻ Re-link':'Connect'}</button>
+        <button class="sbtn ${isConnected?'green':'gold'}" onclick="initPlaidLink()">${isConnected?'\u21BB Re-link':'Connect'}</button>
       </div>
       <div class="srow">
         <div class="srow-left">
-          <div class="sico" style="background:rgba(76,175,125,.1)">↻</div>
+          <div class="sico" style="background:rgba(76,175,125,.1)">\u21BB</div>
           <div><div class="sname">Manual Sync</div><div class="ssub">Fetch latest transactions now</div></div>
         </div>
         <button class="sbtn green" onclick="syncAll()">Sync</button>
@@ -641,17 +822,17 @@ function txRows(txs,deletable){
   if(!txs.length)return`<div class="empty-msg">No transactions yet</div>`;
   return txs.map(t=>`
     <div class="tx-row">
-      <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}22">${CAT_ICONS[t.cat]||'📌'}</div>
+      <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}22">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
       <div class="tx-body">
         <div class="tx-desc">${t.desc}</div>
         <div class="tx-meta">
           ${t.user_name?`<span class="tx-who" style="background:${USER_COLORS[t.user_id]||'#888'}22;color:${USER_COLORS[t.user_id]||'var(--text-dim)'}">${t.user_name}</span>`:''}
           <span class="tx-cat">${t.cat}</span>
-          <span class="tx-date">· ${t.date}</span>
+          <span class="tx-date">\u00B7 ${t.date}</span>
         </div>
       </div>
       <div class="tx-amt ${t.type==='income'?'pos':'neg'}">${t.type==='income'?'+':'-'}${money(t.amount)}</div>
-      ${deletable?`<div class="tx-del" onclick="deleteTx('${t.id}')">✕</div>`:''}
+      ${deletable?`<div class="tx-del" onclick="deleteTx('${t.id}')">\u2715</div>`:''}
     </div>`).join('');
 }
 
@@ -700,12 +881,12 @@ function plaidCallbacks(){
   return {
     onSuccess:async(pt)=>{
       localStorage.removeItem('plaid_link_token');
-      showSync('Connecting bank…');
+      showSync('Connecting bank\u2026');
       try{
         const er=await fetch(`${API}/api/exchange_public_token`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token:pt,userId:currentUser})});
-        if(er.ok){setConnected(true);await loadData();hideSync('✓ Bank connected and synced!');}
-        else hideSync('✗ Connection failed');
-      }catch(ex){hideSync('✗ '+ex.message);}
+        if(er.ok){setConnected(true);await loadData();hideSync('\u2713 Bank connected and synced!');}
+        else hideSync('\u2717 Connection failed');
+      }catch(ex){hideSync('\u2717 '+ex.message);}
     },
     onExit:(err,metadata)=>{
       if(err)console.error('Plaid error:',err);
@@ -721,7 +902,7 @@ async function initPlaidLink(){
     const{link_token}=await res.json();
     localStorage.setItem('plaid_link_token',link_token);
     Plaid.create({token:link_token,...plaidCallbacks()}).open();
-  }catch(e){alert('⚠ '+e.message);}
+  }catch(e){alert('\u26A0 '+e.message);}
 }
 
 // Handle OAuth return — bank redirects back here after authentication
@@ -809,7 +990,7 @@ function openUserPicker(){
     <div class="upick-option ${u.id===currentUser?'selected':''}" onclick="switchUser('${u.id}')">
       <div class="upick-avatar" style="background:${USER_COLORS[u.id]||'#888'}">${USER_INITIALS[u.id]||u.name[0]}</div>
       <div><div class="upick-name">${u.name}</div><div class="upick-sub">${u.id==='christian'?'Your transactions':'Wife\'s transactions'}</div></div>
-      ${u.id===currentUser?'<div class="upick-check">✓</div>':''}
+      ${u.id===currentUser?'<div class="upick-check">\u2713</div>':''}
     </div>`).join('');
   $('upicker').classList.add('on');
 }
@@ -840,7 +1021,7 @@ const isStandalone=window.matchMedia('(display-mode:standalone)').matches;
 if(isIOS&&!isStandalone&&!localStorage.getItem('install_dismissed')){
   setTimeout(()=>{
     $('install-bar').classList.add('on');
-    document.querySelector('.install-sub').textContent='Tap Share → "Add to Home Screen"';
+    document.querySelector('.install-sub').textContent='Tap Share \u2192 "Add to Home Screen"';
     document.querySelector('.install-actions').innerHTML='<button class="sbtn ghost" onclick="dismissInstall()">Got it</button>';
   },2000);
 }
@@ -848,7 +1029,7 @@ if(isIOS&&!isStandalone&&!localStorage.getItem('install_dismissed')){
 // ─── SERVICE WORKER ───────────────────────────────────────────────
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/sw.js')
-    .then(()=>console.log('✓ Service worker registered'))
+    .then(()=>console.log('\u2713 Service worker registered'))
     .catch(e=>console.warn('SW failed:', e));
 }
 
