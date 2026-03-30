@@ -113,7 +113,15 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`);
   const insertMany = db.transaction(() => {
     for (const t of resp.data.transactions) {
-      const cat = mapCategory(t.personal_finance_category?.primary || t.category?.[0]);
+      let cat = mapCategory(t.personal_finance_category?.primary || t.category?.[0]);
+      // Also check description for transfer patterns Plaid may miss
+      const desc = (t.name || '').toUpperCase();
+      if (cat !== 'Transfer' && (
+        desc.includes('TRANSFER') || desc.includes('CREDIT CARD') && desc.includes('PAYMENT') ||
+        desc.includes('CD DEPOSIT') || desc.includes('SAVINGS') && desc.includes('WITHDRAWAL') ||
+        desc.includes('AUTOMATIC PAYMENT') || desc.includes('AUTOPAY') ||
+        desc.includes('PAYMENT - THANK')
+      )) cat = 'Transfer';
       const type = cat === 'Transfer' ? 'transfer' : (t.amount > 0 ? 'expense' : 'income');
       upsertTx.run(
         t.transaction_id, household, userId, t.name,
