@@ -349,6 +349,18 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .sidebar-brand{display:none;}
 .empty-msg{text-align:center;padding:40px 20px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;}
 
+/* ─── RECATEGORIZE ─────────────────────────────────────────── */
+.tx-cat{cursor:pointer;padding:2px 6px;border-radius:4px;transition:background .15s;}
+.tx-cat:hover{background:rgba(201,168,76,.15);color:var(--gold);}
+.recat-tx-info{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.recat-options{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.recat-option{display:flex;align-items:center;gap:8px;padding:12px;border-radius:12px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;transition:all .15s;}
+.recat-option:hover{border-color:var(--gold);background:rgba(201,168,76,.06);}
+.recat-option:active{transform:scale(.96);}
+.recat-option.selected{border-color:var(--gold);background:rgba(201,168,76,.1);}
+.recat-option-icon{font-size:18px;}
+.recat-option-name{font-size:12px;font-weight:500;}
+
 /* ─── CATEGORY SHEET ──────────────────────────────────────────── */
 .cat-sheet-header{display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);}
 .cat-sheet-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;}
@@ -741,6 +753,16 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
   </div>
 </div>
 
+<!-- RECATEGORIZE SHEET -->
+<div class="sheet-bg" id="recat-sheet" onclick="closeBg(event,'recat-sheet')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Change Category</div>
+    <div class="recat-tx-info" id="recat-info"></div>
+    <div class="recat-options" id="recat-options"></div>
+  </div>
+</div>
+
 <script>
 // ─── CONFIG ──────────────────────────────────────────────────────
 // Change this to your deployed URL when hosted
@@ -1056,7 +1078,7 @@ function txRows(txs,deletable){
         <div class="tx-desc">${t.desc}</div>
         <div class="tx-meta">
           ${t.user_name?`<span class="tx-who" style="background:${USER_COLORS[t.user_id]||'#888'}22;color:${USER_COLORS[t.user_id]||'var(--text-dim)'}">${t.user_name}</span>`:''}
-          <span class="tx-cat">${t.cat}</span>
+          <span class="tx-cat" onclick="event.stopPropagation();openRecat('${t.id}','${(t.desc||'').replace(/'/g,"\\'")}','${t.cat}')">${t.cat}</span>
           <span class="tx-date">\u00B7 ${t.date}</span>
         </div>
       </div>
@@ -1089,6 +1111,31 @@ function toggleTop20(){
   const txs = window._showAllTop ? window._top20 : window._top20.slice(0,5);
   $('top-expenses').innerHTML = rankedTxRows(txs, 0);
   $('top-toggle').textContent = window._showAllTop ? 'Show less' : 'Show all \u2192';
+}
+
+// ─── RECATEGORIZE ─────────────────────────────────────────────────
+let recatTxId=null;
+function openRecat(txId, desc, currentCat){
+  recatTxId=txId;
+  $('recat-info').innerHTML=`<strong>${desc}</strong> — currently: ${currentCat}`;
+  const allCats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].filter(c=>c!=='Transfer').sort();
+  $('recat-options').innerHTML=allCats.map(cat=>`
+    <div class="recat-option ${cat===currentCat?'selected':''}" onclick="applyRecat('${cat}')">
+      <span class="recat-option-icon">${CAT_ICONS[cat]||'\u{1F4CC}'}</span>
+      <span class="recat-option-name">${cat}</span>
+    </div>`).join('');
+  $('recat-sheet').classList.add('on');
+}
+async function applyRecat(newCat){
+  if(!recatTxId)return;
+  try{
+    const res=await fetch(`${API}/api/transactions/${recatTxId}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:newCat})});
+    if(!res.ok)throw new Error('Update failed');
+    const tx=transactions.find(t=>t.id===recatTxId);
+    if(tx)tx.cat=newCat;
+    closeSheet('recat-sheet');
+    renderAll();
+  }catch(e){alert('Failed to update: '+e.message);}
 }
 
 // ─── CATEGORY SHEET ───────────────────────────────────────────────
