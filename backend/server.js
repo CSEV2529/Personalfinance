@@ -78,6 +78,7 @@ function mapCategory(plaidCat) {
   if (c.includes('ENTERTAINMENT') || c.includes('RECREATION'))                    return 'Entertainment';
   if (c.includes('SHOPS') || c.includes('SHOPPING') || c.includes('MERCHANDISE')) return 'Shopping';
   if (c.includes('UTILITIES') || c.includes('TELECOM') || c.includes('INTERNET')) return 'Utilities';
+  if (c.includes('TRANSFER') || c.includes('WIRE') || c.includes('ACH'))          return 'Transfer';
   if (c.includes('PAYROLL') || c.includes('INCOME') || c.includes('DEPOSIT'))     return 'Income';
   return 'Other';
 }
@@ -100,10 +101,11 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`);
   const insertMany = db.transaction(() => {
     for (const t of resp.data.transactions) {
+      const cat = mapCategory(t.personal_finance_category?.primary || t.category?.[0]);
+      const type = cat === 'Transfer' ? 'transfer' : (t.amount > 0 ? 'expense' : 'income');
       upsertTx.run(
         t.transaction_id, household, userId, t.name,
-        Math.abs(t.amount), t.amount > 0 ? 'expense' : 'income',
-        mapCategory(t.personal_finance_category?.primary || t.category?.[0]),
+        Math.abs(t.amount), type, cat,
         t.date, t.pending ? 1 : 0, t.account_id
       );
     }
