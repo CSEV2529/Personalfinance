@@ -435,11 +435,19 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .recat-option-icon{font-size:18px;cursor:pointer;border-radius:6px;padding:2px;transition:background .15s;}
 .recat-option-icon:hover{background:rgba(255,215,0,.15);}
 .recat-option-name{font-size:12px;font-weight:500;}
-.emoji-picker{position:fixed;z-index:600;background:var(--surface2);border:1px solid var(--border2);border-radius:14px;padding:10px;display:none;flex-wrap:wrap;gap:4px;max-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.6),0 0 20px rgba(255,215,0,.08);animation:fadeUp .2s ease both;}
-.emoji-picker.on{display:flex;}
-.emoji-pick{width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:20px;border-radius:8px;cursor:pointer;transition:all .12s;}
-.emoji-pick:hover{background:rgba(255,215,0,.12);transform:scale(1.15);}
+.emoji-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:700;display:none;align-items:center;justify-content:center;}
+.emoji-overlay.on{display:flex;}
+.emoji-picker{background:linear-gradient(180deg,#10102a,#0a0a1e);border:1px solid rgba(255,215,0,.15);border-radius:22px;padding:20px;max-width:320px;width:90vw;max-height:70vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,.7),0 0 30px rgba(255,215,0,.08);animation:sheetIn .28s cubic-bezier(.34,1.2,.64,1);}
+.emoji-picker::-webkit-scrollbar{display:none;}
+.emoji-picker-title{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
+.emoji-picker-cat{font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:14px;text-shadow:0 0 15px rgba(255,215,0,.3);}
+.emoji-section{margin-bottom:14px;}
+.emoji-section-lbl{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
+.emoji-grid{display:flex;flex-wrap:wrap;gap:4px;}
+.emoji-pick{width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:22px;border-radius:10px;cursor:pointer;transition:all .12s;background:rgba(255,255,255,.03);}
+.emoji-pick:hover{background:rgba(255,215,0,.12);transform:scale(1.15);box-shadow:0 0 12px rgba(255,215,0,.15);}
 .emoji-pick:active{transform:scale(.9);}
+.emoji-pick.current{background:rgba(255,215,0,.15);border:1px solid rgba(255,215,0,.3);box-shadow:0 0 15px rgba(255,215,0,.2);}
 .recat-type-btn{padding:8px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.5px;cursor:pointer;transition:all .15s;}
 .recat-type-btn:hover{border-color:var(--tc,var(--gold));}
 .recat-type-btn.active{background:rgba(201,168,76,.15);border-color:var(--tc,var(--gold));color:var(--tc,var(--gold));font-weight:500;}
@@ -854,7 +862,9 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 </div>
 
 <!-- EMOJI PICKER -->
-<div class="emoji-picker" id="emoji-picker"></div>
+<div class="emoji-overlay" id="emoji-overlay" onclick="if(event.target===this)closeEmojiPicker()">
+  <div class="emoji-picker" id="emoji-picker"></div>
+</div>
 
 <!-- MULTI-SELECT BAR -->
 <div class="select-bar" id="select-bar">
@@ -1418,28 +1428,36 @@ function recatNewCategory(){
 }
 
 // ─── EMOJI PICKER ────────────────────────────────────────────────
-const EMOJI_LIST=[
-  '\u{1F3E0}','\u{1F37D}\uFE0F','\u{1F697}','\u{1F48A}','\u{1F3AC}','\u{1F6CD}\uFE0F','\u26A1','\u{1F4B0}','\u{1F501}','\u{1F4CC}',
-  '\u{1F4B8}','\u{1F4B3}','\u{1F3E6}','\u{1F4BC}','\u{2708}\uFE0F','\u{1F3EB}','\u{1F4DA}','\u{1F3CB}\uFE0F','\u{1F489}','\u{1F6BF}',
-  '\u{2615}','\u{1F354}','\u{1F355}','\u{1F370}','\u{1F37A}','\u{1F942}','\u{1F6D2}','\u{1F381}','\u{1F4F1}','\u{1F4BB}',
-  '\u{1F3AE}','\u{1F3B5}','\u{1F3A8}','\u{1F4FA}','\u{26BD}','\u{1F6B2}','\u{1F3D6}\uFE0F','\u{1F30E}','\u{1F436}','\u{1F431}',
-  '\u{1F333}','\u{2B50}','\u{1F525}','\u{1F4A1}','\u{2764}\uFE0F','\u{1F389}','\u{1F4E6}','\u{1F527}','\u{1F3E5}','\u{1F6E1}\uFE0F}'
-];
+const EMOJI_SECTIONS={
+  'Money & Finance':['💰','💵','💸','💳','💲','🏦','📈','📉','💎','🪙','🏧','💹','🧾','📊','💼'],
+  'Home & Living':['🏠','🏡','🛏️','🪑','🔑','🏗️','🧹','🪴','🛋️','🏘️','🚪','🧺','💡','🔧','🪠'],
+  'Food & Drink':['🍽️','🍕','🍔','🥗','🍜','☕','🍺','🍷','🥤','🛒','🥩','🍳','🧁','🍱','🥡'],
+  'Transport':['🚗','✈️','🚇','🚌','⛽','🚲','🛵','🚕','🛞','🅿️','🚂','🛳️','🚁','🛣️','🏍️'],
+  'Health & Wellness':['💊','🏥','🏋️','🧘','❤️','🩺','🦷','👁️','🧬','🩹','💉','🏃','🧠','🫀','🍎'],
+  'Fun & Entertainment':['🎬','🎮','🎵','🎨','📺','🎭','🎪','🎯','🎲','🎳','🎤','📸','🎻','🎸','🎧'],
+  'Shopping & Style':['🛍️','👗','👟','💄','⌚','👜','🧥','💍','🕶️','👔','🎁','📦','🏷️','🛒','✂️'],
+  'Tech & Education':['📱','💻','🖥️','📡','🎓','📚','🔬','📝','🗂️','⌨️','🖨️','📹','📺','💾','🔌'],
+  'Nature & Pets':['🐕','🐈','🌳','🌊','☀️','🌸','⭐','🔥','🌈','🦜','🐠','🏔️','🌙','🍀','🌻'],
+  'Utilities & Services':['⚡','💧','📶','♻️','🗑️','📬','🔒','🛡️','⚙️','🏛️','📋','🧰','🪣','🚰','🔋']
+};
 let emojiPickerCat=null;
 
 function openEmojiPicker(cat,el){
   emojiPickerCat=cat;
+  const currentIcon=CAT_ICONS[cat]||'\u{1F4CC}';
   const picker=$('emoji-picker');
-  picker.innerHTML=EMOJI_LIST.map(e=>`<div class="emoji-pick" onclick="pickEmoji('${e}')">${e}</div>`).join('');
-  const rect=el.getBoundingClientRect();
-  picker.style.top=Math.min(rect.bottom+4,window.innerHeight-200)+'px';
-  picker.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-270))+'px';
-  picker.classList.add('on');
-  setTimeout(()=>document.addEventListener('click',closeEmojiPicker,{once:true}),10);
+  let html=`<div class="emoji-picker-title">Change icon for</div><div class="emoji-picker-cat">${cat}</div>`;
+  for(const[section,emojis] of Object.entries(EMOJI_SECTIONS)){
+    html+=`<div class="emoji-section"><div class="emoji-section-lbl">${section}</div><div class="emoji-grid">`;
+    html+=emojis.map(e=>`<div class="emoji-pick ${e===currentIcon?'current':''}" onclick="event.stopPropagation();pickEmoji('${e}')">${e}</div>`).join('');
+    html+=`</div></div>`;
+  }
+  picker.innerHTML=html;
+  $('emoji-overlay').classList.add('on');
 }
 
 function closeEmojiPicker(){
-  $('emoji-picker').classList.remove('on');
+  $('emoji-overlay').classList.remove('on');
 }
 
 async function pickEmoji(emoji){
