@@ -332,9 +332,53 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .upick-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:2px;}
 .upick-check{color:var(--gold);font-size:18px;margin-left:auto;text-shadow:0 0 10px var(--gold);}
 
+.month-nav{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+.month-arrow{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:18px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;}
+.month-arrow:hover{background:var(--surface3);border-color:var(--gold);}
+.month-arrow:active{transform:scale(.9);}
+.month-label{font-family:'DM Mono',monospace;font-size:12px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;min-width:120px;text-align:center;}
+.bcard-actions{display:flex;gap:6px;align-items:center;}
+.bcard-edit,.bcard-del{background:none;border:none;cursor:pointer;font-size:14px;padding:4px;border-radius:6px;transition:all .15s;line-height:1;}
+.bcard-edit{color:var(--text-dim);}
+.bcard-edit:hover{color:var(--gold);}
+.bcard-del{color:var(--text-muted);}
+.bcard-del:hover{color:var(--red);}
+.add-budget-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;margin:0 14px 10px;border-radius:18px;border:1px dashed var(--border2);background:transparent;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .15s;}
+.add-budget-btn:hover{border-color:var(--gold);color:var(--gold);background:rgba(201,168,76,.06);}
 .spacer{height:18px;}
 .sidebar-brand{display:none;}
 .empty-msg{text-align:center;padding:40px 20px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;}
+
+/* ─── CATEGORY SHEET ──────────────────────────────────────────── */
+.cat-sheet-header{display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.cat-sheet-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;}
+.cat-sheet-info{flex:1;}
+.cat-sheet-name{font-family:'Playfair Display',serif;font-size:20px;}
+.cat-sheet-stats{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted);margin-top:4px;}
+.cat-sheet-budget{margin-top:8px;}
+.cat-sheet-budget-text{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:4px;}
+.dleg-row{cursor:pointer;padding:4px 6px;border-radius:6px;transition:background .15s;}
+.dleg-row:hover{background:rgba(255,255,255,.05);}
+.bcard{cursor:pointer;transition:transform .1s,box-shadow .15s;}
+.bcard:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.3);}
+
+/* ─── TOP EXPENSES RANK ──────────────────────────────────────── */
+.tx-rank{width:24px;height:24px;border-radius:50%;background:rgba(201,168,76,.15);color:var(--gold);font-family:'DM Mono',monospace;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:500;}
+
+/* ─── VENDOR BREAKDOWN ───────────────────────────────────────── */
+.vendor-row{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin:0 14px 8px;cursor:pointer;transition:transform .1s;position:relative;overflow:hidden;}
+.vendor-row:hover{transform:translateY(-1px);}
+.vendor-row:active{transform:scale(.98);}
+.vendor-row{display:grid;grid-template-columns:28px 1fr auto;grid-template-rows:auto auto;gap:4px 12px;align-items:center;}
+.vendor-rank{grid-row:1/3;width:28px;height:28px;border-radius:50%;background:rgba(201,168,76,.12);color:var(--gold);font-family:'DM Mono',monospace;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:500;}
+.vendor-info{grid-column:2;grid-row:1;}
+.vendor-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vendor-meta{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:2px;}
+.vendor-right{grid-column:3;grid-row:1;text-align:right;}
+.vendor-amt{font-family:'DM Mono',monospace;font-size:13px;color:var(--red);font-weight:500;}
+.vendor-pct{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);}
+.vendor-bar{grid-column:2/4;grid-row:2;height:4px;background:var(--border2);border-radius:2px;overflow:hidden;}
+.vendor-bar-fill{height:100%;border-radius:2px;transition:width .5s cubic-bezier(.4,0,.2,1);}
 
 /* ─── BUDGET GRID (desktop) ─────────────────────────────────── */
 .budget-cats-grid{display:block;}
@@ -509,6 +553,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
       <div class="desktop-container">
         <div class="hero">
           <div class="hero-who" id="hero-who">Household &middot; This Month</div>
+          <div class="month-nav" id="month-nav">
+            <button class="month-arrow" onclick="changeMonth(-1)">&#x2039;</button>
+            <span class="month-label" id="month-label">March 2026</span>
+            <button class="month-arrow" onclick="changeMonth(1)">&#x203A;</button>
+          </div>
           <div class="hero-amt" id="hero-amt">$0.00</div>
           <div class="hero-sub" id="hero-sub">Net Cash Flow</div>
           <div class="hero-stats">
@@ -518,6 +567,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
           </div>
         </div>
         <div class="hscroll-outer"><div class="hscroll" id="kpi-cards"></div></div>
+
+        <div class="sec-head"><div class="sec-title">Biggest Expenses</div><div class="sec-link" id="top-toggle" onclick="toggleTop20()">Show all →</div></div>
+        <div class="tx-list" id="top-expenses"></div>
+        <div class="spacer"></div>
 
         <div class="dashboard-grid">
           <div class="dashboard-recent-col">
@@ -538,6 +591,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
             </div>
           </div>
         </div>
+
+        <div class="sec-head"><div class="sec-title">Top Vendors</div></div>
+        <div id="vendor-breakdown"></div>
+        <div class="spacer"></div>
+
       </div>
     </div>
 
@@ -649,6 +707,40 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
   </div>
 </div>
 
+<!-- BUDGET EDIT SHEET -->
+<div class="sheet-bg" id="budget-sheet" onclick="closeBg(event,'budget-sheet')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="budget-sheet-title">Edit Budget</div>
+    <div class="fstack">
+      <div class="fg"><label class="flbl">Category</label><input class="finput" id="fb-cat" placeholder="e.g. Pets"></div>
+      <div class="fg"><label class="flbl">Monthly Budget ($)</label><input class="finput" id="fb-amt" type="number" placeholder="0.00" step="0.01" inputmode="decimal"></div>
+    </div>
+    <div class="sheet-actions">
+      <button class="sht-btn ghost" onclick="closeSheet('budget-sheet')">Cancel</button>
+      <button class="sht-btn primary" onclick="saveBudget()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- CATEGORY SHEET -->
+<div class="sheet-bg" id="cat-sheet" onclick="closeBg(event,'cat-sheet')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="cat-sheet-header" id="cat-sheet-header"></div>
+    <div class="tx-list" id="cat-sheet-txs"></div>
+  </div>
+</div>
+
+<!-- VENDOR SHEET -->
+<div class="sheet-bg" id="vendor-sheet" onclick="closeBg(event,'vendor-sheet')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="cat-sheet-header" id="vendor-sheet-header"></div>
+    <div class="tx-list" id="vendor-sheet-txs"></div>
+  </div>
+</div>
+
 <script>
 // ─── CONFIG ──────────────────────────────────────────────────────
 // Change this to your deployed URL when hosted
@@ -659,7 +751,7 @@ const API = window.location.hostname === 'localhost' || window.location.hostname
 // ─── CONSTANTS ───────────────────────────────────────────────────
 const CAT_COLORS={Housing:'#c9a84c',Food:'#4caf7d',Transport:'#5a8fc9',Health:'#c95a8f',Entertainment:'#8fc95a',Shopping:'#c97a5a',Utilities:'#5ac9c9',Income:'#4caf7d',Transfer:'#9b6dff',Other:'#888880'};
 const CAT_ICONS={Housing:'\u{1F3E0}',Food:'\u{1F37D}\uFE0F',Transport:'\u{1F697}',Health:'\u{1F48A}',Entertainment:'\u{1F3AC}',Shopping:'\u{1F6CD}\uFE0F',Utilities:'\u26A1',Income:'\u{1F4B0}',Transfer:'\u{1F501}',Other:'\u{1F4CC}'};
-const BUDGET={Housing:2000,Food:800,Transport:400,Health:300,Entertainment:200,Shopping:400,Utilities:250};
+let budgets = {};
 const USER_COLORS={christian:'#c9a84c',wife:'#5a8fc9'};
 const USER_INITIALS={christian:'C',wife:'M'};
 
@@ -672,6 +764,7 @@ let isConnected = false;
 let currentTab = 'home';
 let deferredInstall = null;
 let isOnline = navigator.onLine;
+let selectedMonth = new Date();
 
 // ─── HELPERS ─────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -682,7 +775,7 @@ function stats(txs){
   return{income:inc,expenses:exp,net:inc-exp};
 }
 function monthTxs(txs,y,m){return txs.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});}
-function currentMonth(){const n=new Date();return monthTxs(transactions,n.getFullYear(),n.getMonth());}
+function currentMonth(){return monthTxs(transactions,selectedMonth.getFullYear(),selectedMonth.getMonth());}
 function catBreak(txs){const m={};txs.filter(t=>t.type==='expense').forEach(t=>{m[t.cat]=(m[t.cat]||0)+t.amount;});return m;}
 function userName(id){return users.find(u=>u.id===id)?.name||id;}
 
@@ -694,23 +787,37 @@ if(!isOnline)$('offline-banner').classList.add('on');
 // ─── DATA LOADING ─────────────────────────────────────────────────
 async function loadData(){
   try{
-    const [txRes, acRes, stRes] = await Promise.all([
-      fetch(`${API}/api/transactions?userId=${currentUser}&days=90&household=true`),
+    // Calculate date range: 6 months back from selected month to cover reports + selected month
+    const startD = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 6, 1);
+    const endD = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
+    const startDate = startD.toISOString().split('T')[0];
+    const endDate = endD.toISOString().split('T')[0];
+    const [txRes, acRes, stRes, budRes] = await Promise.all([
+      fetch(`${API}/api/transactions?userId=${currentUser}&startDate=${startDate}&endDate=${endDate}&household=true`),
       fetch(`${API}/api/accounts?userId=${currentUser}`),
       fetch(`${API}/api/status?userId=${currentUser}`),
+      fetch(`${API}/api/budgets?userId=${currentUser}`),
     ]);
     if(txRes.ok){const d=await txRes.json();transactions=d.transactions||[];}
     if(acRes.ok){const d=await acRes.json();accounts=d.accounts||[];}
     if(stRes.ok){const d=await stRes.json();setConnected(d.connected);}
+    if(budRes.ok){
+      const d=await budRes.json();
+      budgets={};
+      (d.budgets||[]).forEach(b=>{budgets[b.category]=b.amount;});
+    }
     // Cache in localStorage for offline
     localStorage.setItem('ledger_cache_tx',JSON.stringify(transactions));
     localStorage.setItem('ledger_cache_ac',JSON.stringify(accounts));
+    localStorage.setItem('ledger_cache_budgets',JSON.stringify(budgets));
   }catch(e){
     // Offline — use cache
     const ct=localStorage.getItem('ledger_cache_tx');
     const ca=localStorage.getItem('ledger_cache_ac');
+    const cb=localStorage.getItem('ledger_cache_budgets');
     if(ct)transactions=JSON.parse(ct);
     if(ca)accounts=JSON.parse(ca);
+    if(cb)budgets=JSON.parse(cb);
   }
   renderAll();
 }
@@ -754,7 +861,8 @@ function renderHome(){
   const s=stats(mtxs);
   const savings=s.income>0?((s.net/s.income)*100).toFixed(0):0;
 
-  $('hero-who').textContent='Household \u00B7 '+new Date().toLocaleString('default',{month:'long',year:'numeric'});
+  $('hero-who').textContent='Household \u00B7 '+selectedMonth.toLocaleString('default',{month:'long',year:'numeric'});
+  $('month-label').textContent=selectedMonth.toLocaleString('default',{month:'long',year:'numeric'});
   $('hero-amt').textContent=(s.net>=0?'':'-')+money(s.net);
   $('hero-amt').style.color=s.net>=0?'var(--green)':'var(--red)';
   $('hs-income').textContent=money(s.income);
@@ -780,6 +888,43 @@ function renderHome(){
 
   // Chart
   $('chart-card').innerHTML=renderBarChart();
+
+  // Top 20 biggest expenses
+  const top20 = currentMonth()
+    .filter(t => t.type === 'expense')
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 20);
+  window._top20 = top20;
+  window._showAllTop = false;
+  const shown = top20.slice(0, 5);
+  $('top-expenses').innerHTML = rankedTxRows(shown, 0);
+  $('top-toggle').textContent = top20.length > 5 ? 'Show all \u2192' : '';
+
+  // Vendor breakdown
+  const vendorMap = {};
+  currentMonth().filter(t=>t.type==='expense').forEach(t=>{
+    if(!vendorMap[t.desc]) vendorMap[t.desc] = {total:0, count:0};
+    vendorMap[t.desc].total += t.amount;
+    vendorMap[t.desc].count++;
+  });
+  const vendors = Object.entries(vendorMap).sort((a,b)=>b[1].total-a[1].total).slice(0,10);
+  const vendorTotal = vendors.reduce((a,v)=>a+v[1].total, 0);
+  $('vendor-breakdown').innerHTML = vendors.length ? vendors.map(([name, v], i) => {
+    const pct = vendorTotal > 0 ? (v.total / vendorTotal * 100) : 0;
+    const colors = ['var(--gold)','var(--green)','var(--blue)','var(--purple)','var(--teal)','var(--orange)','var(--pink)','var(--red)','var(--text-dim)','var(--text-muted)'];
+    return `<div class="vendor-row" onclick="openVendorSheet('${name.replace(/'/g,"\\'")}')">
+      <div class="vendor-rank">${i+1}</div>
+      <div class="vendor-info">
+        <div class="vendor-name">${name}</div>
+        <div class="vendor-meta">${v.count} transaction${v.count>1?'s':''}</div>
+      </div>
+      <div class="vendor-right">
+        <div class="vendor-amt">-${money(v.total)}</div>
+        <div class="vendor-pct">${pct.toFixed(0)}%</div>
+      </div>
+      <div class="vendor-bar"><div class="vendor-bar-fill" style="width:${pct}%;background:${colors[i]||colors[0]}"></div></div>
+    </div>`;
+  }).join('') : '<div class="empty-msg">No expense data</div>';
 }
 
 function renderLedger(){
@@ -795,25 +940,31 @@ function renderLedger(){
 function renderBudget(){
   const mtxs=currentMonth();
   const bd=catBreak(mtxs);
-  const totalB=Object.values(BUDGET).reduce((a,b)=>a+b,0);
-  const totalS=Object.keys(BUDGET).reduce((a,c)=>a+(bd[c]||0),0);
+  const totalB=Object.values(budgets).reduce((a,b)=>a+b,0);
+  const totalS=Object.keys(budgets).reduce((a,c)=>a+(bd[c]||0),0);
   const rem=totalB-totalS;
   $('budget-kpis').innerHTML=`
     <div class="kcard" style="--kc:var(--gold);width:auto"><div class="kcard-lbl">Budget</div><div class="kcard-val" style="font-size:16px">${money(totalB)}</div></div>
     <div class="kcard" style="--kc:var(--red);width:auto"><div class="kcard-lbl">Spent</div><div class="kcard-val" style="font-size:16px">${money(totalS)}</div></div>
     <div class="kcard" style="--kc:${rem>=0?'var(--green)':'var(--red)'};width:auto"><div class="kcard-lbl">Left</div><div class="kcard-val" style="font-size:16px">${money(rem)}</div></div>`;
-  $('budget-cats').innerHTML=Object.keys(BUDGET).map(cat=>{
-    const spent=bd[cat]||0,limit=BUDGET[cat];
+  $('budget-cats').innerHTML=Object.keys(budgets).map(cat=>{
+    const spent=bd[cat]||0,limit=budgets[cat];
     const pct=Math.min((spent/limit)*100,100);
     const over=spent>limit,color=over?'var(--red)':pct>75?'var(--gold)':'var(--green)';
-    return`<div class="bcard">
+    return`<div class="bcard" onclick="openCategorySheet('${cat}')">
       <div class="bcard-top">
-        <div class="bcard-left"><div class="bcard-dot" style="background:${CAT_COLORS[cat]}"></div>${CAT_ICONS[cat]} ${cat}</div>
-        <div class="bcard-nums"><span>${money(spent)}<span style="color:var(--text-muted)"> / ${money(limit)}</span></span>${over?`<div class="bcard-over">\u25B2 ${money(spent-limit)} over</div>`:''}</div>
+        <div class="bcard-left"><div class="bcard-dot" style="background:${CAT_COLORS[cat]||'#888'}"></div>${CAT_ICONS[cat]||'\u{1F4CC}'} ${cat}</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="bcard-nums"><span>${money(spent)}<span style="color:var(--text-muted)"> / ${money(limit)}</span></span>${over?`<div class="bcard-over">\u25B2 ${money(spent-limit)} over</div>`:''}</div>
+          <div class="bcard-actions">
+            <button class="bcard-edit" onclick="openBudgetEdit('${cat.replace(/'/g,"\\'")}',${limit})" title="Edit">&#x270E;</button>
+            <button class="bcard-del" onclick="deleteBudget('${cat.replace(/'/g,"\\'")}')" title="Delete">&#x2715;</button>
+          </div>
+        </div>
       </div>
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
     </div>`;
-  }).join('');
+  }).join('')+`<button class="add-budget-btn" onclick="openAddBudget()">+ Add Budget</button>`;
 }
 
 function renderReports(){
@@ -914,6 +1065,65 @@ function txRows(txs,deletable){
     </div>`).join('');
 }
 
+// ─── RANKED TX ROWS ───────────────────────────────────────────────
+function rankedTxRows(txs, startRank){
+  if(!txs.length) return '<div class="empty-msg">No expenses this month</div>';
+  return txs.map((t,i) => `
+    <div class="tx-row">
+      <div class="tx-rank">${startRank+i+1}</div>
+      <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}22">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
+      <div class="tx-body">
+        <div class="tx-desc">${t.desc}</div>
+        <div class="tx-meta">
+          ${t.user_name?`<span class="tx-who" style="background:${USER_COLORS[t.user_id]||'#888'}22;color:${USER_COLORS[t.user_id]||'var(--text-dim)'}">${t.user_name}</span>`:''}
+          <span class="tx-cat">${t.cat}</span>
+          <span class="tx-date">\u00B7 ${t.date}</span>
+        </div>
+      </div>
+      <div class="tx-amt neg">-${money(t.amount)}</div>
+    </div>`).join('');
+}
+
+function toggleTop20(){
+  window._showAllTop = !window._showAllTop;
+  const txs = window._showAllTop ? window._top20 : window._top20.slice(0,5);
+  $('top-expenses').innerHTML = rankedTxRows(txs, 0);
+  $('top-toggle').textContent = window._showAllTop ? 'Show less' : 'Show all \u2192';
+}
+
+// ─── CATEGORY SHEET ───────────────────────────────────────────────
+function openCategorySheet(cat){
+  const txs = currentMonth().filter(t => t.cat === cat).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const total = txs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+  const budgetAmt = budgets[cat];
+  $('cat-sheet-header').innerHTML = `
+    <div class="cat-sheet-icon" style="background:${CAT_COLORS[cat]||'#888'}22">${CAT_ICONS[cat]||'\u{1F4CC}'}</div>
+    <div class="cat-sheet-info">
+      <div class="cat-sheet-name">${cat}</div>
+      <div class="cat-sheet-stats">${txs.length} transactions \u00B7 ${money(total)} spent</div>
+      ${budgetAmt ? `<div class="cat-sheet-budget">
+        <div class="cat-sheet-budget-text">${money(total)} of ${money(budgetAmt)} budget (${Math.round(total/budgetAmt*100)}%)</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.min(total/budgetAmt*100,100)}%;background:${total>budgetAmt?'var(--red)':total/budgetAmt>.75?'var(--gold)':'var(--green)'}"></div></div>
+      </div>` : ''}
+    </div>`;
+  $('cat-sheet-txs').innerHTML = txRows(txs, false);
+  $('cat-sheet').classList.add('on');
+}
+
+// ─── VENDOR SHEET ─────────────────────────────────────────────────
+function openVendorSheet(vendor){
+  const txs = currentMonth().filter(t => t.desc === vendor).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const total = txs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+  $('vendor-sheet-header').innerHTML = `
+    <div class="cat-sheet-icon" style="background:rgba(201,168,76,.15)">\u{1F3EA}</div>
+    <div class="cat-sheet-info">
+      <div class="cat-sheet-name">${vendor}</div>
+      <div class="cat-sheet-stats">${txs.length} transactions \u00B7 ${money(total)} total</div>
+    </div>`;
+  $('vendor-sheet-txs').innerHTML = txRows(txs, false);
+  $('vendor-sheet').classList.add('on');
+}
+
 // ─── DONUT ────────────────────────────────────────────────────────
 function renderDonut(bd,total){
   const entries=Object.entries(bd).sort((a,b)=>b[1]-a[1]);
@@ -926,7 +1136,7 @@ function renderDonut(bd,total){
     paths+=`<path d="M ${x1} ${y1} A ${r} ${r} 0 ${deg>180?1:0} 1 ${x2} ${y2}" fill="none" stroke="${CAT_COLORS[cat]||'#888'}" stroke-width="${sw}" stroke-linecap="butt"/>`;
     offset+=deg;
   });
-  const legend=entries.slice(0,5).map(([cat,amt])=>`<div class="dleg-row"><div class="dleg-swatch" style="background:${CAT_COLORS[cat]||'#888'}"></div><span class="dleg-name">${cat}</span><span class="dleg-pct">${((amt/total)*100).toFixed(0)}%</span></div>`).join('');
+  const legend=entries.slice(0,5).map(([cat,amt])=>`<div class="dleg-row" onclick="openCategorySheet('${cat}')"><div class="dleg-swatch" style="background:${CAT_COLORS[cat]||'#888'}"></div><span class="dleg-name">${cat}</span><span class="dleg-pct">${((amt/total)*100).toFixed(0)}%</span></div>`).join('');
   return`<div class="donut-inner">
     <svg viewBox="0 0 100 100" width="120" height="120" style="flex-shrink:0;filter:drop-shadow(0 0 8px rgba(155,109,255,.15))">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border2)" stroke-width="${sw}"/>
@@ -1046,6 +1256,56 @@ window.addEventListener('online',async()=>{
   }
   localStorage.removeItem('ledger_queue');
 });
+
+// ─── MONTH SELECTOR ──────────────────────────────────────────────
+function changeMonth(delta){
+  selectedMonth.setMonth(selectedMonth.getMonth()+delta);
+  const now=new Date();
+  if(selectedMonth>now) selectedMonth=new Date(now.getFullYear(),now.getMonth(),1);
+  loadData();
+}
+
+// ─── BUDGET EDITING ──────────────────────────────────────────────
+let editingBudgetCat=null;
+function openBudgetEdit(cat,amt){
+  editingBudgetCat=cat;
+  $('budget-sheet-title').textContent='Edit Budget';
+  $('fb-cat').value=cat;
+  $('fb-cat').disabled=true;
+  $('fb-amt').value=amt;
+  $('budget-sheet').classList.add('on');
+}
+function openAddBudget(){
+  editingBudgetCat=null;
+  $('budget-sheet-title').textContent='Add Budget';
+  $('fb-cat').value='';
+  $('fb-cat').disabled=false;
+  $('fb-amt').value='';
+  $('budget-sheet').classList.add('on');
+}
+async function saveBudget(){
+  const cat=$('fb-cat').value.trim();
+  const amt=parseFloat($('fb-amt').value);
+  if(!cat||isNaN(amt)||amt<=0){alert('Please enter a valid category and amount.');return;}
+  try{
+    const res=await fetch(`${API}/api/budgets`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:cat,amount:amt})});
+    if(!res.ok)throw new Error('Save failed');
+    budgets[cat]=amt;
+    closeSheet('budget-sheet');
+    renderBudget();
+    animateBars();
+  }catch(e){alert('Error: '+e.message);}
+}
+async function deleteBudget(cat){
+  if(!confirm('Delete budget for "'+cat+'"?'))return;
+  try{
+    const res=await fetch(`${API}/api/budgets`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:cat})});
+    if(!res.ok)throw new Error('Delete failed');
+    delete budgets[cat];
+    renderBudget();
+    animateBars();
+  }catch(e){alert('Error: '+e.message);}
+}
 
 // ─── NAV ─────────────────────────────────────────────────────────
 function go(tab){

@@ -44,10 +44,21 @@ function initDB() {
     household TEXT NOT NULL DEFAULT 'default',
     name TEXT, mask TEXT, type TEXT, subtype TEXT,
     balance REAL, updated_at TEXT DEFAULT (datetime('now')))`);
+  db.exec(`CREATE TABLE IF NOT EXISTS budgets (
+    household TEXT NOT NULL,
+    category TEXT NOT NULL,
+    amount REAL NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (household, category)
+  )`);
   run(`INSERT OR IGNORE INTO users (id, name, household) VALUES (?, ?, ?)`,
     ['christian', 'Christian', 'spenziero']);
   run(`INSERT OR IGNORE INTO users (id, name, household) VALUES (?, ?, ?)`,
     ['wife', 'Marisol', 'spenziero']);
+  const defaultBudgets = {Housing:2000,Food:800,Transport:400,Health:300,Entertainment:200,Shopping:400,Utilities:250};
+  for (const [cat, amt] of Object.entries(defaultBudgets)) {
+    run('INSERT OR IGNORE INTO budgets (household, category, amount) VALUES (?, ?, ?)', ['spenziero', cat, amt]);
+  }
   console.log('  DB: schema ready');
 }
 
@@ -173,20 +184,33 @@ app.post('/api/exchange_public_token', async (req, res) => {
 });
 
 app.get('/api/transactions', async (req, res) => {
-  const { userId = 'christian', days = 60, household: hhParam = 'true' } = req.query;
-  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - parseInt(days));
-  const cutoffStr = cutoff.toISOString().split('T')[0];
+  const { userId = 'christian', days = 60, household: hhParam = 'true', startDate, endDate } = req.query;
   try {
     let txs;
-    if (hhParam === 'true') {
-      const hh = getHousehold(userId);
-      txs = all(`SELECT t.*, u.name as user_name FROM transactions t
-        LEFT JOIN users u ON t.user_id = u.id
-        WHERE t.household = ? AND t.date >= ?
-        ORDER BY t.date DESC, t.created_at DESC`, [hh, cutoffStr]);
+    if (startDate && endDate) {
+      if (hhParam === 'true') {
+        const hh = getHousehold(userId);
+        txs = all(`SELECT t.*, u.name as user_name FROM transactions t
+          LEFT JOIN users u ON t.user_id = u.id
+          WHERE t.household = ? AND t.date >= ? AND t.date <= ?
+          ORDER BY t.date DESC, t.created_at DESC`, [hh, startDate, endDate]);
+      } else {
+        txs = all(`SELECT * FROM transactions WHERE user_id = ? AND date >= ? AND date <= ?
+          ORDER BY date DESC, created_at DESC`, [userId, startDate, endDate]);
+      }
     } else {
-      txs = all(`SELECT * FROM transactions WHERE user_id = ? AND date >= ?
-        ORDER BY date DESC, created_at DESC`, [userId, cutoffStr]);
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - parseInt(days));
+      const cutoffStr = cutoff.toISOString().split('T')[0];
+      if (hhParam === 'true') {
+        const hh = getHousehold(userId);
+        txs = all(`SELECT t.*, u.name as user_name FROM transactions t
+          LEFT JOIN users u ON t.user_id = u.id
+          WHERE t.household = ? AND t.date >= ?
+          ORDER BY t.date DESC, t.created_at DESC`, [hh, cutoffStr]);
+      } else {
+        txs = all(`SELECT * FROM transactions WHERE user_id = ? AND date >= ?
+          ORDER BY date DESC, created_at DESC`, [userId, cutoffStr]);
+      }
     }
     res.json({ transactions: txs, total: txs.length });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -260,6 +284,48 @@ app.post('/api/webhook', async (req, res) => {
       if (item) await fetchAndStorePlaidTransactions(item.access_token, item.user_id, item_id);
     } catch (err) { console.error('Webhook error:', err.message); }
   }
+});
+
+// ─── BUDGETS ──────────────────────────────────────────────────────
+app.get('/api/budgets', (req, res) => {
+  try {
+    const hh = getHousehold(req.query.userId || 'christian');
+    const rows = all('SELECT category, amount FROM budgets WHERE household = ? ORDER BY category', [hh]);
+    res.json({ budgets: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/budgets', (req, res) => {
+  const { userId = 'christian', category, amount } = req.body;
+  if (!category || amount == null) return res.status(400).json({ error: 'Missing category or amount' });
+  try {
+    const hh = getHousehold(userId);
+    run(`INSERT OR REPLACE INTO budgets (household, category, amount, updated_at) VALUES (?, ?, ?, datetime('now'))`, [hh, category, parseFloat(amount)]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/budgets', (req, res) => {
+  const { userId = 'christian', category } = req.body;
+  if (!category) return res.status(400).json({ error: 'Missing category' });
+  try {
+    const hh = getHousehold(userId);
+    run('DELETE FROM budgets WHERE household = ? AND category = ?', [hh, category]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── VENDOR SPENDING ─────────────────────────────────────────────
+app.get('/api/spending/by-vendor', (req, res) => {
+  const { userId = 'christian', startDate, endDate } = req.query;
+  try {
+    const hh = getHousehold(userId);
+    const rows = all(`SELECT desc as vendor, SUM(amount) as total, COUNT(*) as count
+      FROM transactions
+      WHERE household = ? AND type = 'expense' AND date >= ? AND date <= ?
+      GROUP BY desc ORDER BY total DESC LIMIT 20`, [hh, startDate, endDate]);
+    res.json({ vendors: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Serve frontend
