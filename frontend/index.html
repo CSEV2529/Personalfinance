@@ -334,6 +334,10 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .sheet{background:linear-gradient(180deg,#10102a,#0a0a1e);border-radius:22px 22px 0 0;border:1px solid rgba(255,215,0,.12);border-bottom:none;width:100%;padding:20px 20px calc(20px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.34,1.2,.64,1);max-height:92dvh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,.5);}
 @keyframes sheetIn{from{transform:translateY(100%);}to{transform:none;}}
 .sheet-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 18px;}
+.sheet-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-dim);font-size:14px;z-index:10;transition:all .15s;}
+.sheet-close:hover{border-color:var(--gold);color:var(--text);}
+.sheet-close:active{transform:scale(.9);}
+.sheet{position:relative;}
 .sheet-title{font-family:'Playfair Display',serif;font-size:22px;margin-bottom:18px;}
 .fstack{display:flex;flex-direction:column;gap:12px;}
 .frow{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
@@ -428,8 +432,14 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .recat-option:hover{border-color:var(--gold);background:rgba(201,168,76,.06);}
 .recat-option:active{transform:scale(.96);}
 .recat-option.selected{border-color:var(--gold);background:rgba(201,168,76,.1);}
-.recat-option-icon{font-size:18px;}
+.recat-option-icon{font-size:18px;cursor:pointer;border-radius:6px;padding:2px;transition:background .15s;}
+.recat-option-icon:hover{background:rgba(255,215,0,.15);}
 .recat-option-name{font-size:12px;font-weight:500;}
+.emoji-picker{position:fixed;z-index:600;background:var(--surface2);border:1px solid var(--border2);border-radius:14px;padding:10px;display:none;flex-wrap:wrap;gap:4px;max-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.6),0 0 20px rgba(255,215,0,.08);animation:fadeUp .2s ease both;}
+.emoji-picker.on{display:flex;}
+.emoji-pick{width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:20px;border-radius:8px;cursor:pointer;transition:all .12s;}
+.emoji-pick:hover{background:rgba(255,215,0,.12);transform:scale(1.15);}
+.emoji-pick:active{transform:scale(.9);}
 .recat-type-btn{padding:8px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.5px;cursor:pointer;transition:all .15s;}
 .recat-type-btn:hover{border-color:var(--tc,var(--gold));}
 .recat-type-btn.active{background:rgba(201,168,76,.15);border-color:var(--tc,var(--gold));color:var(--tc,var(--gold));font-weight:500;}
@@ -763,6 +773,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 <!-- ADD TRANSACTION SHEET -->
 <div class="sheet-bg" id="sheet" onclick="closeBg(event,'sheet')">
   <div class="sheet">
+    <div class="sheet-close" onclick="closeSheet('sheet')">&times;</div>
     <div class="sheet-handle"></div>
     <div class="sheet-title">New Transaction</div>
     <div class="fstack">
@@ -786,6 +797,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 <!-- USER PICKER SHEET -->
 <div class="sheet-bg" id="upicker" onclick="closeBg(event,'upicker')">
   <div class="sheet">
+    <div class="sheet-close" onclick="closeSheet('upicker')">&times;</div>
     <div class="sheet-handle"></div>
     <div class="sheet-title">Who's viewing?</div>
     <div id="user-options"></div>
@@ -796,6 +808,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 <!-- BUDGET EDIT SHEET -->
 <div class="sheet-bg" id="budget-sheet" onclick="closeBg(event,'budget-sheet')">
   <div class="sheet">
+    <div class="sheet-close" onclick="closeSheet('budget-sheet')">&times;</div>
     <div class="sheet-handle"></div>
     <div class="sheet-title" id="budget-sheet-title">Edit Budget</div>
     <div class="fstack">
@@ -812,6 +825,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 <!-- CATEGORY SHEET -->
 <div class="sheet-bg" id="cat-sheet" onclick="closeBg(event,'cat-sheet')">
   <div class="sheet">
+    <div class="sheet-close" onclick="closeSheet('cat-sheet')">&times;</div>
     <div class="sheet-handle"></div>
     <div class="cat-sheet-header" id="cat-sheet-header"></div>
     <div class="tx-list" id="cat-sheet-txs"></div>
@@ -821,6 +835,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 <!-- VENDOR SHEET -->
 <div class="sheet-bg" id="vendor-sheet" onclick="closeBg(event,'vendor-sheet')">
   <div class="sheet">
+    <div class="sheet-close" onclick="closeSheet('vendor-sheet')">&times;</div>
     <div class="sheet-handle"></div>
     <div class="cat-sheet-header" id="vendor-sheet-header"></div>
     <div class="tx-list" id="vendor-sheet-txs"></div>
@@ -830,12 +845,16 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 <!-- RECATEGORIZE SHEET -->
 <div class="sheet-bg" id="recat-sheet" onclick="closeBg(event,'recat-sheet')">
   <div class="sheet">
+    <div class="sheet-close" onclick="closeSheet('recat-sheet')">&times;</div>
     <div class="sheet-handle"></div>
     <div class="sheet-title">Change Category</div>
     <div class="recat-tx-info" id="recat-info"></div>
     <div class="recat-options" id="recat-options"></div>
   </div>
 </div>
+
+<!-- EMOJI PICKER -->
+<div class="emoji-picker" id="emoji-picker"></div>
 
 <!-- MULTI-SELECT BAR -->
 <div class="select-bar" id="select-bar">
@@ -1350,9 +1369,9 @@ function renderRecatSheet(){
   </div>
   <div class="flbl" style="margin-bottom:8px">CATEGORY</div>`;
   $('recat-options').innerHTML=typeButtons+allCats.map(cat=>`
-    <div class="recat-option ${cat===recatCurrentCat?'selected':''}" onclick="applyRecat('${cat.replace(/'/g,"\\'")}')">
-      <span class="recat-option-icon">${CAT_ICONS[cat]||'\u{1F4CC}'}</span>
-      <span class="recat-option-name">${cat}</span>
+    <div class="recat-option ${cat===recatCurrentCat?'selected':''}">
+      <span class="recat-option-icon" onclick="event.stopPropagation();openEmojiPicker('${cat.replace(/'/g,"\\'")}',this)" title="Change icon">${CAT_ICONS[cat]||'\u{1F4CC}'}</span>
+      <span class="recat-option-name" onclick="applyRecat('${cat.replace(/'/g,"\\'")}')">${cat}</span>
     </div>`).join('')+`
     <div class="recat-option" onclick="recatNewCategory()" style="border-style:dashed;">
       <span class="recat-option-icon">+</span>
@@ -1388,6 +1407,40 @@ function recatNewCategory(){
   if(!CAT_COLORS[cat])CAT_COLORS[cat]='#9b6dff';
   if(!CAT_ICONS[cat])CAT_ICONS[cat]='\u{1F4CC}';
   applyRecat(cat);
+}
+
+// ─── EMOJI PICKER ────────────────────────────────────────────────
+const EMOJI_LIST=[
+  '\u{1F3E0}','\u{1F37D}\uFE0F','\u{1F697}','\u{1F48A}','\u{1F3AC}','\u{1F6CD}\uFE0F','\u26A1','\u{1F4B0}','\u{1F501}','\u{1F4CC}',
+  '\u{1F4B8}','\u{1F4B3}','\u{1F3E6}','\u{1F4BC}','\u{2708}\uFE0F','\u{1F3EB}','\u{1F4DA}','\u{1F3CB}\uFE0F','\u{1F489}','\u{1F6BF}',
+  '\u{2615}','\u{1F354}','\u{1F355}','\u{1F370}','\u{1F37A}','\u{1F942}','\u{1F6D2}','\u{1F381}','\u{1F4F1}','\u{1F4BB}',
+  '\u{1F3AE}','\u{1F3B5}','\u{1F3A8}','\u{1F4FA}','\u{26BD}','\u{1F6B2}','\u{1F3D6}\uFE0F','\u{1F30E}','\u{1F436}','\u{1F431}',
+  '\u{1F333}','\u{2B50}','\u{1F525}','\u{1F4A1}','\u{2764}\uFE0F','\u{1F389}','\u{1F4E6}','\u{1F527}','\u{1F3E5}','\u{1F6E1}\uFE0F}'
+];
+let emojiPickerCat=null;
+
+function openEmojiPicker(cat,el){
+  emojiPickerCat=cat;
+  const picker=$('emoji-picker');
+  picker.innerHTML=EMOJI_LIST.map(e=>`<div class="emoji-pick" onclick="pickEmoji('${e}')">${e}</div>`).join('');
+  const rect=el.getBoundingClientRect();
+  picker.style.top=Math.min(rect.bottom+4,window.innerHeight-200)+'px';
+  picker.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-270))+'px';
+  picker.classList.add('on');
+  setTimeout(()=>document.addEventListener('click',closeEmojiPicker,{once:true}),10);
+}
+
+function closeEmojiPicker(){
+  $('emoji-picker').classList.remove('on');
+}
+
+function pickEmoji(emoji){
+  if(emojiPickerCat){
+    CAT_ICONS[emojiPickerCat]=emoji;
+    renderRecatSheet();
+    renderAll();
+  }
+  closeEmojiPicker();
 }
 
 async function applyRecat(newCat){
