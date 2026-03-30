@@ -151,7 +151,18 @@ app.post('/api/exchange_public_token', async (req, res) => {
     run(`INSERT OR REPLACE INTO plaid_items (item_id, user_id, access_token, institution)
       VALUES (?, ?, ?, ?)`, [item_id, userId, access_token, institution || 'Unknown']);
     console.log(`✓ Bank connected: user=${userId}, item=${item_id}`);
-    const result = await fetchAndStorePlaidTransactions(access_token, userId, item_id);
+    // Try to fetch transactions, but don't fail if not ready yet
+    let result = { count: 0, accounts: 0 };
+    try {
+      result = await fetchAndStorePlaidTransactions(access_token, userId, item_id);
+    } catch (fetchErr) {
+      const code = fetchErr.response?.data?.error_code;
+      if (code === 'PRODUCT_NOT_READY') {
+        console.log('  Transactions not ready yet — will arrive via webhook or manual sync');
+      } else {
+        console.error('  Initial fetch failed:', fetchErr.response?.data || fetchErr.message);
+      }
+    }
     res.json({ success: true, item_id, ...result });
   } catch (err) {
     console.error('exchange_public_token:', err.response?.data || err.message);
