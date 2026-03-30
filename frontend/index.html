@@ -1123,8 +1123,21 @@ function openRecat(txId, desc, currentCat){
     <div class="recat-option ${cat===currentCat?'selected':''}" onclick="applyRecat('${cat}')">
       <span class="recat-option-icon">${CAT_ICONS[cat]||'\u{1F4CC}'}</span>
       <span class="recat-option-name">${cat}</span>
-    </div>`).join('');
+    </div>`).join('')+`
+    <div class="recat-option" onclick="recatNewCategory()" style="border-style:dashed;">
+      <span class="recat-option-icon">+</span>
+      <span class="recat-option-name" style="color:var(--gold)">New Category</span>
+    </div>`;
   $('recat-sheet').classList.add('on');
+}
+function recatNewCategory(){
+  const name=prompt('New category name:');
+  if(!name||!name.trim())return;
+  const cat=name.trim();
+  // Add to CAT_COLORS and CAT_ICONS if not present
+  if(!CAT_COLORS[cat])CAT_COLORS[cat]='#9b6dff';
+  if(!CAT_ICONS[cat])CAT_ICONS[cat]='\u{1F4CC}';
+  applyRecat(cat);
 }
 async function applyRecat(newCat){
   if(!recatTxId)return;
@@ -1133,6 +1146,11 @@ async function applyRecat(newCat){
     if(!res.ok)throw new Error('Update failed');
     const tx=transactions.find(t=>t.id===recatTxId);
     if(tx)tx.cat=newCat;
+    // Auto-create budget for new category if it doesn't exist
+    if(!budgets[newCat]){
+      const budRes=await fetch(`${API}/api/budgets`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:newCat,amount:200})});
+      if(budRes.ok)budgets[newCat]=200;
+    }
     closeSheet('recat-sheet');
     renderAll();
   }catch(e){alert('Failed to update: '+e.message);}
