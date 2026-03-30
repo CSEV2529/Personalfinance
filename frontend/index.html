@@ -708,7 +708,7 @@ async function initPlaidLink(){
         const er=await fetch(`${API}/api/exchange_public_token`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token:pt,userId:currentUser})});
         if(er.ok){setConnected(true);await loadData();hideSync('✓ Bank connected and synced!');}
         else hideSync('✗ Connection failed');
-      },onExit:()=>{}
+      },onExit:(err,metadata)=>{if(err)alert('Plaid error: '+JSON.stringify(err));console.log('Plaid exit:',err,metadata);}
     }).open();
   }catch(e){alert('⚠ '+e.message);}
 }
