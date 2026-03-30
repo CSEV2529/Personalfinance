@@ -944,11 +944,12 @@ async function loadData(){
     const endD = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
     const startDate = startD.toISOString().split('T')[0];
     const endDate = endD.toISOString().split('T')[0];
-    const [txRes, acRes, stRes, budRes] = await Promise.all([
+    const [txRes, acRes, stRes, budRes, iconRes] = await Promise.all([
       fetch(`${API}/api/transactions?userId=${currentUser}&startDate=${startDate}&endDate=${endDate}&household=true`),
       fetch(`${API}/api/accounts?userId=${currentUser}`),
       fetch(`${API}/api/status?userId=${currentUser}`),
       fetch(`${API}/api/budgets?userId=${currentUser}`),
+      fetch(`${API}/api/category-icons?userId=${currentUser}`),
     ]);
     if(txRes.ok){const d=await txRes.json();transactions=d.transactions||[];}
     if(acRes.ok){const d=await acRes.json();accounts=d.accounts||[];}
@@ -958,10 +959,15 @@ async function loadData(){
       budgets={};
       (d.budgets||[]).forEach(b=>{budgets[b.category]=b.amount;});
     }
+    if(iconRes.ok){
+      const d=await iconRes.json();
+      (d.icons||[]).forEach(i=>{CAT_ICONS[i.category]=i.icon;});
+    }
     // Cache in localStorage for offline
     localStorage.setItem('ledger_cache_tx',JSON.stringify(transactions));
     localStorage.setItem('ledger_cache_ac',JSON.stringify(accounts));
     localStorage.setItem('ledger_cache_budgets',JSON.stringify(budgets));
+    localStorage.setItem('ledger_cache_icons',JSON.stringify(CAT_ICONS));
   }catch(e){
     // Offline — use cache
     const ct=localStorage.getItem('ledger_cache_tx');
@@ -970,6 +976,8 @@ async function loadData(){
     if(ct)transactions=JSON.parse(ct);
     if(ca)accounts=JSON.parse(ca);
     if(cb)budgets=JSON.parse(cb);
+    const ci=localStorage.getItem('ledger_cache_icons');
+    if(ci)Object.assign(CAT_ICONS,JSON.parse(ci));
   }
   renderAll();
 }
@@ -1434,11 +1442,14 @@ function closeEmojiPicker(){
   $('emoji-picker').classList.remove('on');
 }
 
-function pickEmoji(emoji){
+async function pickEmoji(emoji){
   if(emojiPickerCat){
     CAT_ICONS[emojiPickerCat]=emoji;
     renderRecatSheet();
     renderAll();
+    try{
+      await fetch(`${API}/api/category-icons`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:emojiPickerCat,icon:emoji})});
+    }catch(e){}
   }
   closeEmojiPicker();
 }

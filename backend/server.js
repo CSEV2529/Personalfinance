@@ -64,6 +64,12 @@ function initDB() {
     updated_at TEXT DEFAULT (datetime('now')),
     PRIMARY KEY (household, vendor)
   )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS category_icons (
+    household TEXT NOT NULL,
+    category TEXT NOT NULL,
+    icon TEXT NOT NULL,
+    PRIMARY KEY (household, category)
+  )`);
   run(`INSERT OR IGNORE INTO users (id, name, household) VALUES (?, ?, ?)`,
     ['christian', 'Christian', 'spenziero']);
   run(`INSERT OR IGNORE INTO users (id, name, household) VALUES (?, ?, ?)`,
@@ -321,6 +327,25 @@ app.get('/api/vendor-rules', (req, res) => {
     const hh = getHousehold(req.query.userId || 'christian');
     const rules = all('SELECT vendor, category, type FROM vendor_rules WHERE household = ?', [hh]);
     res.json({ rules });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Category icons
+app.get('/api/category-icons', (req, res) => {
+  try {
+    const hh = getHousehold(req.query.userId || 'christian');
+    const icons = all('SELECT category, icon FROM category_icons WHERE household = ?', [hh]);
+    res.json({ icons });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/category-icons', (req, res) => {
+  const { userId = 'christian', category, icon } = req.body;
+  if (!category || !icon) return res.status(400).json({ error: 'Missing category or icon' });
+  try {
+    const hh = getHousehold(userId);
+    run('INSERT OR REPLACE INTO category_icons (household, category, icon) VALUES (?, ?, ?)', [hh, category, icon]);
+    res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
