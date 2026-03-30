@@ -120,6 +120,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 }
 .hstat-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
 .hstat-val{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;}
+.hero-pills{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.hero-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.5px;cursor:pointer;transition:all .15s;}
+.hero-pill:hover{filter:brightness(1.2);}
+.hero-pill:active{transform:scale(.95);}
 
 /* ─── SECTION ───────────────────────────────────────────────── */
 .sec-head{display:flex;align-items:center;justify-content:space-between;padding:0 18px;margin-bottom:10px;}
@@ -625,6 +629,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
             <div class="hstat" onclick="openTypeSheet('expense')" style="cursor:pointer"><div class="hstat-lbl">Expenses</div><div class="hstat-val" id="hs-expenses" style="color:var(--red)">&mdash;</div></div>
             <div class="hstat"><div class="hstat-lbl">Saved</div><div class="hstat-val" id="hs-saved" style="color:var(--blue)">&mdash;</div></div>
           </div>
+          <div class="hero-pills" id="hero-pills"></div>
         </div>
         <div class="hscroll-outer"><div class="hscroll" id="kpi-cards"></div></div>
 
@@ -967,6 +972,16 @@ function renderHome(){
   $('hs-expenses').textContent=money(s.expenses);
   $('hs-saved').textContent=savings+'%';
 
+  // Refund & transfer pills
+  const refundTotal=mtxs.filter(t=>t.type==='refund').reduce((a,t)=>a+t.amount,0);
+  const transferTotal=mtxs.filter(t=>t.type==='transfer').reduce((a,t)=>a+t.amount,0);
+  const refundCount=mtxs.filter(t=>t.type==='refund').length;
+  const transferCount=mtxs.filter(t=>t.type==='transfer').length;
+  let pills='';
+  if(refundCount)pills+=`<div class="hero-pill" style="background:rgba(45,212,191,.12);color:var(--teal);border:1px solid rgba(45,212,191,.25)" onclick="openTypeSheet('refund')">↩ ${refundCount} Refund${refundCount>1?'s':''} · +${money(refundTotal)}</div>`;
+  if(transferCount)pills+=`<div class="hero-pill" style="background:rgba(155,109,255,.12);color:var(--purple);border:1px solid rgba(155,109,255,.25)" onclick="openTypeSheet('transfer')">⇄ ${transferCount} Transfer${transferCount>1?'s':''} · ${money(transferTotal)}</div>`;
+  $('hero-pills').innerHTML=pills;
+
   // KPI cards
   const totalBal=accounts.filter(a=>a.type==='depository').reduce((a,ac)=>a+(ac.balance||0),0);
   const cards=[
@@ -1174,7 +1189,7 @@ function rankedTxRows(txs, startRank){
         <div class="tx-desc">${t.desc}</div>
         <div class="tx-meta">
           ${t.user_name?`<span class="tx-who" style="background:${USER_COLORS[t.user_id]||'#888'}22;color:${USER_COLORS[t.user_id]||'var(--text-dim)'}">${t.user_name}</span>`:''}
-          <span class="tx-cat">${t.cat}</span>
+          <span class="tx-cat" onclick="event.stopPropagation();openRecat('${t.id}','${(t.desc||'').replace(/'/g,"\\'")}','${t.cat}')">${t.cat}</span>
           <span class="tx-date">\u00B7 ${t.date}</span>
         </div>
       </div>
@@ -1257,13 +1272,12 @@ async function applyRecat(newCat){
 function openTypeSheet(type){
   const txs=currentMonth().filter(t=>t.type===type).sort((a,b)=>b.amount-a.amount);
   const total=txs.reduce((a,t)=>a+t.amount,0);
-  const label=type==='income'?'Income':'Expenses';
-  const color=type==='income'?'var(--green)':'var(--red)';
-  const icon=type==='income'?'\u{1F4B0}':'\u{1F4B8}';
+  const typeMap={income:{label:'Income',icon:'\u{1F4B0}',bg:'rgba(76,175,125,.15)'},expense:{label:'Expenses',icon:'\u{1F4B8}',bg:'rgba(201,90,90,.15)'},refund:{label:'Refunds',icon:'\u21A9',bg:'rgba(45,212,191,.15)'},transfer:{label:'Transfers',icon:'\u21C4',bg:'rgba(155,109,255,.15)'}};
+  const info=typeMap[type]||typeMap.expense;
   $('cat-sheet-header').innerHTML=`
-    <div class="cat-sheet-icon" style="background:${type==='income'?'rgba(76,175,125,.15)':'rgba(201,90,90,.15)'}">${icon}</div>
+    <div class="cat-sheet-icon" style="background:${info.bg}">${info.icon}</div>
     <div class="cat-sheet-info">
-      <div class="cat-sheet-name">${label}</div>
+      <div class="cat-sheet-name">${info.label}</div>
       <div class="cat-sheet-stats">${txs.length} transactions \u00B7 ${money(total)}</div>
     </div>`;
   $('cat-sheet-txs').innerHTML=txRows(txs,false);

@@ -378,7 +378,7 @@ app.post('/api/chat', async (req, res) => {
     monthTxs.filter(t=>t.type==='expense').forEach(t=>{ vendorSpend[t.desc]=(vendorSpend[t.desc]||0)+t.amount; });
     const topVendors = Object.entries(vendorSpend).sort((a,b)=>b[1]-a[1]).slice(0,15);
     const budgetRows = all('SELECT category, amount FROM budgets WHERE household = ?', [hh]);
-    const accts = all(`SELECT name, type, subtype, balance FROM accounts a
+    const accts = all(`SELECT a.name, a.type, a.subtype, a.balance FROM accounts a
       JOIN users u ON a.user_id = u.id WHERE u.household = ?`, [hh]);
     const recentTxs = monthTxs.slice(0, 30);
 
@@ -422,7 +422,7 @@ When answering:
     const messages = [...history.slice(-10), { role: 'user', content: message }];
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: systemPrompt,
       messages,
