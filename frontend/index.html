@@ -1041,9 +1041,10 @@ function renderHome(){
 }
 
 function renderLedger(){
-  const all=[...transactions].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  const s=stats(all);
-  $('ledger-count').textContent=`All Transactions (${all.length})`;
+  const mtxs=currentMonth();
+  const all=[...mtxs].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const s=stats(mtxs);
+  $('ledger-count').textContent=`Transactions (${all.length})`;
   $('ledger-kpis').innerHTML=`
     <div class="kcard" style="--kc:var(--green);width:auto"><div class="kcard-lbl">Income</div><div class="kcard-val" style="font-size:17px">${money(s.income)}</div></div>
     <div class="kcard" style="--kc:var(--red);width:auto"><div class="kcard-lbl">Expenses</div><div class="kcard-val" style="font-size:17px">${money(s.expenses)}</div></div>`;
@@ -1207,21 +1208,35 @@ function toggleTop20(){
 // ─── RECATEGORIZE ─────────────────────────────────────────────────
 let recatTxId=null;
 let recatCurrentType=null;
+let recatCurrentCat=null;
+let recatDesc=null;
+
 function openRecat(txId, desc, currentCat){
   recatTxId=txId;
+  recatDesc=desc;
+  recatCurrentCat=currentCat;
   const tx=transactions.find(t=>t.id===txId);
   recatCurrentType=tx?.type||'expense';
-  $('recat-info').innerHTML=`<strong>${desc}</strong> — ${currentCat} (${recatCurrentType})`;
+  renderRecatSheet();
+  $('recat-sheet').classList.add('on');
+}
+
+function renderRecatSheet(){
+  $('recat-info').innerHTML=`<strong>${recatDesc}</strong> — ${recatCurrentCat} (${recatCurrentType})`;
   const allCats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].filter(c=>c!=='Transfer').sort();
-  // Type reclassification buttons
   const typeButtons=`<div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;">
     <button class="recat-type-btn ${recatCurrentType==='expense'?'active':''}" onclick="applyType('expense')">Expense</button>
     <button class="recat-type-btn ${recatCurrentType==='income'?'active':''}" onclick="applyType('income')">Income</button>
     <button class="recat-type-btn ${recatCurrentType==='refund'?'active':''}" onclick="applyType('refund')" style="--tc:var(--teal)">Refund</button>
     <button class="recat-type-btn ${recatCurrentType==='transfer'?'active':''}" onclick="applyType('transfer')" style="--tc:var(--purple)">Transfer</button>
-  </div><div class="flbl" style="margin-bottom:8px">CATEGORY</div>`;
+  </div>
+  <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;" onclick="this.querySelector('input').click()">
+    <input type="checkbox" id="recat-vendor-toggle" style="accent-color:var(--gold);width:16px;height:16px;" onclick="event.stopPropagation()">
+    <label for="recat-vendor-toggle" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:.5px;cursor:pointer;">Always classify <strong style="color:var(--text)">${recatDesc}</strong> this way</label>
+  </div>
+  <div class="flbl" style="margin-bottom:8px">CATEGORY</div>`;
   $('recat-options').innerHTML=typeButtons+allCats.map(cat=>`
-    <div class="recat-option ${cat===currentCat?'selected':''}" onclick="applyRecat('${cat}')">
+    <div class="recat-option ${cat===recatCurrentCat?'selected':''}" onclick="applyRecat('${cat.replace(/'/g,"\\'")}')">
       <span class="recat-option-icon">${CAT_ICONS[cat]||'\u{1F4CC}'}</span>
       <span class="recat-option-name">${cat}</span>
     </div>`).join('')+`
@@ -1229,40 +1244,52 @@ function openRecat(txId, desc, currentCat){
       <span class="recat-option-icon">+</span>
       <span class="recat-option-name" style="color:var(--gold)">New Category</span>
     </div>`;
-  $('recat-sheet').classList.add('on');
 }
+
 async function applyType(newType){
   if(!recatTxId)return;
+  const applyToVendor=$('recat-vendor-toggle')?.checked||false;
   try{
-    const res=await fetch(`${API}/api/transactions/${recatTxId}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:newType})});
+    const res=await fetch(`${API}/api/transactions/${recatTxId}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:newType,applyToVendor})});
     if(!res.ok)throw new Error('Update failed');
-    const tx=transactions.find(t=>t.id===recatTxId);
-    if(tx)tx.type=newType;
-    closeSheet('recat-sheet');
+    if(applyToVendor){
+      transactions.filter(t=>t.desc===recatDesc).forEach(t=>{t.type=newType;});
+    }else{
+      const tx=transactions.find(t=>t.id===recatTxId);
+      if(tx)tx.type=newType;
+    }
+    recatCurrentType=newType;
+    renderRecatSheet();
     renderAll();
   }catch(e){alert('Failed to update: '+e.message);}
 }
+
 function recatNewCategory(){
   const name=prompt('New category name:');
   if(!name||!name.trim())return;
   const cat=name.trim();
-  // Add to CAT_COLORS and CAT_ICONS if not present
   if(!CAT_COLORS[cat])CAT_COLORS[cat]='#9b6dff';
   if(!CAT_ICONS[cat])CAT_ICONS[cat]='\u{1F4CC}';
   applyRecat(cat);
 }
+
 async function applyRecat(newCat){
   if(!recatTxId)return;
+  const applyToVendor=$('recat-vendor-toggle')?.checked||false;
   try{
-    const res=await fetch(`${API}/api/transactions/${recatTxId}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:newCat})});
+    const res=await fetch(`${API}/api/transactions/${recatTxId}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:newCat,applyToVendor})});
     if(!res.ok)throw new Error('Update failed');
-    const tx=transactions.find(t=>t.id===recatTxId);
-    if(tx)tx.cat=newCat;
-    // Auto-create budget for new category if it doesn't exist
+    if(applyToVendor){
+      transactions.filter(t=>t.desc===recatDesc).forEach(t=>{t.cat=newCat;});
+    }else{
+      const tx=transactions.find(t=>t.id===recatTxId);
+      if(tx)tx.cat=newCat;
+    }
     if(!budgets[newCat]){
       const budRes=await fetch(`${API}/api/budgets`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:newCat,amount:200})});
       if(budRes.ok)budgets[newCat]=200;
     }
+    recatCurrentCat=newCat;
     closeSheet('recat-sheet');
     renderAll();
   }catch(e){alert('Failed to update: '+e.message);}

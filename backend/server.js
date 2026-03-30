@@ -16,9 +16,10 @@ app.use(express.json());
 app.use(cors({ origin: '*' }));
 
 // ─── DATABASE ────────────────────────────────────────────────────
-const db = new Database(path.join(__dirname, 'ledger.db'));
+const dbPath = process.env.DB_PATH || path.join(__dirname, 'ledger.db');
+const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
-console.log('  DB: ledger.db opened');
+console.log(`  DB: ${dbPath} opened`);
 
 const run = (sql, params = []) => db.prepare(sql).run(...params);
 const get = (sql, params = []) => db.prepare(sql).get(...params);
@@ -51,6 +52,14 @@ function initDB() {
     amount REAL NOT NULL,
     updated_at TEXT DEFAULT (datetime('now')),
     PRIMARY KEY (household, category)
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS vendor_rules (
+    household TEXT NOT NULL,
+    vendor TEXT NOT NULL,
+    category TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'expense',
+    updated_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (household, vendor)
   )`);
   run(`INSERT OR IGNORE INTO users (id, name, household) VALUES (?, ?, ?)`,
     ['christian', 'Christian', 'spenziero']);
@@ -111,18 +120,30 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
   const upsertAcct = db.prepare(`INSERT OR REPLACE INTO accounts
     (account_id, user_id, household, name, mask, type, subtype, balance, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`);
+  // Load vendor rules to override Plaid categories
+  const vendorRules = {};
+  all('SELECT vendor, category, type FROM vendor_rules WHERE household = ?', [household])
+    .forEach(r => { vendorRules[r.vendor] = { cat: r.category, type: r.type }; });
+
   const insertMany = db.transaction(() => {
     for (const t of resp.data.transactions) {
-      let cat = mapCategory(t.personal_finance_category?.primary || t.category?.[0]);
-      // Also check description for transfer patterns Plaid may miss
-      const desc = (t.name || '').toUpperCase();
-      if (cat !== 'Transfer' && (
-        desc.includes('TRANSFER') || desc.includes('CREDIT CARD') && desc.includes('PAYMENT') ||
-        desc.includes('CD DEPOSIT') || desc.includes('SAVINGS') && desc.includes('WITHDRAWAL') ||
-        desc.includes('AUTOMATIC PAYMENT') || desc.includes('AUTOPAY') ||
-        desc.includes('PAYMENT - THANK')
-      )) cat = 'Transfer';
-      const type = cat === 'Transfer' ? 'transfer' : (t.amount > 0 ? 'expense' : 'income');
+      // Check vendor rules first — user overrides take priority
+      const rule = vendorRules[t.name];
+      let cat, type;
+      if (rule) {
+        cat = rule.cat;
+        type = rule.type;
+      } else {
+        cat = mapCategory(t.personal_finance_category?.primary || t.category?.[0]);
+        const desc = (t.name || '').toUpperCase();
+        if (cat !== 'Transfer' && (
+          desc.includes('TRANSFER') || desc.includes('CREDIT CARD') && desc.includes('PAYMENT') ||
+          desc.includes('CD DEPOSIT') || desc.includes('SAVINGS') && desc.includes('WITHDRAWAL') ||
+          desc.includes('AUTOMATIC PAYMENT') || desc.includes('AUTOPAY') ||
+          desc.includes('PAYMENT - THANK')
+        )) cat = 'Transfer';
+        type = cat === 'Transfer' ? 'transfer' : (t.amount > 0 ? 'expense' : 'income');
+      }
       upsertTx.run(
         t.transaction_id, household, userId, t.name,
         Math.abs(t.amount), type, cat,
@@ -269,17 +290,34 @@ app.post('/api/transactions', (req, res) => {
 });
 
 app.put('/api/transactions/:id/category', (req, res) => {
-  const { category, type } = req.body;
+  const { category, type, applyToVendor } = req.body;
   if (!category && !type) return res.status(400).json({ error: 'Missing category or type' });
   try {
-    if (category && type) {
-      run('UPDATE transactions SET cat = ?, type = ? WHERE id = ?', [category, type, req.params.id]);
-    } else if (category) {
-      run('UPDATE transactions SET cat = ? WHERE id = ?', [category, req.params.id]);
-    } else {
-      run('UPDATE transactions SET type = ? WHERE id = ?', [type, req.params.id]);
+    const tx = get('SELECT * FROM transactions WHERE id = ?', [req.params.id]);
+    if (!tx) return res.status(404).json({ error: 'Transaction not found' });
+    const newCat = category || tx.cat;
+    const newType = type || tx.type;
+    // Update this transaction
+    run('UPDATE transactions SET cat = ?, type = ? WHERE id = ?', [newCat, newType, req.params.id]);
+    let updatedCount = 1;
+    // If applyToVendor, save the rule and update all matching transactions
+    if (applyToVendor) {
+      run(`INSERT OR REPLACE INTO vendor_rules (household, vendor, category, type)
+        VALUES (?, ?, ?, ?)`, [tx.household, tx.desc, newCat, newType]);
+      const result = run('UPDATE transactions SET cat = ?, type = ? WHERE household = ? AND desc = ?',
+        [newCat, newType, tx.household, tx.desc]);
+      updatedCount = result.changes || 1;
     }
-    res.json({ success: true });
+    res.json({ success: true, updated: updatedCount });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Vendor rules
+app.get('/api/vendor-rules', (req, res) => {
+  try {
+    const hh = getHousehold(req.query.userId || 'christian');
+    const rules = all('SELECT vendor, category, type FROM vendor_rules WHERE household = ?', [hh]);
+    res.json({ rules });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
