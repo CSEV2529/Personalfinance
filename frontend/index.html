@@ -103,7 +103,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 @keyframes heroGlow{from{opacity:.6;transform:scale(.9);}to{opacity:1;transform:scale(1.1);}}
 .hero-who{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;position:relative;}
 .hero-amt{font-family:'Playfair Display',serif;font-size:56px;line-height:1;transition:color .3s,text-shadow .3s;position:relative;text-shadow:0 0 40px rgba(0,255,135,.3),0 0 80px rgba(0,255,135,.1);letter-spacing:-1px;}
-.hero-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:8px;letter-spacing:2px;position:relative;}
+.hero-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:8px;letter-spacing:2px;position:relative;}
 .hero-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:18px;position:relative;}
 .hstat{
   border-radius:14px;padding:14px 14px;position:relative;overflow:hidden;
@@ -249,14 +249,14 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
   content:'';position:absolute;top:-40px;left:-40px;width:150px;height:150px;
   background:radial-gradient(circle,rgba(0,255,213,.1) 0%,transparent 65%);pointer-events:none;filter:blur(10px);
 }
-.chart-lbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;position:relative;}
+.chart-lbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;position:relative;}
 .barchart{display:flex;align-items:flex-end;gap:8px;height:110px;position:relative;}
 .bcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;}
 .bpair{display:flex;gap:4px;align-items:flex-end;}
 .bseg{border-radius:4px 4px 0 0;min-width:14px;}
-.bcol-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);}
+.bcol-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);}
 .chart-leg{display:flex;gap:16px;margin-top:12px;position:relative;}
-.chart-leg-item{display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);}
+.chart-leg-item{display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);}
 .chart-leg-dot{width:8px;height:8px;border-radius:3px;}
 
 /* ─── REPORTS ───────────────────────────────────────────────── */
@@ -276,16 +276,16 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .rbar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green),var(--teal));box-shadow:0 0 12px rgba(0,255,135,.3),0 0 24px rgba(0,255,213,.15);}
 .rright{text-align:right;}
 .rnet{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;}
-.rrate{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);}
+.rrate{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);}
 
 /* ─── CONNECT SCREEN ────────────────────────────────────────── */
 .connect-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px 28px;gap:12px;min-height:320px;}
 .connect-icon{font-size:56px;margin-bottom:4px;filter:drop-shadow(0 0 20px rgba(201,168,76,.3));}
 .connect-title{font-family:'Playfair Display',serif;font-size:28px;}
-.connect-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;line-height:1.9;max-width:280px;}
+.connect-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:1px;line-height:1.9;max-width:280px;}
 .connect-btn{padding:14px 36px;border-radius:14px;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:2px;text-transform:uppercase;background:linear-gradient(135deg,var(--gold),#ffed4a);color:#000;font-weight:600;margin-top:4px;box-shadow:0 4px 20px rgba(255,215,0,.35),0 0 40px rgba(255,215,0,.15);}
 .connect-btn:active{transform:scale(.96);}
-.connect-note{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);letter-spacing:1px;}
+.connect-note{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-dim);letter-spacing:1px;}
 
 /* ─── SETTINGS ──────────────────────────────────────────────── */
 .scard{background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);border:1px solid var(--border);border-radius:18px;overflow:hidden;margin:0 14px 14px;box-shadow:0 2px 16px rgba(0,0,0,.3);}
@@ -294,7 +294,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .srow-left{display:flex;align-items:center;gap:12px;}
 .sico{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:16px;}
 .sname{font-size:14px;font-weight:500;}
-.ssub{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:2px;}
+.ssub{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:2px;}
 .sbtn{padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;transition:all .15s;}
 .sbtn:active{transform:scale(.94);}
 .sbtn.gold{background:linear-gradient(135deg,var(--gold),#ffed4a);color:#000;font-weight:600;box-shadow:0 2px 12px rgba(255,215,0,.3),0 0 20px rgba(255,215,0,.12);}
@@ -308,7 +308,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .member-avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;color:#000;box-shadow:0 0 12px rgba(201,168,76,.2);}
 .member-info{flex:1;}
 .member-name{font-size:14px;font-weight:500;}
-.member-status{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:2px;}
+.member-status{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:2px;}
 .member-badge{font-family:'DM Mono',monospace;font-size:9px;padding:3px 8px;border-radius:5px;letter-spacing:1px;text-transform:uppercase;}
 
 /* ─── INSTALL PROMPT ────────────────────────────────────────── */
@@ -325,7 +325,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .install-icon{font-size:28px;flex-shrink:0;}
 .install-text{flex:1;}
 .install-title{font-size:13px;font-weight:600;}
-.install-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:2px;}
+.install-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:2px;}
 .install-actions{display:flex;gap:7px;flex-shrink:0;}
 
 /* ─── BOTTOM SHEET ──────────────────────────────────────────── */
@@ -342,7 +342,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .fstack{display:flex;flex-direction:column;gap:12px;}
 .frow{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .fg{display:flex;flex-direction:column;gap:6px;}
-.flbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;}
+.flbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;}
 .finput,.fselect{background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:13px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color .15s,box-shadow .15s;width:100%;-webkit-appearance:none;}
 .finput:focus,.fselect:focus{border-color:var(--gold);box-shadow:0 0 12px rgba(201,168,76,.15);}
 .fselect option{background:var(--surface2);}
@@ -358,7 +358,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .upick-option.selected{background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.25);}
 .upick-avatar{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:bold;color:#000;}
 .upick-name{font-size:16px;font-weight:500;}
-.upick-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:2px;}
+.upick-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:2px;}
 .upick-check{color:var(--gold);font-size:18px;margin-left:auto;text-shadow:0 0 10px var(--gold);}
 
 .month-nav{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
@@ -376,7 +376,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .add-budget-btn:hover{border-color:var(--gold);color:var(--gold);background:rgba(201,168,76,.06);}
 .spacer{height:18px;}
 .sidebar-brand{display:none;}
-.empty-msg{text-align:center;padding:40px 20px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1px;}
+.empty-msg{text-align:center;padding:40px 20px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:1px;}
 
 /* ─── AI CHAT ──────────────────────────────────────────────── */
 .chat-fab{position:fixed;bottom:calc(var(--tab-h) + var(--safe-b) + 16px);right:16px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#ffed4a);color:#000;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:150;box-shadow:0 4px 20px rgba(255,215,0,.4),0 0 40px rgba(255,215,0,.15);transition:transform .15s,box-shadow .15s;}
@@ -400,7 +400,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .chat-bubble{padding:12px 16px;border-radius:16px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;}
 .chat-msg.user .chat-bubble{background:linear-gradient(135deg,var(--gold),#e0c060);color:#000;border-bottom-right-radius:4px;}
 .chat-msg.assistant .chat-bubble{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px;}
-.chat-typing{align-self:flex-start;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:16px;border-bottom-left-radius:4px;font-size:13px;color:var(--text-muted);}
+.chat-typing{align-self:flex-start;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:16px;border-bottom-left-radius:4px;font-size:13px;color:var(--text-dim);}
 .chat-typing::after{content:'...';animation:dots 1.2s infinite;}
 @keyframes dots{0%,20%{content:'.';}40%{content:'..';}60%,100%{content:'...';}}
 
@@ -426,7 +426,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 /* ─── RECATEGORIZE ─────────────────────────────────────────── */
 .tx-cat{cursor:pointer;padding:2px 6px;border-radius:4px;transition:background .15s;}
 .tx-cat:hover{background:rgba(201,168,76,.15);color:var(--gold);}
-.recat-tx-info{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.recat-tx-info{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);}
 .recat-options{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .recat-option{display:flex;align-items:center;gap:8px;padding:12px;border-radius:12px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;transition:all .15s;}
 .recat-option:hover{border-color:var(--gold);background:rgba(201,168,76,.06);}
@@ -442,7 +442,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .emoji-picker-title{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
 .emoji-picker-cat{font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:14px;text-shadow:0 0 15px rgba(255,215,0,.3);}
 .emoji-section{margin-bottom:14px;}
-.emoji-section-lbl{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
+.emoji-section-lbl{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
 .emoji-grid{display:flex;flex-wrap:wrap;gap:4px;}
 .emoji-pick{width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:22px;border-radius:10px;cursor:pointer;transition:all .12s;background:rgba(255,255,255,.03);}
 .emoji-pick:hover{background:rgba(255,215,0,.12);transform:scale(1.15);box-shadow:0 0 12px rgba(255,215,0,.15);}
@@ -457,9 +457,9 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .cat-sheet-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;}
 .cat-sheet-info{flex:1;}
 .cat-sheet-name{font-family:'Playfair Display',serif;font-size:20px;}
-.cat-sheet-stats{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted);margin-top:4px;}
+.cat-sheet-stats{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:4px;}
 .cat-sheet-budget{margin-top:8px;}
-.cat-sheet-budget-text{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:4px;}
+.cat-sheet-budget-text{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);margin-bottom:4px;}
 .dleg-row{cursor:pointer;padding:4px 6px;border-radius:6px;transition:background .15s;}
 .dleg-row:hover{background:rgba(255,255,255,.05);}
 .bcard{cursor:pointer;transition:transform .1s,box-shadow .15s;}
@@ -476,10 +476,10 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .vendor-rank{grid-row:1/3;width:28px;height:28px;border-radius:50%;background:rgba(201,168,76,.12);color:var(--gold);font-family:'DM Mono',monospace;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:500;}
 .vendor-info{grid-column:2;grid-row:1;}
 .vendor-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.vendor-meta{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:2px;}
+.vendor-meta{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:2px;}
 .vendor-right{grid-column:3;grid-row:1;text-align:right;}
 .vendor-amt{font-family:'DM Mono',monospace;font-size:13px;color:var(--red);font-weight:500;}
-.vendor-pct{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);}
+.vendor-pct{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);}
 .vendor-bar{grid-column:2/4;grid-row:2;height:4px;background:var(--border2);border-radius:2px;overflow:hidden;}
 .vendor-bar-fill{height:100%;border-radius:2px;transition:width .5s cubic-bezier(.4,0,.2,1);box-shadow:0 0 8px currentColor;}
 
@@ -707,6 +707,11 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
     <div class="view" id="v-ledger">
       <div class="desktop-container">
         <div style="padding:14px 14px 0">
+          <div class="month-nav" style="justify-content:center;margin-bottom:12px">
+            <div class="month-arrow" onclick="changeMonth(-1)">&larr;</div>
+            <div class="month-label" id="ledger-month-label"></div>
+            <div class="month-arrow" onclick="changeMonth(1)">&rarr;</div>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px" id="ledger-kpis"></div>
         </div>
         <div class="sec-head"><div class="sec-title" id="ledger-count">Transactions</div></div>
@@ -719,6 +724,11 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
     <div class="view" id="v-budget">
       <div class="desktop-container">
         <div style="padding:14px 14px 0">
+          <div class="month-nav" style="justify-content:center;margin-bottom:12px">
+            <div class="month-arrow" onclick="changeMonth(-1)">&larr;</div>
+            <div class="month-label" id="budget-month-label"></div>
+            <div class="month-arrow" onclick="changeMonth(1)">&rarr;</div>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px" id="budget-kpis"></div>
         </div>
         <div class="sec-head"><div class="sec-title">Categories</div></div>
@@ -809,7 +819,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
     <div class="sheet-handle"></div>
     <div class="sheet-title">Who's viewing?</div>
     <div id="user-options"></div>
-    <p style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);text-align:center;margin-top:10px;letter-spacing:1px">Household data is always shared</p>
+    <p style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);text-align:center;margin-top:10px;letter-spacing:1px">Household data is always shared</p>
   </div>
 </div>
 
@@ -913,7 +923,7 @@ const API = window.location.hostname === 'localhost' || window.location.hostname
 const CAT_COLORS={Housing:'#ffd700',Food:'#00ff87',Transport:'#00d4ff',Health:'#ff6ec7',Entertainment:'#bf5af2',Shopping:'#ff9f1c',Utilities:'#00ffd5',Income:'#00ff87',Transfer:'#bf5af2',Other:'#7a78a0'};
 const CAT_ICONS={Housing:'\u{1F3E0}',Food:'\u{1F37D}\uFE0F',Transport:'\u{1F697}',Health:'\u{1F48A}',Entertainment:'\u{1F3AC}',Shopping:'\u{1F6CD}\uFE0F',Utilities:'\u26A1',Income:'\u{1F4B0}',Transfer:'\u{1F501}',Other:'\u{1F4CC}'};
 let budgets = {};
-const USER_COLORS={christian:'#c9a84c',wife:'#5a8fc9'};
+const USER_COLORS={christian:'#ffd700',wife:'#00d4ff'};
 const USER_INITIALS={christian:'C',wife:'M'};
 
 // ─── STATE ────────────────────────────────────────────────────────
@@ -950,7 +960,7 @@ if(!isOnline)$('offline-banner').classList.add('on');
 async function loadData(){
   try{
     // Calculate date range: 6 months back from selected month to cover reports + selected month
-    const startD = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 6, 1);
+    const startD = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 12, 1);
     const endD = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
     const startDate = startD.toISOString().split('T')[0];
     const endDate = endD.toISOString().split('T')[0];
@@ -1111,14 +1121,17 @@ function renderLedger(){
   const mtxs=currentMonth();
   const all=[...mtxs].sort((a,b)=>new Date(b.date)-new Date(a.date));
   const s=stats(mtxs);
+  $('ledger-month-label').textContent=selectedMonth.toLocaleString('default',{month:'long',year:'numeric'});
   $('ledger-count').textContent=`Transactions (${all.length})`;
   $('ledger-kpis').innerHTML=`
     <div class="kcard" style="--kc:var(--green);width:auto"><div class="kcard-lbl">Income</div><div class="kcard-val" style="font-size:17px">${money(s.income)}</div></div>
-    <div class="kcard" style="--kc:var(--red);width:auto"><div class="kcard-lbl">Expenses</div><div class="kcard-val" style="font-size:17px">${money(s.expenses)}</div></div>`;
+    <div class="kcard" style="--kc:var(--red);width:auto"><div class="kcard-lbl">Expenses</div><div class="kcard-val" style="font-size:17px">${money(s.expenses)}</div></div>
+    <div class="kcard" style="--kc:var(--blue);width:auto;grid-column:1/-1"><div class="kcard-lbl">Net Cash Flow</div><div class="kcard-val" style="font-size:17px;color:${s.net>=0?'var(--green)':'var(--red)'}">${s.net>=0?'+':'-'}${money(s.net)}</div></div>`;
   $('ledger-list').innerHTML=txRows(all,true);
 }
 
 function renderBudget(){
+  $('budget-month-label').textContent=selectedMonth.toLocaleString('default',{month:'long',year:'numeric'});
   const mtxs=currentMonth();
   const bd=catBreak(mtxs);
   const totalB=Object.values(budgets).reduce((a,b)=>a+b,0);
@@ -1136,7 +1149,7 @@ function renderBudget(){
       <div class="bcard-top">
         <div class="bcard-left"><div class="bcard-dot" style="background:${CAT_COLORS[cat]||'#888'}"></div>${CAT_ICONS[cat]||'\u{1F4CC}'} ${cat}</div>
         <div style="display:flex;align-items:center;gap:10px">
-          <div class="bcard-nums"><span>${money(spent)}<span style="color:var(--text-muted)"> / ${money(limit)}</span></span>${over?`<div class="bcard-over">\u25B2 ${money(spent-limit)} over</div>`:''}</div>
+          <div class="bcard-nums"><span>${money(spent)}<span style="color:var(--text-dim)"> / ${money(limit)}</span></span>${over?`<div class="bcard-over">\u25B2 ${money(spent-limit)} over</div>`:''}</div>
           <div class="bcard-actions">
             <button class="bcard-edit" onclick="event.stopPropagation();openBudgetEdit('${cat.replace(/'/g,"\\'")}',${limit})" title="Edit">&#x270E;</button>
             <button class="bcard-del" onclick="event.stopPropagation();deleteBudget('${cat.replace(/'/g,"\\'")}')" title="Delete">&#x2715;</button>
@@ -1151,7 +1164,7 @@ function renderBudget(){
 function renderReports(){
   const now=new Date();
   const rows=[];
-  for(let i=5;i>=0;i--){
+  for(let i=11;i>=0;i--){
     const d=new Date(now.getFullYear(),now.getMonth()-i,1);
     const txs=monthTxs(transactions,d.getFullYear(),d.getMonth());
     const s=stats(txs);
@@ -1178,8 +1191,8 @@ function renderAccounts(){
         <div class="kcard" style="--kc:var(--red);width:auto"><div class="kcard-lbl">Credit</div><div class="kcard-val" style="font-size:17px">${money(cred.reduce((a,ac)=>a+(ac.balance||0),0))}</div><div class="kcard-sub">${cred.length} card(s)</div></div>
       </div>
     </div>
-    ${dep.length?`<div class="sec-head"><div class="sec-title">Deposit Accounts</div></div>${dep.map(a=>`<div class="bcard" style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:13px;font-weight:500">${a.name}</div><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted)">\u2022\u2022\u2022\u2022${a.mask}${a.user_name?' \u00B7 '+a.user_name:''}</div></div><div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--green)">${money(a.balance)}</div></div>`).join('')}`:''}
-    ${cred.length?`<div class="sec-head" style="margin-top:6px"><div class="sec-title">Credit Cards</div></div>${cred.map(a=>`<div class="bcard" style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:13px;font-weight:500">${a.name}</div><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted)">\u2022\u2022\u2022\u2022${a.mask}${a.user_name?' \u00B7 '+a.user_name:''}</div></div><div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--red)">${money(a.balance)}</div></div>`).join('')}`:''}
+    ${dep.length?`<div class="sec-head"><div class="sec-title">Deposit Accounts</div></div>${dep.map(a=>`<div class="bcard" style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:13px;font-weight:500">${a.name}</div><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim)">\u2022\u2022\u2022\u2022${a.mask}${a.user_name?' \u00B7 '+a.user_name:''}</div></div><div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--green)">${money(a.balance)}</div></div>`).join('')}`:''}
+    ${cred.length?`<div class="sec-head" style="margin-top:6px"><div class="sec-title">Credit Cards</div></div>${cred.map(a=>`<div class="bcard" style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:13px;font-weight:500">${a.name}</div><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim)">\u2022\u2022\u2022\u2022${a.mask}${a.user_name?' \u00B7 '+a.user_name:''}</div></div><div style="font-family:'Playfair Display',serif;font-size:20px;color:var(--red)">${money(a.balance)}</div></div>`).join('')}`:''}
   ` : `<div class="connect-screen">
     <div class="connect-icon">\u{1F3E6}</div>
     <div class="connect-title">Connect Your Bank</div>
@@ -1576,7 +1589,7 @@ function renderDonut(bd,total){
 function renderBarChart(){
   const now=new Date();
   const months=[];
-  for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push({lbl:d.toLocaleString('default',{month:'short'}),y:d.getFullYear(),m:d.getMonth()});}
+  for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push({lbl:d.toLocaleString('default',{month:'short'}),y:d.getFullYear(),m:d.getMonth()});}
   const data=months.map(mo=>{const txs=monthTxs(transactions,mo.y,mo.m);return{...mo,...stats(txs)};});
   const maxV=Math.max(...data.map(d=>Math.max(d.income,d.expenses)),1);
   const H=100;
