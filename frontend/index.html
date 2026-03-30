@@ -957,8 +957,8 @@ function renderBudget(){
         <div style="display:flex;align-items:center;gap:10px">
           <div class="bcard-nums"><span>${money(spent)}<span style="color:var(--text-muted)"> / ${money(limit)}</span></span>${over?`<div class="bcard-over">\u25B2 ${money(spent-limit)} over</div>`:''}</div>
           <div class="bcard-actions">
-            <button class="bcard-edit" onclick="openBudgetEdit('${cat.replace(/'/g,"\\'")}',${limit})" title="Edit">&#x270E;</button>
-            <button class="bcard-del" onclick="deleteBudget('${cat.replace(/'/g,"\\'")}')" title="Delete">&#x2715;</button>
+            <button class="bcard-edit" onclick="event.stopPropagation();openBudgetEdit('${cat.replace(/'/g,"\\'")}',${limit})" title="Edit">&#x270E;</button>
+            <button class="bcard-del" onclick="event.stopPropagation();deleteBudget('${cat.replace(/'/g,"\\'")}')" title="Delete">&#x2715;</button>
           </div>
         </div>
       </div>
