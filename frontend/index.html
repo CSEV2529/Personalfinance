@@ -405,6 +405,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .recat-option.selected{border-color:var(--gold);background:rgba(201,168,76,.1);}
 .recat-option-icon{font-size:18px;}
 .recat-option-name{font-size:12px;font-weight:500;}
+.recat-type-btn{padding:8px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.5px;cursor:pointer;transition:all .15s;}
+.recat-type-btn:hover{border-color:var(--tc,var(--gold));}
+.recat-type-btn.active{background:rgba(201,168,76,.15);border-color:var(--tc,var(--gold));color:var(--tc,var(--gold));font-weight:500;}
 
 /* ─── CATEGORY SHEET ──────────────────────────────────────────── */
 .cat-sheet-header{display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);}
@@ -618,8 +621,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
           <div class="hero-amt" id="hero-amt">$0.00</div>
           <div class="hero-sub" id="hero-sub">Net Cash Flow</div>
           <div class="hero-stats">
-            <div class="hstat"><div class="hstat-lbl">Income</div><div class="hstat-val" id="hs-income" style="color:var(--green)">&mdash;</div></div>
-            <div class="hstat"><div class="hstat-lbl">Expenses</div><div class="hstat-val" id="hs-expenses" style="color:var(--red)">&mdash;</div></div>
+            <div class="hstat" onclick="openTypeSheet('income')" style="cursor:pointer"><div class="hstat-lbl">Income</div><div class="hstat-val" id="hs-income" style="color:var(--green)">&mdash;</div></div>
+            <div class="hstat" onclick="openTypeSheet('expense')" style="cursor:pointer"><div class="hstat-lbl">Expenses</div><div class="hstat-val" id="hs-expenses" style="color:var(--red)">&mdash;</div></div>
             <div class="hstat"><div class="hstat-lbl">Saved</div><div class="hstat-val" id="hs-saved" style="color:var(--blue)">&mdash;</div></div>
           </div>
         </div>
@@ -866,11 +869,12 @@ const money = n => '$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits
 function stats(txs){
   const inc=txs.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0);
   const exp=txs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
-  return{income:inc,expenses:exp,net:inc-exp};
+  const refunds=txs.filter(t=>t.type==='refund').reduce((a,t)=>a+t.amount,0);
+  return{income:inc,expenses:exp-refunds,net:inc-(exp-refunds),refunds};
 }
 function monthTxs(txs,y,m){return txs.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});}
 function currentMonth(){return monthTxs(transactions,selectedMonth.getFullYear(),selectedMonth.getMonth());}
-function catBreak(txs){const m={};txs.filter(t=>t.type==='expense').forEach(t=>{m[t.cat]=(m[t.cat]||0)+t.amount;});return m;}
+function catBreak(txs){const m={};txs.filter(t=>t.type==='expense').forEach(t=>{m[t.cat]=(m[t.cat]||0)+t.amount;});txs.filter(t=>t.type==='refund').forEach(t=>{m[t.cat]=(m[t.cat]||0)-t.amount;});return m;}
 function userName(id){return users.find(u=>u.id===id)?.name||id;}
 
 // ─── ONLINE/OFFLINE ───────────────────────────────────────────────
@@ -1154,7 +1158,7 @@ function txRows(txs,deletable){
           <span class="tx-date">\u00B7 ${t.date}</span>
         </div>
       </div>
-      <div class="tx-amt ${t.type==='income'?'pos':'neg'}">${t.type==='income'?'+':'-'}${money(t.amount)}</div>
+      <div class="tx-amt ${t.type==='income'?'pos':t.type==='refund'?'pos':'neg'}">${t.type==='income'?'+':t.type==='refund'?'+':'-'}${money(t.amount)}${t.type==='refund'?' \u21A9':''}</div>
       ${deletable?`<div class="tx-del" onclick="deleteTx('${t.id}')">\u2715</div>`:''}
     </div>`).join('');
 }
@@ -1187,11 +1191,21 @@ function toggleTop20(){
 
 // ─── RECATEGORIZE ─────────────────────────────────────────────────
 let recatTxId=null;
+let recatCurrentType=null;
 function openRecat(txId, desc, currentCat){
   recatTxId=txId;
-  $('recat-info').innerHTML=`<strong>${desc}</strong> — currently: ${currentCat}`;
+  const tx=transactions.find(t=>t.id===txId);
+  recatCurrentType=tx?.type||'expense';
+  $('recat-info').innerHTML=`<strong>${desc}</strong> — ${currentCat} (${recatCurrentType})`;
   const allCats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].filter(c=>c!=='Transfer').sort();
-  $('recat-options').innerHTML=allCats.map(cat=>`
+  // Type reclassification buttons
+  const typeButtons=`<div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;">
+    <button class="recat-type-btn ${recatCurrentType==='expense'?'active':''}" onclick="applyType('expense')">Expense</button>
+    <button class="recat-type-btn ${recatCurrentType==='income'?'active':''}" onclick="applyType('income')">Income</button>
+    <button class="recat-type-btn ${recatCurrentType==='refund'?'active':''}" onclick="applyType('refund')" style="--tc:var(--teal)">Refund</button>
+    <button class="recat-type-btn ${recatCurrentType==='transfer'?'active':''}" onclick="applyType('transfer')" style="--tc:var(--purple)">Transfer</button>
+  </div><div class="flbl" style="margin-bottom:8px">CATEGORY</div>`;
+  $('recat-options').innerHTML=typeButtons+allCats.map(cat=>`
     <div class="recat-option ${cat===currentCat?'selected':''}" onclick="applyRecat('${cat}')">
       <span class="recat-option-icon">${CAT_ICONS[cat]||'\u{1F4CC}'}</span>
       <span class="recat-option-name">${cat}</span>
@@ -1201,6 +1215,17 @@ function openRecat(txId, desc, currentCat){
       <span class="recat-option-name" style="color:var(--gold)">New Category</span>
     </div>`;
   $('recat-sheet').classList.add('on');
+}
+async function applyType(newType){
+  if(!recatTxId)return;
+  try{
+    const res=await fetch(`${API}/api/transactions/${recatTxId}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:newType})});
+    if(!res.ok)throw new Error('Update failed');
+    const tx=transactions.find(t=>t.id===recatTxId);
+    if(tx)tx.type=newType;
+    closeSheet('recat-sheet');
+    renderAll();
+  }catch(e){alert('Failed to update: '+e.message);}
 }
 function recatNewCategory(){
   const name=prompt('New category name:');
@@ -1226,6 +1251,23 @@ async function applyRecat(newCat){
     closeSheet('recat-sheet');
     renderAll();
   }catch(e){alert('Failed to update: '+e.message);}
+}
+
+// ─── TYPE BREAKDOWN SHEET ─────────────────────────────────────────
+function openTypeSheet(type){
+  const txs=currentMonth().filter(t=>t.type===type).sort((a,b)=>b.amount-a.amount);
+  const total=txs.reduce((a,t)=>a+t.amount,0);
+  const label=type==='income'?'Income':'Expenses';
+  const color=type==='income'?'var(--green)':'var(--red)';
+  const icon=type==='income'?'\u{1F4B0}':'\u{1F4B8}';
+  $('cat-sheet-header').innerHTML=`
+    <div class="cat-sheet-icon" style="background:${type==='income'?'rgba(76,175,125,.15)':'rgba(201,90,90,.15)'}">${icon}</div>
+    <div class="cat-sheet-info">
+      <div class="cat-sheet-name">${label}</div>
+      <div class="cat-sheet-stats">${txs.length} transactions \u00B7 ${money(total)}</div>
+    </div>`;
+  $('cat-sheet-txs').innerHTML=txRows(txs,false);
+  $('cat-sheet').classList.add('on');
 }
 
 // ─── CATEGORY SHEET ───────────────────────────────────────────────

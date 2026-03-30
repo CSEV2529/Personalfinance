@@ -269,10 +269,16 @@ app.post('/api/transactions', (req, res) => {
 });
 
 app.put('/api/transactions/:id/category', (req, res) => {
-  const { category } = req.body;
-  if (!category) return res.status(400).json({ error: 'Missing category' });
+  const { category, type } = req.body;
+  if (!category && !type) return res.status(400).json({ error: 'Missing category or type' });
   try {
-    run('UPDATE transactions SET cat = ? WHERE id = ?', [category, req.params.id]);
+    if (category && type) {
+      run('UPDATE transactions SET cat = ?, type = ? WHERE id = ?', [category, type, req.params.id]);
+    } else if (category) {
+      run('UPDATE transactions SET cat = ? WHERE id = ?', [category, req.params.id]);
+    } else {
+      run('UPDATE transactions SET type = ? WHERE id = ?', [type, req.params.id]);
+    }
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
