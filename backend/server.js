@@ -9,6 +9,7 @@ const cors = require('cors');
 const Database = require('better-sqlite3');
 const path = require('path');
 const { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } = require('plaid');
+const Anthropic = require('@anthropic-ai/sdk');
 
 const app = express();
 app.use(express.json());
@@ -335,6 +336,89 @@ app.get('/api/spending/by-vendor', (req, res) => {
       GROUP BY desc ORDER BY total DESC LIMIT 20`, [hh, startDate, endDate]);
     res.json({ vendors: rows });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── AI CHAT ─────────────────────────────────────────────────────
+const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
+
+app.post('/api/chat', async (req, res) => {
+  if (!anthropic) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+  const { userId = 'christian', message, history = [] } = req.body;
+  if (!message) return res.status(400).json({ error: 'Missing message' });
+
+  try {
+    const hh = getHousehold(userId);
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+    const lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+    const monthEnd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+
+    // Gather financial context
+    const monthTxs = all(`SELECT desc, amount, type, cat, date FROM transactions
+      WHERE household = ? AND date >= ? AND date <= ? ORDER BY date DESC`, [hh, monthStart, monthEnd]);
+    const income = monthTxs.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0);
+    const expenses = monthTxs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+    const catSpend = {};
+    monthTxs.filter(t=>t.type==='expense').forEach(t=>{ catSpend[t.cat]=(catSpend[t.cat]||0)+t.amount; });
+    const vendorSpend = {};
+    monthTxs.filter(t=>t.type==='expense').forEach(t=>{ vendorSpend[t.desc]=(vendorSpend[t.desc]||0)+t.amount; });
+    const topVendors = Object.entries(vendorSpend).sort((a,b)=>b[1]-a[1]).slice(0,15);
+    const budgetRows = all('SELECT category, amount FROM budgets WHERE household = ?', [hh]);
+    const accts = all(`SELECT name, type, subtype, balance FROM accounts a
+      JOIN users u ON a.user_id = u.id WHERE u.household = ?`, [hh]);
+    const recentTxs = monthTxs.slice(0, 30);
+
+    const context = `
+## Financial Data for ${now.toLocaleString('default',{month:'long',year:'numeric'})}
+
+### Summary
+- Income: $${income.toFixed(2)}
+- Expenses: $${expenses.toFixed(2)}
+- Net: $${(income-expenses).toFixed(2)}
+- Savings rate: ${income>0?((income-expenses)/income*100).toFixed(0):'0'}%
+- Total transactions: ${monthTxs.length}
+
+### Spending by Category
+${Object.entries(catSpend).sort((a,b)=>b[1]-a[1]).map(([c,a])=>`- ${c}: $${a.toFixed(2)}`).join('\n')}
+
+### Budgets vs Actual
+${budgetRows.map(b=>{const spent=catSpend[b.category]||0;return `- ${b.category}: $${spent.toFixed(2)} / $${b.amount.toFixed(2)} (${(spent/b.amount*100).toFixed(0)}%)`;}).join('\n')}
+
+### Top Vendors
+${topVendors.map(([v,a])=>`- ${v}: $${a.toFixed(2)}`).join('\n')}
+
+### Accounts
+${accts.length?accts.map(a=>`- ${a.name} (${a.type}/${a.subtype}): $${(a.balance||0).toFixed(2)}`).join('\n'):'No linked accounts'}
+
+### Recent Transactions (last 30)
+${recentTxs.map(t=>`- ${t.date} | ${t.type} | ${t.cat} | ${t.desc} | $${t.amount.toFixed(2)}`).join('\n')}
+`;
+
+    const systemPrompt = `You are a helpful personal finance assistant for the Spenziero household. You have access to their real financial data below. Give concise, actionable advice. Use specific numbers from their data. Be conversational but brief.
+
+${context}
+
+When answering:
+- Reference actual numbers and transactions
+- Be specific about where money is going
+- If asked about budgets, compare actual vs budgeted
+- Keep responses under 200 words unless detail is needed
+- Use $ formatting for amounts`;
+
+    const messages = [...history.slice(-10), { role: 'user', content: message }];
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages,
+    });
+
+    res.json({ reply: response.content[0].text });
+  } catch (e) {
+    console.error('Chat error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Serve frontend
