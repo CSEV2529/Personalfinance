@@ -696,26 +696,49 @@ function animateBars(){
 }
 
 // ─── PLAID ────────────────────────────────────────────────────────
+function plaidCallbacks(){
+  return {
+    onSuccess:async(pt)=>{
+      localStorage.removeItem('plaid_link_token');
+      showSync('Connecting bank…');
+      try{
+        const er=await fetch(`${API}/api/exchange_public_token`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token:pt,userId:currentUser})});
+        if(er.ok){setConnected(true);await loadData();hideSync('✓ Bank connected and synced!');}
+        else hideSync('✗ Connection failed');
+      }catch(ex){hideSync('✗ '+ex.message);}
+    },
+    onExit:(err,metadata)=>{
+      if(err)console.error('Plaid error:',err);
+      console.log('Plaid exit:',metadata?.status);
+    }
+  };
+}
+
 async function initPlaidLink(){
   try{
     const res=await fetch(`${API}/api/create_link_token`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser})});
     if(!res.ok)throw new Error('Backend unreachable. Is server running?');
     const{link_token}=await res.json();
-    Plaid.create({
-      token:link_token,
-      onSuccess:async(pt)=>{
-        alert('Plaid onSuccess fired! Exchanging token…');
-        showSync('Connecting bank…');
-        try{
-          const er=await fetch(`${API}/api/exchange_public_token`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token:pt,userId:currentUser})});
-          const body=await er.text();
-          if(er.ok){setConnected(true);await loadData();hideSync('✓ Bank connected and synced!');}
-          else{alert('Exchange failed: '+body);hideSync('✗ Connection failed');}
-        }catch(ex){alert('Exchange error: '+ex.message);}
-      },onExit:(err,metadata)=>{alert('Plaid onExit: err='+JSON.stringify(err)+' status='+metadata?.status);}
-    }).open();
+    localStorage.setItem('plaid_link_token',link_token);
+    Plaid.create({token:link_token,...plaidCallbacks()}).open();
   }catch(e){alert('⚠ '+e.message);}
 }
+
+// Handle OAuth return — bank redirects back here after authentication
+(function handleOAuthReturn(){
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('oauth_state_id')){
+    const savedToken=localStorage.getItem('plaid_link_token');
+    if(savedToken){
+      Plaid.create({
+        token:savedToken,
+        receivedRedirectUri:window.location.href,
+        ...plaidCallbacks()
+      }).open();
+    }
+    window.history.replaceState({},'',window.location.pathname);
+  }
+})();
 
 function setConnected(val){
   isConnected=val;
