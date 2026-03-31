@@ -619,10 +619,12 @@ app.post('/api/recurring', (req, res) => {
   if (!vendor) return res.status(400).json({ error: 'Missing vendor' });
   try {
     const hh = getHousehold(userId);
+    // Check if rule already exists for this vendor
+    const existing = get('SELECT id FROM recurring_rules WHERE household=? AND vendor=? AND is_active=1', [hh, vendor]);
+    if (existing) return res.json({ success: true, id: existing.id, existing: true });
     const id = 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     run(`INSERT INTO recurring_rules (id,household,vendor,category,expected_amount,frequency,is_subscription,last_seen)
       VALUES (?,?,?,?,?,?,?,date('now'))`, [id, hh, vendor, category, expected_amount, frequency, is_subscription ? 1 : 0]);
-    // Mark matching transactions as recurring
     run('UPDATE transactions SET is_recurring=1, recurring_group_id=? WHERE household=? AND desc=?', [id, hh, vendor]);
     res.json({ success: true, id });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -701,6 +703,19 @@ app.get('/api/subscriptions', (req, res) => {
       return a + (s.expected_amount || 0) * mult;
     }, 0);
     res.json({ subscriptions: subs, monthly_total: monthlyTotal });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/recurring/dedup', (req, res) => {
+  const { userId = 'christian' } = req.body;
+  try {
+    const hh = getHousehold(userId);
+    // Keep the earliest rule per vendor, delete the rest
+    const dupes = all(`SELECT id FROM recurring_rules WHERE household=? AND id NOT IN (
+      SELECT MIN(id) FROM recurring_rules WHERE household=? GROUP BY vendor
+    )`, [hh, hh]);
+    for (const d of dupes) run('DELETE FROM recurring_rules WHERE id=?', [d.id]);
+    res.json({ success: true, removed: dupes.length });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

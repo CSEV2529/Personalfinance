@@ -1676,8 +1676,9 @@ async function openBulkRecat(){
 }
 
 function onTxRowClick(e,id){
-  if(selectMode){e.stopPropagation();toggleSelectTx(id);return;}
-  // Close any open bottom sheets first so detail page is visible
+  // Select mode only works on the ledger tab
+  if(selectMode && currentTab==='ledger'){e.stopPropagation();toggleSelectTx(id);return;}
+  // Close any open bottom sheets first
   ['cat-sheet','vendor-sheet','recat-sheet'].forEach(s=>$(s)?.classList.remove('on'));
   openTxDetail(id);
 }
@@ -2149,16 +2150,24 @@ async function applyRecat(newCat){
 function openTypeSheet(type){
   const txs=currentMonth().filter(t=>t.type===type).sort((a,b)=>b.amount-a.amount);
   const total=txs.reduce((a,t)=>a+t.amount,0);
-  const typeMap={income:{label:'Income',icon:'\u{1F4B0}',bg:'rgba(76,175,125,.15)'},expense:{label:'Expenses',icon:'\u{1F4B8}',bg:'rgba(201,90,90,.15)'},refund:{label:'Refunds',icon:'\u21A9',bg:'rgba(45,212,191,.15)'},transfer:{label:'Transfers',icon:'\u21C4',bg:'rgba(155,109,255,.15)'}};
+  const typeMap={income:{label:'Income',icon:'\u{1F4B0}'},expense:{label:'Expenses',icon:'\u{1F4B8}'},refund:{label:'Refunds',icon:'\u21A9'},transfer:{label:'Transfers',icon:'\u21C4'}};
   const info=typeMap[type]||typeMap.expense;
-  $('cat-sheet-header').innerHTML=`
-    <div class="cat-sheet-icon" style="background:${info.bg}">${info.icon}</div>
-    <div class="cat-sheet-info">
-      <div class="cat-sheet-name">${info.label}</div>
-      <div class="cat-sheet-stats">${txs.length} transactions \u00B7 ${money(total)}</div>
-    </div>`;
-  $('cat-sheet-txs').innerHTML=txRows(txs,false);
-  $('cat-sheet').classList.add('on');
+  $('catdrill-title').textContent=info.label;
+  openPage('page-catdrill',()=>{
+    $('catdrill-body').innerHTML=`
+      <div class="catd-summary">
+        <div class="catd-header">
+          <div class="catd-icon" style="background:var(--surface2)">${info.icon}</div>
+          <div class="catd-name">${info.label}</div>
+        </div>
+        <div class="catd-stats">
+          <div class="catd-stat"><div class="catd-stat-val">${txs.length}</div><div class="catd-stat-lbl">Transactions</div></div>
+          <div class="catd-stat"><div class="catd-stat-val">${money(total)}</div><div class="catd-stat-lbl">Total</div></div>
+        </div>
+      </div>
+      <div class="txd-label">Tap any transaction to view details</div>
+      <div class="tx-list">${txRows(txs,false)}</div>`;
+  });
 }
 
 // ─── CATEGORY SHEET ───────────────────────────────────────────────
@@ -2182,16 +2191,31 @@ function openCategorySheet(cat){
 
 // ─── VENDOR SHEET ─────────────────────────────────────────────────
 function openVendorSheet(vendor){
-  const txs = currentMonth().filter(t => t.desc === vendor).sort((a,b) => new Date(b.date) - new Date(a.date));
-  const total = txs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
-  $('vendor-sheet-header').innerHTML = `
-    <div class="cat-sheet-icon" style="background:rgba(201,168,76,.15)">\u{1F3EA}</div>
-    <div class="cat-sheet-info">
-      <div class="cat-sheet-name">${vendor}</div>
-      <div class="cat-sheet-stats">${txs.length} transactions \u00B7 ${money(total)} total</div>
-    </div>`;
-  $('vendor-sheet-txs').innerHTML = txRows(txs, false);
-  $('vendor-sheet').classList.add('on');
+  // Use category drill-down page repurposed for vendor
+  $('catdrill-title').textContent=vendor;
+  openPage('page-catdrill',()=>{
+    const body=$('catdrill-body');
+    const txs=currentMonth().filter(t=>t.desc===vendor).sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const expTotal=txs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+    const refTotal=txs.filter(t=>t.type==='refund').reduce((a,t)=>a+t.amount,0);
+    const incTotal=txs.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0);
+    body.innerHTML=`
+      <div class="catd-summary">
+        <div class="catd-header">
+          <div class="catd-icon" style="background:rgba(245,197,24,.1)">🏪</div>
+          <div class="catd-name">${vendor}</div>
+        </div>
+        <div class="catd-stats">
+          <div class="catd-stat"><div class="catd-stat-val">${txs.length}</div><div class="catd-stat-lbl">Transactions</div></div>
+          <div class="catd-stat"><div class="catd-stat-val" style="color:var(--red)">${money(expTotal)}</div><div class="catd-stat-lbl">Expenses</div></div>
+          ${refTotal>0?`<div class="catd-stat"><div class="catd-stat-val" style="color:var(--green)">+${money(refTotal)}</div><div class="catd-stat-lbl">Refunds</div></div>`
+          :incTotal>0?`<div class="catd-stat"><div class="catd-stat-val" style="color:var(--green)">+${money(incTotal)}</div><div class="catd-stat-lbl">Income</div></div>`
+          :`<div class="catd-stat"><div class="catd-stat-val" style="color:var(--red)">${money(expTotal-refTotal)}</div><div class="catd-stat-lbl">Net</div></div>`}
+        </div>
+      </div>
+      <div class="txd-label">Tap any transaction to view details</div>
+      <div class="tx-list">${txRows(txs,false)}</div>`;
+  });
 }
 
 // ─── DONUT ────────────────────────────────────────────────────────
@@ -2685,7 +2709,9 @@ async function openRecurringModule(){
 async function confirmRecurring(vendor,category,amount,frequency,isSub,el){
   try{
     await fetch(`${API}/api/recurring`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,vendor,category,expected_amount:amount,frequency,is_subscription:isSub})});
-    el.closest('.rec-item').style.opacity='.4';
+    const item=el.closest('.rec-item');
+    if(item){item.style.opacity='.4';item.style.pointerEvents='none';
+      const btn=item.querySelector('.sht-btn.gold');if(btn)btn.textContent='\u2713 Added';}
   }catch(e){alert('Error: '+e.message);}
 }
 
