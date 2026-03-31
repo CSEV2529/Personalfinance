@@ -1278,16 +1278,13 @@ const money = n => '$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits
 function stats(txs){
   let income=0,expenses=0,refunds=0,transfers=0;
   txs.forEach(t=>{
-    const sign=t.original_sign||(t.type==='income'||t.type==='refund'?1:-1);
-    if(sign===1){
-      if(t.type==='refund')refunds+=t.amount;
-      else income+=t.amount;
-    }else{
-      if(t.type==='transfer')transfers+=t.amount;
-      else expenses+=t.amount;
-    }
+    // Type determines classification for math — original_sign is for display only
+    if(t.type==='income')income+=t.amount;
+    else if(t.type==='refund')refunds+=t.amount;
+    else if(t.type==='transfer')transfers+=t.amount;
+    else expenses+=t.amount;
   });
-  return{income,expenses,refunds,transfers,net:(income+refunds)-expenses};
+  return{income:income+refunds,expenses,refunds,transfers,net:(income+refunds)-expenses};
 }
 function truncate(str,len){return str&&str.length>len?str.substring(0,len)+'\u2026':str||'';}
 function monthTxs(txs,y,m){return txs.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});}
@@ -1787,7 +1784,7 @@ function onTxRowClick(e,id){
 function txRows(txs,deletable){
   if(!txs.length)return`<div class="empty-msg">No transactions yet</div>`;
   return txs.map(t=>{
-    const sign=t.original_sign||(t.type==='income'||t.type==='refund'?1:-1);
+    const sign=(t.type==='income'||t.type==='refund')?1:-1;
     const isPos=sign===1;
     return`<div class="tx-row ${selectedTxIds.has(t.id)?'selected':''}" data-txid="${t.id}" onclick="onTxRowClick(event,'${t.id}')">
       <div class="tx-check">\u2713</div>
@@ -1925,7 +1922,7 @@ async function renderTxDetail(id){
     if(res.ok){const d=await res.json();tags=d.tags||[];notes=d.notes||'';if(d.original_sign!==undefined)t.original_sign=d.original_sign;if(d.status)t.status=d.status;}
   }catch(e){}
 
-  const sign=t.original_sign||(t.type==='income'||t.type==='refund'?1:-1);
+  const sign=(t.type==='income'||t.type==='refund')?1:-1;
   const isPos=sign===1;
   const account=accounts.find(a=>a.account_id===t.account_id);
 

@@ -79,12 +79,16 @@ function initDB() {
   if (!txCols.includes('recurring_group_id')) db.exec("ALTER TABLE transactions ADD COLUMN recurring_group_id TEXT");
   if (!txCols.includes('reviewed')) db.exec("ALTER TABLE transactions ADD COLUMN reviewed INTEGER DEFAULT 0");
   if (!txCols.includes('original_cat')) db.exec("ALTER TABLE transactions ADD COLUMN original_cat TEXT");
-  if (!txCols.includes('original_sign')) db.exec("ALTER TABLE transactions ADD COLUMN original_sign INTEGER DEFAULT -1");
+  if (!txCols.includes('original_sign')) {
+    db.exec("ALTER TABLE transactions ADD COLUMN original_sign INTEGER DEFAULT -1");
+    // Backfill: income and refunds are credits (+1), expenses and transfers are debits (-1)
+    run("UPDATE transactions SET original_sign = 1 WHERE type IN ('income','refund')");
+    run("UPDATE transactions SET original_sign = -1 WHERE type IN ('expense','transfer')");
+  }
   if (!txCols.includes('status')) db.exec("ALTER TABLE transactions ADD COLUMN status TEXT DEFAULT 'confirmed'");
-  // Backfill original_sign for existing transactions
-  run("UPDATE transactions SET original_sign = 1 WHERE type IN ('income','refund') AND original_sign IS NULL");
-  run("UPDATE transactions SET original_sign = -1 WHERE type IN ('expense','transfer') AND original_sign IS NULL");
-  run("UPDATE transactions SET original_sign = CASE WHEN type IN ('income','refund') THEN 1 ELSE -1 END WHERE source='manual' AND original_sign IS NULL");
+  // Always ensure income/refund types that were Plaid credits have correct sign
+  // This catches cases where the backfill defaulted to -1 but type was already set
+  run("UPDATE transactions SET original_sign = 1 WHERE type IN ('income','refund') AND original_sign = -1 AND source = 'plaid'");
 
   db.exec(`CREATE TABLE IF NOT EXISTS transaction_tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
