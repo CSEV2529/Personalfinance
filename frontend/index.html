@@ -2989,7 +2989,19 @@ function scrollChat(){$('chat-messages').scrollTop=$('chat-messages').scrollHeig
 // ─── SERVICE WORKER ───────────────────────────────────────────────
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/sw.js')
-    .then(()=>console.log('\u2713 Service worker registered'))
+    .then(reg=>{
+      console.log('\u2713 Service worker registered');
+      // Auto-reload when a new SW takes over
+      reg.addEventListener('updatefound',()=>{
+        const newSW=reg.installing;
+        newSW.addEventListener('statechange',()=>{
+          if(newSW.state==='activated'&&navigator.serviceWorker.controller){
+            console.log('New SW active — reloading');
+            window.location.reload();
+          }
+        });
+      });
+    })
     .catch(e=>console.warn('SW failed:', e));
 }
 
