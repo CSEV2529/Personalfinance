@@ -147,6 +147,81 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .edit-mode-btn:hover{border-color:var(--gold);color:var(--gold);}
 .edit-mode-btn.active{background:rgba(255,215,0,.1);border-color:var(--gold);color:var(--gold);}
 
+/* ─── CATEGORY MANAGEMENT ────────────────────────────────── */
+.catm-row{display:flex;align-items:center;gap:12px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:8px;cursor:pointer;transition:all .15s;}
+.catm-row:active{transform:scale(.98);}
+.catm-emoji{font-size:24px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;cursor:pointer;transition:background .15s;}
+.catm-emoji:hover{background:rgba(255,215,0,.1);}
+.catm-info{flex:1;}
+.catm-name{font-size:14px;font-weight:500;}
+.catm-stats{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:2px;}
+.catm-color{width:12px;height:12px;border-radius:4px;box-shadow:0 0 8px currentColor;}
+.catm-add{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-radius:14px;border:1px dashed var(--border2);background:transparent;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;width:100%;margin-top:8px;}
+.catm-add:hover{border-color:var(--gold);color:var(--gold);}
+
+/* ─── CATEGORY DRILL-DOWN ────────────────────────────────── */
+.catd-summary{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:16px;}
+.catd-header{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.catd-icon{font-size:28px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:14px;}
+.catd-name{font-family:'Playfair Display',serif;font-size:22px;}
+.catd-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;}
+.catd-stat{text-align:center;}
+.catd-stat-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:600;}
+.catd-stat-lbl{font-family:'DM Mono',monospace;font-size:8px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+.catd-toggle{display:flex;gap:8px;margin-bottom:16px;}
+.catd-toggle-btn{flex:1;padding:8px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;text-align:center;cursor:pointer;transition:all .15s;}
+.catd-toggle-btn.active{border-color:var(--gold);color:var(--gold);background:rgba(255,215,0,.08);}
+.catd-vendor-group{margin-bottom:12px;}
+.catd-vendor-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all .15s;}
+.catd-vendor-header:active{transform:scale(.98);}
+.catd-vendor-name{font-size:13px;font-weight:500;}
+.catd-vendor-meta{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);}
+.catd-vendor-amt{font-family:'DM Mono',monospace;font-size:14px;font-weight:600;color:var(--red);}
+.catd-vendor-txs{padding:0 8px;display:none;}
+.catd-vendor-txs.open{display:block;}
+
+/* ─── REVIEW QUEUE ───────────────────────────────────────── */
+.review-vendor{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px;}
+.review-vendor-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.review-vendor-name{font-size:14px;font-weight:500;}
+.review-vendor-info{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);}
+.review-pills{display:flex;gap:6px;flex-wrap:wrap;}
+.review-pill{padding:6px 12px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;transition:all .15s;}
+.review-pill:hover{border-color:var(--gold);color:var(--gold);}
+.review-pill:active{transform:scale(.95);}
+.review-pill.more{color:var(--text-dim);border-style:dashed;}
+
+/* ─── RECURRING MODULE ───────────────────────────────────── */
+.rec-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;}
+.rec-item{display:flex;align-items:center;gap:12px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:8px;}
+.rec-item-icon{font-size:20px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;}
+.rec-item-info{flex:1;}
+.rec-item-vendor{font-size:13px;font-weight:500;}
+.rec-item-meta{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:2px;}
+.rec-item-right{text-align:right;}
+.rec-item-amt{font-family:'DM Mono',monospace;font-size:14px;font-weight:600;color:var(--red);}
+.rec-item-freq{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:2px;}
+.rec-status{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.rec-status.paid{background:var(--green);box-shadow:0 0 8px var(--green);}
+.rec-status.upcoming{background:var(--text-dim);}
+.rec-status.late{background:#ff9f1c;box-shadow:0 0 8px #ff9f1c;animation:pendPulse 2s infinite;}
+
+/* ─── CASH FLOW LINE CHART ───────────────────────────────── */
+.cf-chart-wrap{background:linear-gradient(145deg,rgba(0,212,255,.08) 0%,var(--surface) 100%);border:1px solid rgba(0,212,255,.2);border-radius:18px;padding:18px;margin:0 14px 18px;position:relative;overflow:hidden;}
+.cf-filters{display:flex;gap:6px;margin-bottom:14px;}
+.cf-filter{padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:9px;cursor:pointer;transition:all .15s;}
+.cf-filter.active{border-color:var(--blue);color:var(--blue);background:rgba(0,212,255,.08);}
+.cf-chart svg{width:100%;height:200px;}
+.cf-chart text{font-family:'DM Mono',monospace;}
+
+/* ─── EXPENSE BAR CHART (horizontal) ─────────────────────── */
+.exp-bar-row{display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;}
+.exp-bar-label{font-size:12px;width:100px;display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.exp-bar-track{flex:1;height:20px;background:rgba(255,255,255,.04);border-radius:4px;overflow:hidden;position:relative;}
+.exp-bar-fill{height:100%;border-radius:4px;transition:width .5s cubic-bezier(.4,0,.2,1);box-shadow:0 0 8px currentColor;}
+.exp-bar-amt{font-family:'DM Mono',monospace;font-size:11px;width:80px;text-align:right;flex-shrink:0;}
+.exp-bar-pct{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);width:35px;text-align:right;flex-shrink:0;}
+
 /* ─── HERO ──────────────────────────────────────────────────── */
 .hero{
   padding:28px 20px 22px;
@@ -726,7 +801,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
           <div class="hero-amt" id="hero-amt">$0.00</div>
           <div class="hero-sub" id="hero-sub">Net Cash Flow</div>
           <div class="hero-stats">
-            <div class="hstat" onclick="openTypeSheet('income')" style="cursor:pointer"><div class="hstat-lbl">Income</div><div class="hstat-val" id="hs-income" style="color:var(--green)">&mdash;</div></div>
+            <div class="hstat" onclick="openIncomeBreakdown()" style="cursor:pointer"><div class="hstat-lbl">Income</div><div class="hstat-val" id="hs-income" style="color:var(--green)">&mdash;</div></div>
             <div class="hstat" onclick="openTypeSheet('expense')" style="cursor:pointer"><div class="hstat-lbl">Expenses</div><div class="hstat-val" id="hs-expenses" style="color:var(--red)">&mdash;</div></div>
             <div class="hstat"><div class="hstat-lbl">Saved</div><div class="hstat-val" id="hs-saved" style="color:var(--blue)">&mdash;</div></div>
           </div>
@@ -793,7 +868,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px" id="budget-kpis"></div>
         </div>
-        <div class="sec-head"><div class="sec-title">Categories</div></div>
+        <div class="sec-head"><div class="sec-title">Categories</div><div class="sec-link" onclick="openCatManage()">Manage</div></div>
         <div class="budget-cats-grid" id="budget-cats"></div>
         <div class="spacer"></div>
       </div>
@@ -951,6 +1026,56 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
     <div class="page-close" onclick="closePage('page-catdrill')">&times;</div>
   </div>
   <div class="page-body" id="catdrill-body"></div>
+</div>
+
+<!-- CATEGORY MANAGEMENT PAGE -->
+<div class="page-overlay" id="page-catmanage">
+  <div class="page-header">
+    <button class="page-back" onclick="closePage('page-catmanage')">&larr; Back</button>
+    <div class="page-title">Categories</div>
+    <div class="page-close" onclick="closePage('page-catmanage')">&times;</div>
+  </div>
+  <div class="page-body" id="catmanage-body"></div>
+</div>
+
+<!-- REVIEW QUEUE PAGE -->
+<div class="page-overlay" id="page-review">
+  <div class="page-header">
+    <button class="page-back" onclick="closePage('page-review')">&larr; Back</button>
+    <div class="page-title">Review Queue</div>
+    <div class="page-close" onclick="closePage('page-review')">&times;</div>
+  </div>
+  <div class="page-body" id="review-body"></div>
+</div>
+
+<!-- VENDOR WIZARD PAGE -->
+<div class="page-overlay" id="page-wizard">
+  <div class="page-header">
+    <button class="page-back" onclick="closePage('page-wizard')">&larr; Back</button>
+    <div class="page-title">Categorize Vendors</div>
+    <div class="page-close" onclick="closePage('page-wizard')">&times;</div>
+  </div>
+  <div class="page-body" id="wizard-body"></div>
+</div>
+
+<!-- INCOME BREAKDOWN PAGE -->
+<div class="page-overlay" id="page-income">
+  <div class="page-header">
+    <button class="page-back" onclick="closePage('page-income')">&larr; Back</button>
+    <div class="page-title">Income</div>
+    <div class="page-close" onclick="closePage('page-income')">&times;</div>
+  </div>
+  <div class="page-body" id="income-body"></div>
+</div>
+
+<!-- RECURRING MODULE PAGE -->
+<div class="page-overlay" id="page-recurring">
+  <div class="page-header">
+    <button class="page-back" onclick="closePage('page-recurring')">&larr; Back</button>
+    <div class="page-title">Recurring</div>
+    <div class="page-close" onclick="closePage('page-recurring')">&times;</div>
+  </div>
+  <div class="page-body" id="recurring-body"></div>
 </div>
 
 <!-- EMOJI PICKER -->
@@ -1139,6 +1264,10 @@ function renderHome(){
   let pills='';
   if(refundCount)pills+=`<div class="hero-pill" style="background:rgba(45,212,191,.12);color:var(--teal);border:1px solid rgba(45,212,191,.25)" onclick="openTypeSheet('refund')">↩ ${refundCount} Refund${refundCount>1?'s':''} · +${money(refundTotal)}</div>`;
   if(transferCount)pills+=`<div class="hero-pill" style="background:rgba(155,109,255,.12);color:var(--purple);border:1px solid rgba(155,109,255,.25)" onclick="openTypeSheet('transfer')">⇄ ${transferCount} Transfer${transferCount>1?'s':''} · ${money(transferTotal)}</div>`;
+  // Review queue pill
+  const unreviewedCount=mtxs.filter(t=>t.cat==='Other'&&!t.reviewed).length;
+  if(unreviewedCount)pills+=`<div class="hero-pill" style="background:rgba(255,159,28,.12);color:var(--orange);border:1px solid rgba(255,159,28,.25)" onclick="openReviewQueue()">⚠ ${unreviewedCount} to review</div>`;
+  pills+=`<div class="hero-pill" style="background:rgba(191,90,242,.12);color:var(--purple);border:1px solid rgba(191,90,242,.25)" onclick="openRecurringModule()">🔄 Recurring</div>`;
   $('hero-pills').innerHTML=pills;
 
   // KPI cards
@@ -1149,17 +1278,28 @@ function renderHome(){
     ...(accounts.length?[{lbl:'Bank Balance',val:money(totalBal),color:'var(--blue)',sub:`${accounts.length} accounts`}]:[{lbl:'Savings Rate',val:savings+'%',color:'var(--blue)',sub:'Of income'}]),
     {lbl:'Transactions',val:mtxs.length,color:'var(--gold)',sub:'This month'},
   ];
+  // Add daily average KPI
+  const now=new Date();
+  const isCurrentMonth=selectedMonth.getFullYear()===now.getFullYear()&&selectedMonth.getMonth()===now.getMonth();
+  const daysElapsed=isCurrentMonth?now.getDate():new Date(selectedMonth.getFullYear(),selectedMonth.getMonth()+1,0).getDate();
+  const dailyAvg=daysElapsed>0?s.expenses/daysElapsed:0;
+  cards.push({lbl:'Avg/Day',val:money(dailyAvg),color:'var(--orange)',sub:`${daysElapsed} days`});
+
   $('kpi-cards').innerHTML=cards.map(c=>`<div class="kcard" style="--kc:${c.color}"><div class="kcard-lbl">${c.lbl}</div><div class="kcard-val">${c.val}</div><div class="kcard-sub">${c.sub}</div></div>`).join('');
 
   // Recent
   const recent=[...mtxs].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
   $('recent-list').innerHTML=txRows(recent,false);
 
-  // Donut
+  // Donut (top 7 + Other)
   $('donut-card').innerHTML=renderDonut(catBreak(mtxs),s.expenses);
 
-  // Chart
-  $('chart-card').innerHTML=renderBarChart();
+  // Cash flow line chart (replaces bar chart)
+  renderCashFlowChart($('chart-card'));
+
+  // Expense category bar chart
+  renderExpenseBarChart($('donut-card').parentElement.querySelector('.exp-bars-container')||
+    (()=>{const d=document.createElement('div');d.className='exp-bars-container';d.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px;margin:0 14px 18px;max-height:400px;overflow-y:auto;';$('donut-card').after(d);return d;})());
 
   // Top 20 biggest expenses
   const top20 = currentMonth()
@@ -1179,7 +1319,7 @@ function renderHome(){
     vendorMap[t.desc].total += t.amount;
     vendorMap[t.desc].count++;
   });
-  const vendors = Object.entries(vendorMap).sort((a,b)=>b[1].total-a[1].total).slice(0,20);
+  const vendors = Object.entries(vendorMap).sort((a,b)=>b[1].total-a[1].total).slice(0,25);
   const vendorTotal = vendors.reduce((a,v)=>a+v[1].total, 0);
   $('vendor-breakdown').innerHTML = vendors.length ? vendors.map(([name, v], i) => {
     const pct = vendorTotal > 0 ? (v.total / vendorTotal * 100) : 0;
@@ -1797,22 +1937,29 @@ function openVendorSheet(vendor){
 
 // ─── DONUT ────────────────────────────────────────────────────────
 function renderDonut(bd,total){
-  const entries=Object.entries(bd).sort((a,b)=>b[1]-a[1]);
+  let entries=Object.entries(bd).sort((a,b)=>b[1]-a[1]);
   if(!entries.length)return`<div class="empty-msg" style="padding:20px">No expense data</div>`;
+  // Top 7 + "Other" bucket
+  let chartEntries=entries.slice(0,7);
+  if(entries.length>7){
+    const otherAmt=entries.slice(7).reduce((a,[,v])=>a+v,0);
+    chartEntries.push(['All Other',otherAmt]);
+  }
   const r=38,cx=50,cy=50,sw=13;let offset=-90,paths='';
-  entries.forEach(([cat,amt])=>{
-    const pct=amt/total,deg=pct*360;
+  chartEntries.forEach(([cat,amt])=>{
+    const pct=amt/total,deg=Math.max(pct*360,1);
     const r1=(offset*Math.PI)/180,r2=((offset+deg)*Math.PI)/180;
     const x1=cx+r*Math.cos(r1),y1=cy+r*Math.sin(r1),x2=cx+r*Math.cos(r2),y2=cy+r*Math.sin(r2);
-    paths+=`<path d="M ${x1} ${y1} A ${r} ${r} 0 ${deg>180?1:0} 1 ${x2} ${y2}" fill="none" stroke="${CAT_COLORS[cat]||'#888'}" stroke-width="${sw}" stroke-linecap="butt"/>`;
+    const color=cat==='All Other'?'#555':CAT_COLORS[cat]||'#888';
+    paths+=`<path d="M ${x1} ${y1} A ${r} ${r} 0 ${deg>180?1:0} 1 ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="butt" style="cursor:pointer" onclick="openCatDrill('${cat.replace(/'/g,"\\'")}')" />`;
     offset+=deg;
   });
-  const legend=entries.slice(0,5).map(([cat,amt])=>`<div class="dleg-row" onclick="openCategorySheet('${cat}')"><div class="dleg-swatch" style="background:${CAT_COLORS[cat]||'#888'}"></div><span class="dleg-name">${cat}</span><span class="dleg-pct">${((amt/total)*100).toFixed(0)}%</span></div>`).join('');
+  const legend=chartEntries.map(([cat,amt])=>`<div class="dleg-row" onclick="openCatDrill('${cat.replace(/'/g,"\\'")}')"><div class="dleg-swatch" style="background:${cat==='All Other'?'#555':CAT_COLORS[cat]||'#888'}"></div><span class="dleg-name">${cat}</span><span class="dleg-pct">${((amt/total)*100).toFixed(0)}%</span></div>`).join('');
   return`<div class="donut-inner">
     <svg viewBox="0 0 100 100" width="150" height="150" style="flex-shrink:0;filter:drop-shadow(0 0 15px rgba(191,90,242,.25)) drop-shadow(0 0 30px rgba(191,90,242,.1))">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border2)" stroke-width="${sw}"/>
       ${paths}
-      <text x="${cx}" y="${cy-3}" text-anchor="middle" fill="var(--text-muted)" font-size="6.5" font-family="DM Mono,monospace" letter-spacing="1">TOTAL</text>
+      <text x="${cx}" y="${cy-3}" text-anchor="middle" fill="var(--text-dim)" font-size="6.5" font-family="DM Mono,monospace" letter-spacing="1">TOTAL</text>
       <text x="${cx}" y="${cy+8}" text-anchor="middle" fill="var(--text)" font-size="8.5" font-family="Playfair Display,serif">${money(total)}</text>
     </svg>
     <div class="dlegend">${legend}</div>
@@ -1833,6 +1980,385 @@ function renderBarChart(){
 
 function animateBars(){
   document.querySelectorAll('.bar-fill').forEach(b=>{const w=b.style.width;b.style.width='0';requestAnimationFrame(()=>{b.style.transition='width .7s cubic-bezier(.4,0,.2,1)';b.style.width=w;});});
+}
+
+// ─── CATEGORY MANAGEMENT ─────────────────────────────────────────
+async function openCatManage(){
+  openPage('page-catmanage',async()=>{
+    const body=$('catmanage-body');
+    body.innerHTML='<div class="empty-msg">Loading...</div>';
+    try{
+      const res=await fetch(`${API}/api/categories?userId=${currentUser}`);
+      const{categories}=await res.json();
+      body.innerHTML=categories.map(c=>`
+        <div class="catm-row" onclick="openCatDrill('${c.id.replace(/'/g,"\\'")}')">
+          <div class="catm-emoji" onclick="event.stopPropagation();openEmojiPickerForCat('${c.id.replace(/'/g,"\\'")}')" style="background:${c.color||'#888'}15">${c.icon||'📌'}</div>
+          <div class="catm-info">
+            <div class="catm-name">${c.id}</div>
+            <div class="catm-stats">${c.tx_count} transactions · ${money(c.spent)} spent</div>
+          </div>
+          <div class="catm-color" style="background:${c.color||'#888'};color:${c.color||'#888'}"></div>
+        </div>`).join('')+`
+        <button class="catm-add" onclick="addNewCategory()">+ New Category</button>`;
+    }catch(e){body.innerHTML='<div class="empty-msg">Failed to load categories</div>';}
+  });
+}
+
+function openEmojiPickerForCat(catName){
+  emojiPickerCat=catName;
+  const currentIcon=CAT_ICONS[catName]||'📌';
+  const picker=$('emoji-picker');
+  let html=`<div class="emoji-picker-title">Change icon for</div><div class="emoji-picker-cat">${catName}</div>`;
+  for(const[section,emojis] of Object.entries(EMOJI_SECTIONS)){
+    html+=`<div class="emoji-section"><div class="emoji-section-lbl">${section}</div><div class="emoji-grid">`;
+    html+=emojis.map(e=>`<div class="emoji-pick ${e===currentIcon?'current':''}" onclick="event.stopPropagation();pickEmoji('${e}')">${e}</div>`).join('');
+    html+=`</div></div>`;
+  }
+  picker.innerHTML=html;
+  $('emoji-overlay').classList.add('on');
+}
+
+async function addNewCategory(){
+  const name=prompt('Category name:');
+  if(!name||!name.trim())return;
+  try{
+    await fetch(`${API}/api/categories`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,name:name.trim()})});
+    CAT_COLORS[name.trim()]=CAT_COLORS[name.trim()]||'#7a78a0';
+    CAT_ICONS[name.trim()]=CAT_ICONS[name.trim()]||'📌';
+    openCatManage();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ─── CATEGORY DRILL-DOWN ─────────────────────────────────────────
+async function openCatDrill(cat){
+  $('catdrill-title').textContent=cat;
+  openPage('page-catdrill',async()=>{
+    const body=$('catdrill-body');
+    body.innerHTML='<div class="empty-msg">Loading...</div>';
+    const mtxs=currentMonth().filter(t=>t.cat===cat);
+    const total=mtxs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+    const budgetAmt=budgets[cat];
+    const txCount=mtxs.length;
+
+    // Get MoM change
+    const prevMonth=new Date(selectedMonth.getFullYear(),selectedMonth.getMonth()-1,1);
+    const prevTxs=monthTxs(transactions,prevMonth.getFullYear(),prevMonth.getMonth()).filter(t=>t.cat===cat&&t.type==='expense');
+    const prevTotal=prevTxs.reduce((a,t)=>a+t.amount,0);
+    const momChange=prevTotal>0?((total-prevTotal)/prevTotal*100).toFixed(0):null;
+
+    let html=`<div class="catd-summary">
+      <div class="catd-header">
+        <div class="catd-icon" style="background:${CAT_COLORS[cat]||'#888'}22">${CAT_ICONS[cat]||'📌'}</div>
+        <div class="catd-name">${cat}</div>
+      </div>
+      <div class="catd-stats">
+        <div class="catd-stat"><div class="catd-stat-val" style="color:var(--red)">${money(total)}</div><div class="catd-stat-lbl">Spent</div></div>
+        <div class="catd-stat"><div class="catd-stat-val">${txCount}</div><div class="catd-stat-lbl">Transactions</div></div>
+        <div class="catd-stat"><div class="catd-stat-val" style="color:${momChange>0?'var(--red)':'var(--green)'}">${momChange!==null?(momChange>0?'▲':'▼')+Math.abs(momChange)+'%':'—'}</div><div class="catd-stat-lbl">vs Last Month</div></div>
+      </div>
+      ${budgetAmt?`<div class="bar-track"><div class="bar-fill" style="width:${Math.min(total/budgetAmt*100,100)}%;background:${total>budgetAmt?'var(--red)':total/budgetAmt>.75?'var(--gold)':'var(--green)'}"></div></div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:6px">${money(total)} of ${money(budgetAmt)} budget</div>`:''}
+    </div>`;
+
+    html+=`<div class="catd-toggle">
+      <div class="catd-toggle-btn active" onclick="renderCatDrillTxs('${cat.replace(/'/g,"\\'")}','all',this)">All Transactions</div>
+      <div class="catd-toggle-btn" onclick="renderCatDrillTxs('${cat.replace(/'/g,"\\'")}','vendor',this)">By Vendor</div>
+    </div>`;
+    html+=`<div id="catdrill-txs"></div>`;
+    body.innerHTML=html;
+    renderCatDrillTxs(cat,'all');
+    animateBars();
+  });
+}
+
+function renderCatDrillTxs(cat,mode,btn){
+  if(btn){btn.parentElement.querySelectorAll('.catd-toggle-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+  const mtxs=currentMonth().filter(t=>t.cat===cat).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const el=$('catdrill-txs');
+  if(mode==='vendor'){
+    const groups={};
+    mtxs.forEach(t=>{if(!groups[t.desc])groups[t.desc]={total:0,count:0,txs:[]};groups[t.desc].total+=t.amount;groups[t.desc].count++;groups[t.desc].txs.push(t);});
+    const sorted=Object.entries(groups).sort((a,b)=>b[1].total-a[1].total);
+    el.innerHTML=sorted.map(([vendor,g])=>`
+      <div class="catd-vendor-group">
+        <div class="catd-vendor-header" onclick="this.nextElementSibling.classList.toggle('open')">
+          <div><div class="catd-vendor-name">${vendor}</div><div class="catd-vendor-meta">${g.count} transactions</div></div>
+          <div class="catd-vendor-amt">-${money(g.total)}</div>
+        </div>
+        <div class="catd-vendor-txs"><div class="tx-list">${txRows(g.txs,false)}</div></div>
+      </div>`).join('')||'<div class="empty-msg">No transactions</div>';
+  }else{
+    el.innerHTML=`<div class="tx-list">${txRows(mtxs,false)}</div>`;
+  }
+}
+
+// ─── REVIEW QUEUE ────────────────────────────────────────────────
+async function openReviewQueue(){
+  openPage('page-review',async()=>{
+    const body=$('review-body');
+    body.innerHTML='<div class="empty-msg">Loading...</div>';
+    try{
+      const res=await fetch(`${API}/api/review-queue?userId=${currentUser}`);
+      const{queue,total_unreviewed}=await res.json();
+      if(!queue.length){body.innerHTML='<div class="empty-msg">All transactions reviewed! 🎉</div>';return;}
+      const cats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].filter(c=>c!=='Transfer').sort();
+      const quickCats=cats.slice(0,8);
+      body.innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:16px">${total_unreviewed} transactions from ${queue.length} vendors need categorization</div>`+
+        queue.map(v=>`<div class="review-vendor" id="rv-${v.vendor.replace(/[^a-z0-9]/gi,'_')}">
+          <div class="review-vendor-top">
+            <div>
+              <div class="review-vendor-name">${v.vendor}</div>
+              <div class="review-vendor-info">${v.cnt} transactions · ${money(v.total)}</div>
+            </div>
+          </div>
+          <div class="review-pills">
+            ${quickCats.map(c=>`<div class="review-pill" onclick="resolveReview('${v.vendor.replace(/'/g,"\\'")}','${c}',this)">${CAT_ICONS[c]||'📌'} ${c}</div>`).join('')}
+            <div class="review-pill more" onclick="openRecat(null,'${v.vendor.replace(/'/g,"\\'")}','Other')">More...</div>
+          </div>
+        </div>`).join('');
+    }catch(e){body.innerHTML='<div class="empty-msg">Failed to load</div>';}
+  });
+}
+
+async function resolveReview(vendor,category,el){
+  try{
+    await fetch(`${API}/api/review-queue/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,vendor,category})});
+    transactions.filter(t=>t.desc===vendor).forEach(t=>{t.cat=category;t.reviewed=1;});
+    CAT_COLORS[category]=CAT_COLORS[category]||'#7a78a0';
+    el.closest('.review-vendor')?.remove();
+    renderAll();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ─── VENDOR WIZARD ───────────────────────────────────────────────
+async function openVendorWizard(){
+  openPage('page-wizard',async()=>{
+    const body=$('wizard-body');
+    body.innerHTML='<div class="empty-msg">Loading...</div>';
+    try{
+      const res=await fetch(`${API}/api/wizard/uncategorized-vendors?userId=${currentUser}`);
+      const{vendors}=await res.json();
+      if(!vendors.length){body.innerHTML='<div class="empty-msg">All vendors categorized! 🎉</div>';return;}
+      const cats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].filter(c=>c!=='Transfer').sort();
+      window._wizardAssignments={};
+      body.innerHTML=`<div style="margin-bottom:16px">
+        <div style="font-size:16px;font-weight:500;margin-bottom:4px">Let's organize your spending</div>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim)">${vendors.length} vendors to categorize</div>
+        <div class="bar-track" style="margin-top:10px"><div class="bar-fill" id="wizard-progress" style="width:0%;background:var(--gold)"></div></div>
+      </div>`+vendors.map(v=>`
+        <div class="review-vendor" id="wz-${v.vendor.replace(/[^a-z0-9]/gi,'_')}">
+          <div class="review-vendor-top"><div>
+            <div class="review-vendor-name">${v.vendor}</div>
+            <div class="review-vendor-info">${v.cnt} txns · ${money(v.total)} · currently: ${v.current_cat}</div>
+          </div></div>
+          <div class="review-pills">
+            ${cats.slice(0,6).map(c=>`<div class="review-pill" onclick="wizardAssign('${v.vendor.replace(/'/g,"\\'")}','${c}',this)">${CAT_ICONS[c]||'📌'} ${c}</div>`).join('')}
+            <div class="review-pill more" onclick="wizardAssignCustom('${v.vendor.replace(/'/g,"\\'")}')")">More...</div>
+          </div>
+        </div>`).join('')+`
+        <button class="sht-btn primary" style="width:100%;margin-top:16px" onclick="submitWizard()">Save All</button>`;
+    }catch(e){body.innerHTML='<div class="empty-msg">Failed to load</div>';}
+  });
+}
+
+function wizardAssign(vendor,category,el){
+  window._wizardAssignments[vendor]=category;
+  el.closest('.review-vendor').style.opacity='.5';
+  el.closest('.review-vendor').style.borderColor='var(--gold)';
+  // Update progress
+  const total=document.querySelectorAll('#wizard-body .review-vendor').length;
+  const done=Object.keys(window._wizardAssignments).length;
+  const pEl=$('wizard-progress');if(pEl)pEl.style.width=(done/total*100)+'%';
+}
+
+async function submitWizard(){
+  const assignments=Object.entries(window._wizardAssignments).map(([vendor,category])=>({vendor,category,type:'expense'}));
+  if(!assignments.length){alert('No assignments to save');return;}
+  try{
+    await fetch(`${API}/api/wizard/bulk-assign`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,assignments})});
+    assignments.forEach(a=>{transactions.filter(t=>t.desc===a.vendor).forEach(t=>{t.cat=a.category;t.reviewed=1;});});
+    closePage('page-wizard');
+    renderAll();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ─── INCOME BREAKDOWN ────────────────────────────────────────────
+async function openIncomeBreakdown(){
+  openPage('page-income',async()=>{
+    const body=$('income-body');
+    body.innerHTML='<div class="empty-msg">Loading...</div>';
+    const mtxs=currentMonth().filter(t=>t.type==='income'||t.type==='refund');
+    const total=mtxs.reduce((a,t)=>a+t.amount,0);
+    // By category
+    const byCat={};
+    mtxs.forEach(t=>{byCat[t.cat]=(byCat[t.cat]||0)+t.amount;});
+    const catEntries=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+    // By merchant
+    const byMerchant={};
+    mtxs.forEach(t=>{if(!byMerchant[t.desc])byMerchant[t.desc]={total:0,count:0};byMerchant[t.desc].total+=t.amount;byMerchant[t.desc].count++;});
+    const merchantEntries=Object.entries(byMerchant).sort((a,b)=>b[1].total-a[1].total);
+
+    body.innerHTML=`
+      <div style="text-align:center;margin-bottom:20px">
+        <div class="txd-amount pos">+${money(total)}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim)">Total income · ${selectedMonth.toLocaleString('default',{month:'long',year:'numeric'})}</div>
+      </div>
+      <div class="txd-label">By Category</div>
+      ${catEntries.map(([cat,amt])=>`
+        <div class="exp-bar-row" onclick="openCatDrill('${cat.replace(/'/g,"\\'")}')">
+          <div class="exp-bar-label">${CAT_ICONS[cat]||'📌'} ${cat}</div>
+          <div class="exp-bar-track"><div class="exp-bar-fill" style="width:${total>0?amt/total*100:0}%;background:var(--green)"></div></div>
+          <div class="exp-bar-amt" style="color:var(--green)">+${money(amt)}</div>
+        </div>`).join('')}
+      <div class="txd-label" style="margin-top:20px">By Source</div>
+      ${merchantEntries.map(([name,v])=>`
+        <div class="exp-bar-row">
+          <div class="exp-bar-label" style="width:140px">${name}</div>
+          <div class="exp-bar-track"><div class="exp-bar-fill" style="width:${total>0?v.total/total*100:0}%;background:var(--green)"></div></div>
+          <div class="exp-bar-amt" style="color:var(--green)">+${money(v.total)}</div>
+        </div>`).join('')}
+      <div class="txd-label" style="margin-top:20px">All Income Transactions</div>
+      <div class="tx-list">${txRows(mtxs.sort((a,b)=>b.amount-a.amount),false)}</div>`;
+  });
+}
+
+// ─── CASH FLOW LINE CHART ────────────────────────────────────────
+let cfPeriod='6';
+async function renderCashFlowChart(container){
+  try{
+    const res=await fetch(`${API}/api/trends/cashflow?userId=${currentUser}&months=${cfPeriod}`);
+    const{data}=await res.json();
+    if(!data.length){container.innerHTML='<div class="empty-msg">No data</div>';return;}
+    const W=320,H=180,pad={t:20,r:15,b:30,l:50};
+    const cw=W-pad.l-pad.r,ch=H-pad.t-pad.b;
+    const maxVal=Math.max(...data.map(d=>Math.max(d.income,d.expenses)),1);
+    const xStep=data.length>1?cw/(data.length-1):cw;
+    const y=v=>pad.t+ch-(v/maxVal)*ch;
+    const x=(i)=>pad.l+i*xStep;
+
+    const incLine=data.map((d,i)=>`${i===0?'M':'L'}${x(i)},${y(d.income)}`).join(' ');
+    const expLine=data.map((d,i)=>`${i===0?'M':'L'}${x(i)},${y(d.expenses)}`).join(' ');
+    // Shaded area between lines
+    const areaPath=data.map((d,i)=>`${i===0?'M':'L'}${x(i)},${y(d.income)}`).join(' ')
+      +data.slice().reverse().map((d,i)=>`L${x(data.length-1-i)},${y(d.expenses)}`).join(' ')+'Z';
+
+    const labels=data.map(d=>{const[y,m]=d.month.split('-');return new Date(y,m-1).toLocaleString('default',{month:'short'});});
+    const gridLines=[0,.25,.5,.75,1].map(p=>{const yy=pad.t+ch*(1-p);return`<line x1="${pad.l}" y1="${yy}" x2="${W-pad.r}" y2="${yy}" stroke="rgba(255,255,255,.05)" stroke-width="1"/>
+      <text x="${pad.l-4}" y="${yy+3}" text-anchor="end" fill="var(--text-dim)" font-size="7">${money(maxVal*p)}</text>`;}).join('');
+
+    container.innerHTML=`
+      <div class="cf-filters">
+        ${['3','6','12'].map(p=>`<div class="cf-filter ${cfPeriod===p?'active':''}" onclick="cfPeriod='${p}';renderCashFlowChart(this.closest('.cf-chart-wrap'))">${p}M</div>`).join('')}
+      </div>
+      <div class="cf-chart">
+        <svg viewBox="0 0 ${W} ${H}">
+          ${gridLines}
+          <path d="${areaPath}" fill="rgba(0,255,135,.06)"/>
+          <path d="${incLine}" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="${expLine}" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round"/>
+          ${data.map((d,i)=>`<circle cx="${x(i)}" cy="${y(d.income)}" r="3.5" fill="var(--green)" stroke="var(--bg)" stroke-width="1.5"/>
+            <circle cx="${x(i)}" cy="${y(d.expenses)}" r="3.5" fill="var(--red)" stroke="var(--bg)" stroke-width="1.5"/>`).join('')}
+          ${labels.map((l,i)=>`<text x="${x(i)}" y="${H-6}" text-anchor="middle" fill="var(--text-dim)" font-size="8">${l}</text>`).join('')}
+        </svg>
+      </div>
+      <div class="chart-leg"><div class="chart-leg-item"><div class="chart-leg-dot" style="background:var(--green)"></div>Income</div><div class="chart-leg-item"><div class="chart-leg-dot" style="background:var(--red)"></div>Expenses</div></div>`;
+  }catch(e){container.innerHTML='<div class="empty-msg">Chart error</div>';}
+}
+
+// ─── EXPENSE CATEGORY BAR CHART ──────────────────────────────────
+function renderExpenseBarChart(container){
+  const mtxs=currentMonth();
+  const bd=catBreak(mtxs);
+  const entries=Object.entries(bd).sort((a,b)=>b[1]-a[1]);
+  const total=entries.reduce((a,[,v])=>a+v,0);
+  if(!entries.length){container.innerHTML='<div class="empty-msg">No expense data</div>';return;}
+  container.innerHTML=`<div class="txd-label" style="margin-bottom:10px">Spending by Category</div>`+entries.map(([cat,amt])=>{
+    const pct=total>0?(amt/total*100).toFixed(0):'0';
+    return`<div class="exp-bar-row" onclick="openCatDrill('${cat.replace(/'/g,"\\'")}')">
+      <div class="exp-bar-label">${CAT_ICONS[cat]||'📌'} ${cat}</div>
+      <div class="exp-bar-track"><div class="exp-bar-fill" style="width:${pct}%;background:${CAT_COLORS[cat]||'#888'};color:${CAT_COLORS[cat]||'#888'}"></div></div>
+      <div class="exp-bar-amt">-${money(amt)}</div>
+      <div class="exp-bar-pct">${pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── RECURRING MODULE ────────────────────────────────────────────
+async function openRecurringModule(){
+  openPage('page-recurring',async()=>{
+    const body=$('recurring-body');
+    body.innerHTML='<div class="empty-msg">Loading...</div>';
+    try{
+      const[recRes,subRes,detectRes]=await Promise.all([
+        fetch(`${API}/api/recurring?userId=${currentUser}`),
+        fetch(`${API}/api/subscriptions?userId=${currentUser}`),
+        fetch(`${API}/api/recurring/detect`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser})}),
+      ]);
+      const{recurring}=await recRes.json();
+      const{subscriptions,monthly_total}=await subRes.json();
+      const{suggestions}=await detectRes.json();
+
+      const totalRecurring=recurring.reduce((a,r)=>a+(r.expected_amount||0),0);
+
+      let html=`<div class="rec-summary">
+        <div class="kcard" style="--kc:var(--red);width:auto"><div class="kcard-lbl">Monthly</div><div class="kcard-val" style="font-size:16px">${money(totalRecurring)}</div></div>
+        <div class="kcard" style="--kc:var(--purple);width:auto"><div class="kcard-lbl">Recurring</div><div class="kcard-val" style="font-size:16px">${recurring.length}</div></div>
+        <div class="kcard" style="--kc:var(--blue);width:auto"><div class="kcard-lbl">Subscriptions</div><div class="kcard-val" style="font-size:16px">${subscriptions.length}</div></div>
+      </div>`;
+
+      // Confirmed recurring
+      if(recurring.length){
+        html+=`<div class="txd-label">Active Recurring</div>`;
+        html+=recurring.map(r=>{
+          const now=new Date();
+          const lastSeen=r.last_seen?new Date(r.last_seen):null;
+          const daysSince=lastSeen?Math.floor((now-lastSeen)/(1000*60*60*24)):999;
+          const status=daysSince<=35?'paid':daysSince<=45?'upcoming':'late';
+          return`<div class="rec-item">
+            <div class="rec-status ${status}"></div>
+            <div class="rec-item-icon" style="background:${CAT_COLORS[r.category]||'#888'}22">${CAT_ICONS[r.category]||'📌'}</div>
+            <div class="rec-item-info">
+              <div class="rec-item-vendor">${r.vendor}</div>
+              <div class="rec-item-meta">${r.category||'Uncategorized'} · Last: ${r.last_seen||'—'}</div>
+            </div>
+            <div class="rec-item-right">
+              <div class="rec-item-amt">-${money(r.expected_amount)}</div>
+              <div class="rec-item-freq">${r.frequency}${r.is_subscription?' · sub':''}</div>
+            </div>
+          </div>`;
+        }).join('');
+      }
+
+      // Suggestions
+      if(suggestions.length){
+        html+=`<div class="txd-label" style="margin-top:20px">Suggested (${suggestions.length} detected)</div>`;
+        html+=suggestions.map(s=>`
+          <div class="rec-item" style="border-style:dashed">
+            <div class="rec-item-icon" style="background:${CAT_COLORS[s.category]||'#888'}22">${CAT_ICONS[s.category]||'📌'}</div>
+            <div class="rec-item-info">
+              <div class="rec-item-vendor">${s.vendor}</div>
+              <div class="rec-item-meta">${s.frequency} · ${s.tx_count} charges${s.is_subscription?' · likely subscription':''}</div>
+            </div>
+            <div class="rec-item-right">
+              <div class="rec-item-amt">~${money(s.expected_amount)}</div>
+              <div class="sht-btn gold" style="font-size:8px;padding:4px 8px;margin-top:4px" onclick="confirmRecurring('${s.vendor.replace(/'/g,"\\'")}','${s.category}',${s.expected_amount},'${s.frequency}',${s.is_subscription},this)">Confirm</div>
+            </div>
+          </div>`).join('');
+      }
+
+      if(!recurring.length&&!suggestions.length) html+='<div class="empty-msg">No recurring transactions detected yet. Sync more data!</div>';
+      body.innerHTML=html;
+    }catch(e){body.innerHTML='<div class="empty-msg">Failed to load: '+e.message+'</div>';}
+  });
+}
+
+async function confirmRecurring(vendor,category,amount,frequency,isSub,el){
+  try{
+    await fetch(`${API}/api/recurring`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,vendor,category,expected_amount:amount,frequency,is_subscription:isSub})});
+    el.closest('.rec-item').style.opacity='.4';
+    el.textContent='✓ Added';
+    el.onclick=null;
+  }catch(e){alert('Error: '+e.message);}
 }
 
 // ─── PLAID ────────────────────────────────────────────────────────
