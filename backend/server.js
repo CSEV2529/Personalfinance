@@ -79,6 +79,12 @@ function initDB() {
   if (!txCols.includes('recurring_group_id')) db.exec("ALTER TABLE transactions ADD COLUMN recurring_group_id TEXT");
   if (!txCols.includes('reviewed')) db.exec("ALTER TABLE transactions ADD COLUMN reviewed INTEGER DEFAULT 0");
   if (!txCols.includes('original_cat')) db.exec("ALTER TABLE transactions ADD COLUMN original_cat TEXT");
+  if (!txCols.includes('original_sign')) db.exec("ALTER TABLE transactions ADD COLUMN original_sign INTEGER DEFAULT -1");
+  if (!txCols.includes('status')) db.exec("ALTER TABLE transactions ADD COLUMN status TEXT DEFAULT 'confirmed'");
+  // Backfill original_sign for existing transactions
+  run("UPDATE transactions SET original_sign = 1 WHERE type IN ('income','refund') AND original_sign IS NULL");
+  run("UPDATE transactions SET original_sign = -1 WHERE type IN ('expense','transfer') AND original_sign IS NULL");
+  run("UPDATE transactions SET original_sign = CASE WHEN type IN ('income','refund') THEN 1 ELSE -1 END WHERE source='manual' AND original_sign IS NULL");
 
   db.exec(`CREATE TABLE IF NOT EXISTS transaction_tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -210,10 +216,10 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
   }
 
   const upsertTx = db.prepare(`INSERT INTO transactions
-    (id, household, user_id, desc, amount, type, cat, date, pending, account_id, source, original_cat, reviewed)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'plaid', ?, 0)
+    (id, household, user_id, desc, amount, type, cat, date, pending, account_id, source, original_cat, reviewed, original_sign)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'plaid', ?, 0, ?)
     ON CONFLICT(id) DO UPDATE SET
-      amount=excluded.amount, date=excluded.date, pending=excluded.pending,
+      amount=excluded.amount, date=excluded.date, pending=excluded.pending, original_sign=excluded.original_sign,
       cat=CASE WHEN transactions.reviewed=1 THEN transactions.cat ELSE excluded.cat END,
       type=CASE WHEN transactions.reviewed=1 THEN transactions.type ELSE excluded.type END`);
   const upsertAcct = db.prepare(`INSERT OR REPLACE INTO accounts
@@ -228,12 +234,11 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
   const insertMany = db.transaction(() => {
     for (const t of allTransactions) {
       const plaidCat = t.personal_finance_category?.primary || t.category?.[0] || 'Other';
-      // Check vendor rules first — user overrides take priority
       const rule = vendorRules[t.name];
+      const originalSign = t.amount > 0 ? -1 : 1; // Plaid: positive=debit, negative=credit
       let cat, type;
       if (rule) {
         cat = rule.cat;
-        type = rule.type;
       } else {
         cat = mapCategory(plaidCat);
         const desc = (t.name || '').toUpperCase();
@@ -243,12 +248,13 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
           desc.includes('AUTOMATIC PAYMENT') || desc.includes('AUTOPAY') ||
           desc.includes('PAYMENT - THANK')
         )) cat = 'Transfer';
-        type = cat === 'Transfer' ? 'transfer' : (t.amount > 0 ? 'expense' : 'income');
       }
+      // Type determined by original sign, not vendor rule
+      type = cat === 'Transfer' ? 'transfer' : (originalSign === 1 ? 'income' : 'expense');
       upsertTx.run(
         t.transaction_id, household, userId, t.name,
         Math.abs(t.amount), type, cat,
-        t.date, t.pending ? 1 : 0, t.account_id, plaidCat
+        t.date, t.pending ? 1 : 0, t.account_id, plaidCat, originalSign
       );
     }
     for (const a of allAccounts) {
@@ -403,7 +409,7 @@ app.get('/api/transactions/:id', (req, res) => {
 });
 
 app.put('/api/transactions/:id', (req, res) => {
-  const { category, type, notes, is_recurring, applyToVendor } = req.body;
+  const { category, type, notes, is_recurring, applyToVendor, original_sign, status } = req.body;
   try {
     const tx = get('SELECT * FROM transactions WHERE id = ?', [req.params.id]);
     if (!tx) return res.status(404).json({ error: 'Transaction not found' });
@@ -411,36 +417,44 @@ app.put('/api/transactions/:id', (req, res) => {
     const newType = type || tx.type;
     const newNotes = notes !== undefined ? notes : tx.notes;
     const newRecurring = is_recurring !== undefined ? (is_recurring ? 1 : 0) : tx.is_recurring;
-    run('UPDATE transactions SET cat=?, type=?, notes=?, is_recurring=?, reviewed=1 WHERE id=?',
-      [newCat, newType, newNotes, newRecurring, req.params.id]);
+    const newSign = original_sign !== undefined ? original_sign : tx.original_sign;
+    const newStatus = status || tx.status || 'confirmed';
+    run('UPDATE transactions SET cat=?, type=?, notes=?, is_recurring=?, original_sign=?, status=?, reviewed=1 WHERE id=?',
+      [newCat, newType, newNotes, newRecurring, newSign, newStatus, req.params.id]);
     let updatedCount = 1;
     if (applyToVendor) {
-      run(`INSERT OR REPLACE INTO vendor_rules (household, vendor, category, type) VALUES (?,?,?,?)`,
-        [tx.household, tx.desc, newCat, newType]);
-      const result = run('UPDATE transactions SET cat=?, type=?, reviewed=1 WHERE household=? AND desc=?',
-        [newCat, newType, tx.household, tx.desc]);
+      // Vendor rule stores ONLY category
+      run(`INSERT OR REPLACE INTO vendor_rules (household, vendor, category, type, updated_at) VALUES (?,?,?,'expense',datetime('now'))`,
+        [tx.household, tx.desc, newCat]);
+      // Apply category only — preserve each tx's type and sign
+      const result = run('UPDATE transactions SET cat=?, reviewed=1 WHERE household=? AND desc=?',
+        [newCat, tx.household, tx.desc]);
       updatedCount = result.changes || 1;
     }
     res.json({ success: true, updated: updatedCount });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Legacy endpoint (frontend compat — same logic as PUT /api/transactions/:id)
+// Legacy endpoint (frontend compat)
 app.put('/api/transactions/:id/category', (req, res) => {
-  const { category, type, applyToVendor } = req.body;
-  if (!category && !type) return res.status(400).json({ error: 'Missing category or type' });
+  const { category, type, applyToVendor, original_sign } = req.body;
+  if (!category && !type && original_sign === undefined) return res.status(400).json({ error: 'Missing category, type, or sign' });
   try {
     const tx = get('SELECT * FROM transactions WHERE id = ?', [req.params.id]);
     if (!tx) return res.status(404).json({ error: 'Transaction not found' });
     const newCat = category || tx.cat;
     const newType = type || tx.type;
-    run('UPDATE transactions SET cat=?, type=?, reviewed=1 WHERE id=?', [newCat, newType, req.params.id]);
+    const newSign = original_sign !== undefined ? original_sign : tx.original_sign;
+    // Always update this specific transaction (type + sign + category)
+    run('UPDATE transactions SET cat=?, type=?, original_sign=?, reviewed=1 WHERE id=?', [newCat, newType, newSign, req.params.id]);
     let updatedCount = 1;
     if (applyToVendor) {
-      run(`INSERT OR REPLACE INTO vendor_rules (household, vendor, category, type) VALUES (?,?,?,?)`,
-        [tx.household, tx.desc, newCat, newType]);
-      const result = run('UPDATE transactions SET cat=?, type=?, reviewed=1 WHERE household=? AND desc=?',
-        [newCat, newType, tx.household, tx.desc]);
+      // Vendor rule stores ONLY category — not type, not sign
+      run(`INSERT OR REPLACE INTO vendor_rules (household, vendor, category, type, updated_at) VALUES (?,?,?,'expense',datetime('now'))`,
+        [tx.household, tx.desc, newCat]);
+      // Apply category to all matching, but PRESERVE their type and sign
+      const result = run('UPDATE transactions SET cat=?, reviewed=1 WHERE household=? AND desc=?',
+        [newCat, tx.household, tx.desc]);
       updatedCount = result.changes || 1;
     }
     res.json({ success: true, updated: updatedCount });
@@ -570,6 +584,26 @@ app.get('/api/categories/:id/transactions', (req, res) => {
       });
       return res.json({ groups: Object.values(groups).sort((a,b) => b.total - a.total) });
     }
+    res.json({ transactions: txs });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── TRANSACTION STATUS (unsure/confirmed) ──────────────────────
+app.put('/api/transactions/:id/status', (req, res) => {
+  const { status } = req.body;
+  if (!status) return res.status(400).json({ error: 'Missing status' });
+  try {
+    run('UPDATE transactions SET status=? WHERE id=?', [status, req.params.id]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/transactions/unsure', (req, res) => {
+  try {
+    const hh = getHousehold(req.query.userId || 'christian');
+    const txs = all(`SELECT t.*, u.name as user_name FROM transactions t
+      LEFT JOIN users u ON t.user_id=u.id
+      WHERE t.household=? AND t.status='unsure' ORDER BY t.date DESC`, [hh]);
     res.json({ transactions: txs });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

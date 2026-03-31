@@ -13,13 +13,14 @@
 <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 <style>
 :root {
-  --bg:#06060F; --surface:#0D0D1C; --surface2:#141428; --surface3:#1C1C38;
-  --surface-elevated:#1A1A36;
-  --border:#1E1E3A; --border2:#282852; --border-accent:rgba(245,197,24,.12);
-  --text:#EEEDF7; --text-secondary:#A5A3C4; --text-muted:#6E6C8E; --text-dim:#A5A3C4;
-  --gold:#F5C518; --green:#34D399; --red:#F87171; --blue:#60A5FA;
+  --bg:#0C0C0E; --surface:#141416; --surface2:#1C1C1F; --surface3:#242428;
+  --surface-elevated:#28282D;
+  --border:#2A2A2F; --border2:#3A3A42; --border-accent:rgba(245,197,24,.10);
+  --text:#EDEDEF; --text-secondary:#A0A0A8; --text-muted:#6B6B74; --text-dim:#A0A0A8;
+  --gold:#F5C518; --gold-dim:rgba(245,197,24,.08); --gold-border:rgba(245,197,24,.15);
+  --green:#34D399; --red:#F87171; --blue:#60A5FA;
   --purple:#A78BFA; --teal:#2DD4BF; --orange:#FB923C; --pink:#F472B6;
-  --pending:#FB923C;
+  --pending:#FB923C; --success:#34D399; --danger:#F87171; --info:#60A5FA; --unsure:#FBBF24;
   --tab-h:68px;
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-t:env(safe-area-inset-top,0px);
@@ -29,15 +30,13 @@
 html,body{height:100%;overscroll-behavior:none;}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;overflow:hidden;}
 body::before{display:none;}
-body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opacity:.5;
-  background:radial-gradient(ellipse at 20% 0%,rgba(52,211,153,.03) 0%,transparent 50%),
-             radial-gradient(ellipse at 80% 100%,rgba(167,139,250,.03) 0%,transparent 50%);}
+body::after{display:none;}
 
 /* ─── APP SHELL ─────────────────────────────────────────────── */
 .app{display:flex;flex-direction:column;height:100vh;height:100dvh;padding-top:var(--safe-t);padding-left:var(--sidebar-w);}
 
 /* ─── TOPBAR ────────────────────────────────────────────────── */
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.3);}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:20;box-shadow:0 1px 3px rgba(0,0,0,.3);}
 .topbar-left{display:flex;align-items:center;gap:10px;}
 .logo-mark{font-family:'Playfair Display',serif;font-size:20px;color:var(--gold);letter-spacing:3px;}
 .net-pill{font-family:'DM Mono',monospace;font-size:11px;padding:4px 12px;border-radius:20px;background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.25);transition:all .3s;}
@@ -77,7 +76,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opa
 .desktop-container{max-width:100%;margin:0 auto;}
 
 /* ─── BOTTOM TABS ───────────────────────────────────────────── */
-.tabs{position:fixed;bottom:0;left:0;right:0;height:calc(var(--tab-h) + var(--safe-b));padding-bottom:var(--safe-b);background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:flex-start;z-index:100;box-shadow:0 -2px 12px rgba(0,0,0,.3);}
+.tabs{position:fixed;bottom:0;left:0;right:0;height:calc(var(--tab-h) + var(--safe-b));padding-bottom:var(--safe-b);background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:flex-start;z-index:100;box-shadow:0 -1px 3px rgba(0,0,0,.2);}
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding-top:10px;cursor:pointer;color:var(--text-muted);transition:color .2s;min-height:var(--tab-h);position:relative;}
 .tab.on{color:var(--gold);}
 .tab-pip{position:absolute;top:6px;width:4px;height:4px;border-radius:50%;background:var(--gold);opacity:0;transition:opacity .2s;}
@@ -95,7 +94,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opa
 .page-overlay.open{transform:translateX(0);}
 #page-catdrill,#page-income,#page-recurring,#page-review,#page-wizard,#page-catmanage{z-index:210;}
 #page-txdetail{z-index:250;}
-.page-header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:linear-gradient(180deg,var(--bg),rgba(5,5,16,.95));border-bottom:1px solid var(--border);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+.page-header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);}
 .page-back{display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;padding:8px;margin:-8px;letter-spacing:.5px;}
 .page-back:active{opacity:.6;}
 .page-title{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;position:absolute;left:50%;transform:translateX(-50%);}
@@ -250,6 +249,47 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opa
 .exp-bar-fill{height:100%;border-radius:4px;transition:width .5s cubic-bezier(.4,0,.2,1);box-shadow:0 0 8px currentColor;}
 .exp-bar-amt{font-family:'DM Mono',monospace;font-size:11px;width:80px;text-align:right;flex-shrink:0;}
 .exp-bar-pct{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);width:35px;text-align:right;flex-shrink:0;}
+
+/* ─── KPI GRID ───────────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px;margin-bottom:20px;}
+@media(min-width:768px){.kpi-grid{grid-template-columns:1fr 1fr 1fr;gap:12px;}}
+@media(min-width:1200px){.kpi-grid{grid-template-columns:repeat(6,1fr);gap:14px;}}
+
+/* ─── QUICK ACTIONS ──────────────────────────────────────── */
+.quick-actions{display:flex;gap:10px;padding:0 16px;margin-bottom:20px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.quick-actions::-webkit-scrollbar{display:none;}
+.qa-card{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .15s;min-width:160px;}
+.qa-card:active{transform:scale(.97);}
+.qa-card-icon{font-size:18px;}
+.qa-card-label{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;}
+.qa-card-value{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;margin-top:2px;}
+
+/* ─── TX NOTES PREVIEW ───────────────────────────────────── */
+.tx-notes-preview{font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-secondary);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px;opacity:.8;}
+
+/* ─── TX UNSURE BADGE ────────────────────────────────────── */
+.tx-unsure-badge{font-family:'DM Mono',monospace;font-size:8px;color:var(--unsure);letter-spacing:1px;text-transform:uppercase;padding:1px 5px;border-radius:4px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);}
+
+/* ─── UNSURE BANNER ──────────────────────────────────────── */
+.unsure-banner{display:none;align-items:center;gap:10px;padding:10px 18px;background:rgba(251,191,36,.08);border-bottom:1px solid rgba(251,191,36,.15);font-family:'DM Mono',monospace;font-size:11px;color:var(--unsure);cursor:pointer;flex-shrink:0;}
+.unsure-banner.on{display:flex;}
+
+/* ─── MONEY DIRECTION ────────────────────────────────────── */
+.txd-direction-row{display:flex;gap:8px;}
+.txd-dir-btn{flex:1;padding:10px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;text-align:center;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px;}
+.txd-dir-btn.active.debit{border-color:var(--red);color:var(--red);background:rgba(248,113,113,.06);}
+.txd-dir-btn.active.credit{border-color:var(--green);color:var(--green);background:rgba(52,211,153,.06);}
+
+/* ─── TX STATUS ──────────────────────────────────────────── */
+.txd-status-row{display:flex;gap:8px;}
+.txd-status-btn{flex:1;padding:10px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;text-align:center;cursor:pointer;transition:all .15s;}
+.txd-status-btn.active{border-color:var(--gold);color:var(--gold);background:var(--gold-dim);}
+.txd-status-btn.unsure.active{border-color:var(--unsure);color:var(--unsure);background:rgba(251,191,36,.08);}
+
+/* ─── INCOME TABS ────────────────────────────────────────── */
+.income-tabs{display:flex;gap:0;margin-bottom:16px;border-radius:12px;overflow:hidden;border:1px solid var(--border);}
+.income-tab{flex:1;padding:10px;text-align:center;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.5px;color:var(--text-muted);cursor:pointer;background:var(--surface);transition:all .15s;}
+.income-tab.active{color:var(--gold);background:var(--surface2);}
 
 /* ─── CATEGORY PICKER (vertical list) ────────────────────── */
 .catp-row{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:6px;cursor:pointer;transition:all .15s;}
@@ -502,7 +542,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opa
 /* ─── BOTTOM SHEET ──────────────────────────────────────────── */
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:500;display:none;align-items:flex-end;}
 .sheet-bg.on{display:flex;}
-.sheet{background:linear-gradient(180deg,#10102a,#0a0a1e);border-radius:22px 22px 0 0;border:1px solid rgba(255,215,0,.12);border-bottom:none;width:100%;padding:20px 20px calc(20px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.34,1.2,.64,1);max-height:92dvh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,.5);}
+.sheet{background:var(--surface);border-radius:22px 22px 0 0;border:1px solid var(--border);border-bottom:none;width:100%;padding:20px 20px calc(20px + var(--safe-b));animation:sheetIn .28s cubic-bezier(.34,1.2,.64,1);max-height:92dvh;overflow-y:auto;box-shadow:0 -4px 20px rgba(0,0,0,.4);}
 @keyframes sheetIn{from{transform:translateY(100%);}to{transform:none;}}
 .sheet-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 18px;}
 .sheet-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-dim);font-size:14px;z-index:10;transition:all .15s;}
@@ -824,6 +864,12 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opa
     <span class="review-banner-arrow">&rarr;</span>
   </div>
 
+  <div class="unsure-banner" id="unsure-banner" onclick="openUnsurePage()">
+    <span>&#x2753;</span>
+    <span id="unsure-banner-text">Charges need household review</span>
+    <span>&rarr;</span>
+  </div>
+
   <!-- SCROLL AREA -->
   <div class="scroll" id="scroll">
 
@@ -846,9 +892,10 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opa
           </div>
           <div class="hero-pills" id="hero-pills"></div>
         </div>
-        <div class="hscroll-outer"><div class="hscroll" id="kpi-cards"></div></div>
+        <div class="kpi-grid" id="kpi-cards"></div>
+        <div class="quick-actions" id="quick-actions"></div>
 
-        <div class="sec-head"><div class="sec-title">Biggest Expenses</div><div class="sec-link" id="top-toggle" onclick="toggleTop20()">Show all →</div></div>
+        <div class="sec-head"><div class="sec-title">Biggest Expenses</div><div class="sec-link" id="top-toggle" onclick="toggleTop20()">Show all &rarr;</div></div>
         <div class="tx-list" id="top-expenses"></div>
         <div class="spacer"></div>
 
@@ -1139,6 +1186,16 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opa
   <div class="page-body" id="recurring-body"></div>
 </div>
 
+<!-- UNSURE PAGE -->
+<div class="page-overlay" id="page-unsure" style="z-index:210;">
+  <div class="page-header">
+    <button class="page-back" onclick="closePage('page-unsure')">&larr; Back</button>
+    <div class="page-title">Unsure Charges</div>
+    <div class="page-close" onclick="closePage('page-unsure')">&times;</div>
+  </div>
+  <div class="page-body" id="unsure-body"></div>
+</div>
+
 <!-- CATEGORY PICKER PAGE -->
 <div class="page-overlay" id="page-catpicker" style="z-index:260;">
   <div class="page-header">
@@ -1219,11 +1276,20 @@ let selectedMonth = new Date();
 const $ = id => document.getElementById(id);
 const money = n => '$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 function stats(txs){
-  const inc=txs.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0);
-  const exp=txs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
-  const refunds=txs.filter(t=>t.type==='refund').reduce((a,t)=>a+t.amount,0);
-  return{income:inc+refunds,expenses:exp,net:(inc+refunds)-exp,refunds};
+  let income=0,expenses=0,refunds=0,transfers=0;
+  txs.forEach(t=>{
+    const sign=t.original_sign||(t.type==='income'||t.type==='refund'?1:-1);
+    if(sign===1){
+      if(t.type==='refund')refunds+=t.amount;
+      else income+=t.amount;
+    }else{
+      if(t.type==='transfer')transfers+=t.amount;
+      else expenses+=t.amount;
+    }
+  });
+  return{income,expenses,refunds,transfers,net:(income+refunds)-expenses};
 }
+function truncate(str,len){return str&&str.length>len?str.substring(0,len)+'\u2026':str||'';}
 function monthTxs(txs,y,m){return txs.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});}
 function currentMonth(){return monthTxs(transactions,selectedMonth.getFullYear(),selectedMonth.getMonth());}
 function catBreak(txs){const m={};txs.filter(t=>t.type==='expense').forEach(t=>{m[t.cat]=(m[t.cat]||0)+t.amount;});txs.filter(t=>t.type==='refund').forEach(t=>{m[t.cat]=(m[t.cat]||0)-t.amount;});return m;}
@@ -1289,7 +1355,24 @@ async function syncAll(){
     const d=await res.json();
     await loadData();
     hideSync('\u2713 Synced '+d.synced+' transactions');
+    checkWizardTrigger();
   }catch(e){hideSync('\u2717 '+e.message);}
+}
+
+async function checkWizardTrigger(){
+  try{
+    const res=await fetch(`${API}/api/wizard/uncategorized-vendors?userId=${currentUser}`);
+    const{vendors}=await res.json();
+    if(vendors.length>=10&&!localStorage.getItem('wizard_shown_'+currentUser)){
+      const banner=document.createElement('div');
+      banner.className='review-banner on';
+      banner.style.background='rgba(245,197,24,.08)';banner.style.borderColor='rgba(245,197,24,.15)';banner.style.color='var(--gold)';
+      banner.innerHTML=`<span>\u{1F3F7}\uFE0F</span><span>${vendors.length} vendors need categorization</span>
+        <button onclick="openVendorWizard();this.parentElement.remove()" class="sht-btn gold" style="padding:4px 10px;font-size:9px">Organize</button>
+        <button onclick="this.parentElement.remove();localStorage.setItem('wizard_shown_${currentUser}','1')" class="sht-btn ghost" style="padding:4px 10px;font-size:9px">Later</button>`;
+      $('review-banner').after(banner);
+    }
+  }catch(e){}
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────
@@ -1327,37 +1410,41 @@ function renderHome(){
   $('hs-expenses').textContent=money(s.expenses);
   $('hs-saved').textContent=savings+'%';
 
-  // Refund & transfer pills
-  const refundTotal=mtxs.filter(t=>t.type==='refund').reduce((a,t)=>a+t.amount,0);
-  const transferTotal=mtxs.filter(t=>t.type==='transfer').reduce((a,t)=>a+t.amount,0);
-  const refundCount=mtxs.filter(t=>t.type==='refund').length;
-  const transferCount=mtxs.filter(t=>t.type==='transfer').length;
-  let pills='';
-  if(refundCount)pills+=`<div class="hero-pill" style="background:rgba(45,212,191,.12);color:var(--teal);border:1px solid rgba(45,212,191,.25)" onclick="openTypeSheet('refund')">↩ ${refundCount} Refund${refundCount>1?'s':''} · +${money(refundTotal)}</div>`;
-  if(transferCount)pills+=`<div class="hero-pill" style="background:rgba(155,109,255,.12);color:var(--purple);border:1px solid rgba(155,109,255,.25)" onclick="openTypeSheet('transfer')">⇄ ${transferCount} Transfer${transferCount>1?'s':''} · ${money(transferTotal)}</div>`;
-  pills+=`<div class="hero-pill" style="background:rgba(167,139,250,.1);color:var(--purple);border:1px solid rgba(167,139,250,.2)" onclick="openRecurringModule()">🔄 Recurring</div>`;
-  // Review banner (not a pill)
+  // Banners
   const unreviewedCount=transactions.filter(t=>t.cat==='Other'&&!t.reviewed).length;
   $('review-banner').classList.toggle('on',unreviewedCount>0);
   $('review-banner-text').textContent=`${unreviewedCount} transaction${unreviewedCount!==1?'s':''} need review`;
-  $('hero-pills').innerHTML=pills;
+  const unsureCount=transactions.filter(t=>t.status==='unsure').length;
+  $('unsure-banner').classList.toggle('on',unsureCount>0);
+  $('unsure-banner-text').textContent=`${unsureCount} charge${unsureCount!==1?'s':''} need household review`;
+  $('hero-pills').innerHTML='';
 
-  // KPI cards
-  const totalBal=accounts.filter(a=>a.type==='depository').reduce((a,ac)=>a+(ac.balance||0),0);
-  const cards=[
-    {lbl:'Income MTD',val:money(s.income),color:'var(--green)',sub:'This month'},
-    {lbl:'Expenses MTD',val:money(s.expenses),color:'var(--red)',sub:'This month'},
-    ...(accounts.length?[{lbl:'Bank Balance',val:money(totalBal),color:'var(--blue)',sub:`${accounts.length} accounts`}]:[{lbl:'Savings Rate',val:savings+'%',color:'var(--blue)',sub:'Of income'}]),
-    {lbl:'Transactions',val:mtxs.length,color:'var(--gold)',sub:'This month'},
-  ];
-  // Add daily average KPI
+  // KPI grid — always 6 cards
   const now=new Date();
   const isCurrentMonth=selectedMonth.getFullYear()===now.getFullYear()&&selectedMonth.getMonth()===now.getMonth();
   const daysElapsed=isCurrentMonth?now.getDate():new Date(selectedMonth.getFullYear(),selectedMonth.getMonth()+1,0).getDate();
   const dailyAvg=daysElapsed>0?s.expenses/daysElapsed:0;
-  cards.push({lbl:'Avg/Day',val:money(dailyAvg),color:'var(--orange)',sub:`${daysElapsed} days`});
-
+  const totalBal=accounts.filter(a=>a.type==='depository').reduce((a,ac)=>a+(ac.balance||0),0);
+  const cards=[
+    {lbl:'Income',val:money(s.income),color:'var(--green)',sub:'This month'},
+    {lbl:'Expenses',val:money(s.expenses),color:'var(--red)',sub:'This month'},
+    {lbl:'Net Cash Flow',val:(s.net>=0?'+':'-')+money(s.net),color:'var(--blue)',sub:'Income - Expenses'},
+    {lbl:'Avg/Day',val:money(dailyAvg),color:'var(--orange)',sub:`${daysElapsed} days`},
+    {lbl:'Savings',val:savings+'%',color:'var(--teal)',sub:'Of income'},
+    ...(accounts.length?[{lbl:'Bank Balance',val:money(totalBal),color:'var(--blue)',sub:`${accounts.length} accounts`}]:[{lbl:'Transactions',val:mtxs.length,color:'var(--gold)',sub:'This month'}]),
+  ];
   $('kpi-cards').innerHTML=cards.map(c=>`<div class="kcard" style="--kc:${c.color}"><div class="kcard-lbl">${c.lbl}</div><div class="kcard-val">${c.val}</div><div class="kcard-sub">${c.sub}</div></div>`).join('');
+
+  // Quick actions row
+  const refundTotal=mtxs.filter(t=>t.type==='refund').reduce((a,t)=>a+t.amount,0);
+  const refundCount=mtxs.filter(t=>t.type==='refund').length;
+  const transferTotal=mtxs.filter(t=>t.type==='transfer').reduce((a,t)=>a+t.amount,0);
+  const transferCount=mtxs.filter(t=>t.type==='transfer').length;
+  let qaCards='';
+  if(refundCount)qaCards+=`<div class="qa-card" onclick="openTypeSheet('refund')"><div class="qa-card-icon">\u21A9</div><div><div class="qa-card-label">Refunds (${refundCount})</div><div class="qa-card-value" style="color:var(--teal)">+${money(refundTotal)}</div></div></div>`;
+  if(transferCount)qaCards+=`<div class="qa-card" onclick="openTypeSheet('transfer')"><div class="qa-card-icon">\u21C4</div><div><div class="qa-card-label">Transfers (${transferCount})</div><div class="qa-card-value" style="color:var(--purple)">${money(transferTotal)}</div></div></div>`;
+  qaCards+=`<div class="qa-card" onclick="openRecurringModule()"><div class="qa-card-icon">\u{1F504}</div><div><div class="qa-card-label">Recurring</div><div class="qa-card-value" style="color:var(--blue)">View All</div></div></div>`;
+  $('quick-actions').innerHTML=qaCards;
 
   // Recent
   const recent=[...mtxs].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
@@ -1699,21 +1786,25 @@ function onTxRowClick(e,id){
 // ─── TX ROWS ──────────────────────────────────────────────────────
 function txRows(txs,deletable){
   if(!txs.length)return`<div class="empty-msg">No transactions yet</div>`;
-  return txs.map(t=>`
-    <div class="tx-row ${selectedTxIds.has(t.id)?'selected':''}" data-txid="${t.id}" onclick="onTxRowClick(event,'${t.id}')">
+  return txs.map(t=>{
+    const sign=t.original_sign||(t.type==='income'||t.type==='refund'?1:-1);
+    const isPos=sign===1;
+    return`<div class="tx-row ${selectedTxIds.has(t.id)?'selected':''}" data-txid="${t.id}" onclick="onTxRowClick(event,'${t.id}')">
       <div class="tx-check">\u2713</div>
       <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}22">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
       <div class="tx-body">
         <div class="tx-desc">${t.desc}</div>
+        ${t.notes?`<div class="tx-notes-preview">\u{1F4DD} ${truncate(t.notes,60)}</div>`:''}
         <div class="tx-meta">
           ${t.user_name?`<span class="tx-who" style="background:${USER_COLORS[t.user_id]||'#888'}22;color:${USER_COLORS[t.user_id]||'var(--text-dim)'}">${t.user_name}</span>`:''}
           <span class="tx-cat">${t.cat}</span>
+          ${t.status==='unsure'?'<span class="tx-unsure-badge">UNSURE</span>':''}
           ${t.pending?'<span class="tx-pending-badge">PENDING</span>':''}
           <span class="tx-date">\u00B7 ${t.date}</span>
         </div>
       </div>
-      <div class="tx-amt ${t.pending?'pending':t.type==='income'?'pos':t.type==='refund'?'pos':'neg'}">${t.type==='income'?'+':t.type==='refund'?'+':'-'}${money(t.amount)}${t.type==='refund'?' \u21A9':''}</div>
-    </div>`).join('');
+      <div class="tx-amt ${t.pending?'pending':isPos?'pos':'neg'}">${isPos?'+':'-'}${money(t.amount)}${t.type==='refund'?' \u21A9':''}</div>
+    </div>`;}).join('');
 }
 
 // ─── RANKED TX ROWS ───────────────────────────────────────────────
@@ -1828,15 +1919,15 @@ async function saveTxDetail(){
 async function renderTxDetail(id){
   const t=transactions.find(tx=>tx.id===id);
   if(!t){$('txdetail-body').innerHTML='<div class="empty-msg">Transaction not found</div>';return;}
-  // Fetch full detail from API for tags/notes
   let tags=[],notes=t.notes||'';
   try{
     const res=await fetch(`${API}/api/transactions/${id}`);
-    if(res.ok){const d=await res.json();tags=d.tags||[];notes=d.notes||'';}
+    if(res.ok){const d=await res.json();tags=d.tags||[];notes=d.notes||'';if(d.original_sign!==undefined)t.original_sign=d.original_sign;if(d.status)t.status=d.status;}
   }catch(e){}
 
-  const isPos=t.type==='income'||t.type==='refund';
-  const allCats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].sort();
+  const sign=t.original_sign||(t.type==='income'||t.type==='refund'?1:-1);
+  const isPos=sign===1;
+  const account=accounts.find(a=>a.account_id===t.account_id);
 
   $('txdetail-body').innerHTML=`
     <div class="txd-vendor">${t.desc}</div>
@@ -1845,6 +1936,7 @@ async function renderTxDetail(id){
       <span>${t.date}</span>
       ${t.pending?'<span class="txd-pending">Pending</span>':''}
       ${t.user_name?`<span>\u00B7 ${t.user_name}</span>`:''}
+      ${account?`<span>\u00B7 ${account.name} \u2022\u2022\u2022\u2022${account.mask||''}</span>`:''}
     </div>
 
     <div class="txd-section">
@@ -1866,6 +1958,26 @@ async function renderTxDetail(id){
     </div>
 
     <div class="txd-section">
+      <div class="txd-label">Money Direction</div>
+      <div class="txd-direction-row">
+        <div class="txd-dir-btn debit ${sign===-1?'active':''}" onclick="changeTxSign('${id}',-1)">
+          <span>\u2191</span> Money Out (Debit)
+        </div>
+        <div class="txd-dir-btn credit ${sign===1?'active':''}" onclick="changeTxSign('${id}',1)">
+          <span>\u2193</span> Money In (Credit)
+        </div>
+      </div>
+    </div>
+
+    <div class="txd-section">
+      <div class="txd-label">Status</div>
+      <div class="txd-status-row">
+        <div class="txd-status-btn ${t.status!=='unsure'?'active':''}" onclick="setTxStatus('${id}','confirmed')">&#x2713; Confirmed</div>
+        <div class="txd-status-btn unsure ${t.status==='unsure'?'active':''}" onclick="setTxStatus('${id}','unsure')">? Unsure</div>
+      </div>
+    </div>
+
+    <div class="txd-section">
       <div class="txd-label">Tags</div>
       <div class="txd-tags" id="txd-tags">
         ${tags.map(tag=>`<div class="txd-tag">${tag}<span class="txd-tag-x" onclick="removeTxTag('${id}','${tag}')">\u2715</span></div>`).join('')}
@@ -1879,8 +1991,8 @@ async function renderTxDetail(id){
     </div>
 
     <div class="txd-toggle-row" onclick="toggleTxApplyVendor(this)">
-      <div><div class="txd-toggle-label">Apply to all "${t.desc}"</div>
-      <div class="txd-toggle-sub">Category & type changes apply to all transactions from this vendor</div></div>
+      <div><div class="txd-toggle-label">Apply category to all "${t.desc}"</div>
+      <div class="txd-toggle-sub">Category changes apply to all transactions from this vendor (type and sign are always per-transaction)</div></div>
       <div class="txd-switch ${window._txdApplyVendor?'on':''}" id="txd-vendor-switch"></div>
     </div>
 
@@ -1893,10 +2005,11 @@ async function renderTxDetail(id){
     <div class="txd-footer">
       <div>Source: ${t.source||'manual'}</div>
       ${t.original_cat?`<div>Plaid category: ${t.original_cat}</div>`:''}
+      <div>Sign: ${sign===1?'Credit (money in)':'Debit (money out)'}</div>
       <div>ID: ${t.id}</div>
     </div>
   `;
-  window._txdApplyVendor=true; // default on per spec
+  window._txdApplyVendor=true;
 }
 
 async function changeTxType(id,newType){
@@ -1944,6 +2057,40 @@ async function toggleTxRecurring(id,el){
   const newVal=!sw.classList.contains('on');
   sw.classList.toggle('on',newVal);
   try{await fetch(`${API}/api/transactions/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_recurring:newVal})});}catch(e){}
+}
+
+async function changeTxSign(id,newSign){
+  try{
+    await fetch(`${API}/api/transactions/${id}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({original_sign:newSign})});
+    const t=transactions.find(tx=>tx.id===id);
+    if(t)t.original_sign=newSign;
+    renderTxDetail(id);
+    renderAll();
+  }catch(e){alert('Failed: '+e.message);}
+}
+
+async function setTxStatus(id,status){
+  try{
+    await fetch(`${API}/api/transactions/${id}/status`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+    const t=transactions.find(tx=>tx.id===id);
+    if(t)t.status=status;
+    renderTxDetail(id);
+    renderAll();
+  }catch(e){alert('Failed: '+e.message);}
+}
+
+async function openUnsurePage(){
+  openPage('page-unsure',async()=>{
+    const body=$('unsure-body');
+    body.innerHTML='<div class="empty-msg">Loading...</div>';
+    try{
+      const res=await fetch(`${API}/api/transactions/unsure?userId=${currentUser}`);
+      const{transactions:txs}=await res.json();
+      if(!txs.length){body.innerHTML='<div class="empty-msg">No unsure charges</div>';return;}
+      body.innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:16px">${txs.length} charge${txs.length!==1?'s':''} marked as unsure</div>
+        <div class="tx-list">${txRows(txs,false)}</div>`;
+    }catch(e){body.innerHTML='<div class="empty-msg">Failed to load</div>';}
+  });
 }
 
 function toggleTop20(){
@@ -2122,9 +2269,11 @@ function closeEmojiPicker(){
 async function pickEmoji(emoji){
   if(emojiPickerCat){
     CAT_ICONS[emojiPickerCat]=emoji;
-    renderRecatSheet();
     renderAll();
     try{
+      // Update categories table (source of truth)
+      await fetch(`${API}/api/categories/${encodeURIComponent(emojiPickerCat)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,icon:emoji})});
+      // Also update legacy category_icons
       await fetch(`${API}/api/category-icons`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:emojiPickerCat,icon:emoji})});
     }catch(e){}
   }
@@ -2286,15 +2435,19 @@ async function openCatManage(){
     try{
       const res=await fetch(`${API}/api/categories?userId=${currentUser}`);
       const{categories}=await res.json();
-      body.innerHTML=categories.map(c=>`
-        <div class="catm-row" onclick="openCatDrill('${c.id.replace(/'/g,"\\'")}')">
-          <div class="catm-emoji" onclick="event.stopPropagation();openEmojiPickerForCat('${c.id.replace(/'/g,"\\'")}')" style="background:${c.color||'#888'}15">${c.icon||'📌'}</div>
-          <div class="catm-info">
+      body.innerHTML=categories.map(c=>{
+        const esc=c.id.replace(/'/g,"\\'");
+        return`<div class="catm-row">
+          <div class="catm-emoji" onclick="event.stopPropagation();openEmojiPickerForCat('${esc}')" style="background:${c.color||'#888'}15">${c.icon||'📌'}</div>
+          <div class="catm-info" onclick="openCatDrill('${esc}')">
             <div class="catm-name">${c.id}</div>
-            <div class="catm-stats">${c.tx_count} transactions · ${money(c.spent)} spent</div>
+            <div class="catm-stats">${c.tx_count} transactions \u00B7 ${money(c.spent)} spent</div>
           </div>
-          <div class="catm-color" style="background:${c.color||'#888'};color:${c.color||'#888'}"></div>
-        </div>`).join('')+`
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button onclick="event.stopPropagation();renameCategory('${esc}')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-dim);padding:4px;">&#x270E;</button>
+            <button onclick="event.stopPropagation();deleteCategory('${esc}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-muted);padding:4px;">&#x2715;</button>
+          </div>
+        </div>`;}).join('')+`
         <button class="catm-add" onclick="addNewCategory()">+ New Category</button>`;
     }catch(e){body.innerHTML='<div class="empty-msg">Failed to load categories</div>';}
   });
@@ -2322,6 +2475,31 @@ async function addNewCategory(){
     CAT_COLORS[name.trim()]=CAT_COLORS[name.trim()]||'#7a78a0';
     CAT_ICONS[name.trim()]=CAT_ICONS[name.trim()]||'📌';
     openCatManage();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function renameCategory(oldName){
+  const newName=prompt('Rename category:',oldName);
+  if(!newName||newName.trim()===oldName)return;
+  try{
+    await fetch(`${API}/api/categories/${encodeURIComponent(oldName)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,name:newName.trim()})});
+    // Update local state
+    transactions.filter(t=>t.cat===oldName).forEach(t=>{t.cat=newName.trim();});
+    if(budgets[oldName]){budgets[newName.trim()]=budgets[oldName];delete budgets[oldName];}
+    CAT_COLORS[newName.trim()]=CAT_COLORS[oldName]||'#6B6B74';
+    CAT_ICONS[newName.trim()]=CAT_ICONS[oldName]||'\u{1F4CC}';
+    openCatManage();renderAll();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deleteCategory(name){
+  const count=transactions.filter(t=>t.cat===name).length;
+  if(!confirm(`Delete "${name}"? ${count} transactions will be moved to "Other".`))return;
+  try{
+    await fetch(`${API}/api/categories/${encodeURIComponent(name)}?userId=${currentUser}`,{method:'DELETE'});
+    transactions.filter(t=>t.cat===name).forEach(t=>{t.cat='Other';});
+    delete budgets[name];
+    openCatManage();renderAll();
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -2683,7 +2861,7 @@ async function openRecurringModule(){
             <div class="rec-item-icon" style="background:${CAT_COLORS[r.category]||'#888'}22">${CAT_ICONS[r.category]||'📌'}</div>
             <div class="rec-item-info">
               <div class="rec-item-vendor">${r.vendor}</div>
-              <div class="rec-item-meta">${r.category||'Uncategorized'} · Last: ${r.last_seen||'—'}</div>
+              <div class="rec-item-meta">${r.category||'Uncategorized'} \u00B7 Last: ${r.last_seen||'\u2014'} \u00B7 Next: ${nextExpectedDate(r.last_seen,r.frequency)||'\u2014'}</div>
             </div>
             <div class="rec-item-right">
               <div class="rec-item-amt">-${money(r.expected_amount)}</div>
@@ -2717,6 +2895,19 @@ async function openRecurringModule(){
       body.innerHTML=html;
     }catch(e){body.innerHTML='<div class="empty-msg">Failed to load: '+e.message+'</div>';}
   });
+}
+
+function nextExpectedDate(lastSeen,frequency){
+  if(!lastSeen)return null;
+  const d=new Date(lastSeen+'T12:00:00');
+  switch(frequency){
+    case'weekly':d.setDate(d.getDate()+7);break;
+    case'monthly':d.setMonth(d.getMonth()+1);break;
+    case'quarterly':d.setMonth(d.getMonth()+3);break;
+    case'annual':d.setFullYear(d.getFullYear()+1);break;
+    default:return null;
+  }
+  return d.toISOString().split('T')[0];
 }
 
 async function confirmRecurring(vendor,category,amount,frequency,isSub,el){
