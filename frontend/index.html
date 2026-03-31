@@ -1757,6 +1757,31 @@ function openTxDetail(id){
 function closeTxDetail(){
   closePage('page-txdetail');
   txDetailId=null;
+  // If review page is open, refresh it to remove resolved transactions
+  if($('page-review')?.classList.contains('open')) refreshReviewQueue();
+}
+
+function refreshReviewQueue(){
+  // Remove individual tx rows that are no longer unreviewed
+  document.querySelectorAll('.review-tx-row[data-txid]').forEach(row=>{
+    const t=transactions.find(tx=>tx.id===row.dataset.txid);
+    if(t&&(t.cat!=='Other'||t.reviewed)){
+      row.remove();
+    }
+  });
+  // Remove vendor groups with no remaining tx rows
+  document.querySelectorAll('.review-vendor').forEach(vendorEl=>{
+    const remaining=vendorEl.querySelectorAll('.review-tx-row');
+    if(!remaining.length){
+      vendorEl.classList.add('done');
+      setTimeout(()=>vendorEl.remove(),400);
+      updateReviewProgress();
+    }else{
+      // Update the count in the header
+      const infoEl=vendorEl.querySelector('.review-vendor-info');
+      if(infoEl)infoEl.textContent=`${remaining.length} transaction${remaining.length!==1?'s':''} remaining`;
+    }
+  });
 }
 
 async function saveTxDetail(){
@@ -1778,6 +1803,10 @@ async function saveTxDetail(){
     }
     btn.textContent='\u2713 Saved';btn.classList.add('saved');
     setTimeout(()=>{btn.textContent='Save';btn.classList.remove('saved');},2000);
+    // Mark as reviewed in local state
+    const saved=transactions.find(tx=>tx.id===txDetailId);
+    if(saved)saved.reviewed=1;
+    if($('page-review')?.classList.contains('open')) refreshReviewQueue();
     renderAll();
   }catch(e){btn.textContent='Save';alert('Failed: '+e.message);}
 }
@@ -2361,7 +2390,7 @@ async function openReviewQueue(){
           <div class="review-vendor-body">
             <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-bottom:8px">Tap a transaction to open details, or categorize all below</div>
             ${(v.transactions||[]).map(t=>`
-              <div class="review-tx-row" onclick="openTxDetail('${t.id}')">
+              <div class="review-tx-row" data-txid="${t.id}" onclick="openTxDetail('${t.id}')">
                 <div class="review-tx-date">${t.date}</div>
                 <div class="review-tx-desc">${t.desc}</div>
                 <div class="review-tx-amt">-${money(t.amount)}</div>
