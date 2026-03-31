@@ -1866,8 +1866,20 @@ function openTxDetail(id){
 function closeTxDetail(){
   closePage('page-txdetail');
   txDetailId=null;
-  // If review page is open, refresh it to remove resolved transactions
+  // Re-render any open parent pages so changed transactions are reflected
   if($('page-review')?.classList.contains('open')) refreshReviewQueue();
+  if($('page-catdrill')?.classList.contains('open')){
+    // Re-render the category/vendor drill-down with fresh data
+    const title=$('catdrill-title')?.textContent;
+    if(title){
+      closePage('page-catdrill');
+      // Detect if it was a category or vendor drill-down and re-open
+      const isCat=Object.keys(CAT_COLORS).includes(title)||Object.keys(budgets).includes(title);
+      if(isCat) openCatDrill(title);
+      else openVendorSheet(title);
+    }
+  }
+  renderAll();
 }
 
 function refreshReviewQueue(){
