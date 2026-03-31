@@ -1276,20 +1276,27 @@ let selectedMonth = new Date();
 const $ = id => document.getElementById(id);
 const money = n => '$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 function stats(txs){
-  let income=0,expenses=0,refunds=0,transfers=0;
+  // Amount from DB: positive = money OUT (expense), negative = money IN (income)
+  // Type is a classification label only — the raw amount determines the math
+  let income=0,expenses=0,transfers=0;
   txs.forEach(t=>{
-    // Type determines classification for math — original_sign is for display only
-    if(t.type==='income')income+=t.amount;
-    else if(t.type==='refund')refunds+=t.amount;
-    else if(t.type==='transfer')transfers+=t.amount;
-    else expenses+=t.amount;
+    if(t.type==='transfer')return; // exclude transfers from income/expense totals
+    if(t.amount<0) income+=Math.abs(t.amount); // negative = money came in
+    else expenses+=t.amount; // positive = money went out
   });
-  return{income:income+refunds,expenses,refunds,transfers,net:(income+refunds)-expenses};
+  return{income,expenses,transfers,net:income-expenses};
 }
 function truncate(str,len){return str&&str.length>len?str.substring(0,len)+'\u2026':str||'';}
 function monthTxs(txs,y,m){return txs.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});}
 function currentMonth(){return monthTxs(transactions,selectedMonth.getFullYear(),selectedMonth.getMonth());}
-function catBreak(txs){const m={};txs.filter(t=>t.type==='expense').forEach(t=>{m[t.cat]=(m[t.cat]||0)+t.amount;});txs.filter(t=>t.type==='refund').forEach(t=>{m[t.cat]=(m[t.cat]||0)-t.amount;});return m;}
+function catBreak(txs){
+  // Use raw amount: positive = expense, negative = refund/income
+  const m={};
+  txs.filter(t=>t.type!=='transfer'&&t.type!=='income').forEach(t=>{
+    m[t.cat]=(m[t.cat]||0)+t.amount; // positive adds, negative subtracts naturally
+  });
+  return m;
+}
 function userName(id){return users.find(u=>u.id===id)?.name||id;}
 
 // ─── ONLINE/OFFLINE ───────────────────────────────────────────────
@@ -1433,9 +1440,9 @@ function renderHome(){
   $('kpi-cards').innerHTML=cards.map(c=>`<div class="kcard" style="--kc:${c.color}"><div class="kcard-lbl">${c.lbl}</div><div class="kcard-val">${c.val}</div><div class="kcard-sub">${c.sub}</div></div>`).join('');
 
   // Quick actions row
-  const refundTotal=mtxs.filter(t=>t.type==='refund').reduce((a,t)=>a+t.amount,0);
+  const refundTotal=mtxs.filter(t=>t.type==='refund').reduce((a,t)=>a+Math.abs(t.amount),0);
   const refundCount=mtxs.filter(t=>t.type==='refund').length;
-  const transferTotal=mtxs.filter(t=>t.type==='transfer').reduce((a,t)=>a+t.amount,0);
+  const transferTotal=mtxs.filter(t=>t.type==='transfer').reduce((a,t)=>a+Math.abs(t.amount),0);
   const transferCount=mtxs.filter(t=>t.type==='transfer').length;
   let qaCards='';
   if(refundCount)qaCards+=`<div class="qa-card" onclick="openTypeSheet('refund')"><div class="qa-card-icon">\u21A9</div><div><div class="qa-card-label">Refunds (${refundCount})</div><div class="qa-card-value" style="color:var(--teal)">+${money(refundTotal)}</div></div></div>`;
@@ -1784,7 +1791,7 @@ function onTxRowClick(e,id){
 function txRows(txs,deletable){
   if(!txs.length)return`<div class="empty-msg">No transactions yet</div>`;
   return txs.map(t=>{
-    const sign=(t.type==='income'||t.type==='refund')?1:-1;
+    const sign=t.amount<0?1:-1; // negative amount = money in = positive display
     const isPos=sign===1;
     return`<div class="tx-row ${selectedTxIds.has(t.id)?'selected':''}" data-txid="${t.id}" onclick="onTxRowClick(event,'${t.id}')">
       <div class="tx-check">\u2713</div>
@@ -1800,7 +1807,7 @@ function txRows(txs,deletable){
           <span class="tx-date">\u00B7 ${t.date}</span>
         </div>
       </div>
-      <div class="tx-amt ${t.pending?'pending':isPos?'pos':'neg'}">${isPos?'+':'-'}${money(t.amount)}${t.type==='refund'?' \u21A9':''}</div>
+      <div class="tx-amt ${t.pending?'pending':isPos?'pos':'neg'}">${isPos?'+':'-'}${money(Math.abs(t.amount))}${t.type==='refund'?' \u21A9':''}</div>
     </div>`;}).join('');
 }
 
@@ -1819,7 +1826,7 @@ function rankedTxRows(txs, startRank){
           <span class="tx-date">\u00B7 ${t.date}</span>
         </div>
       </div>
-      <div class="tx-amt neg">-${money(t.amount)}</div>
+      <div class="tx-amt neg">-${money(Math.abs(t.amount))}</div>
     </div>`).join('');
 }
 
@@ -1922,13 +1929,13 @@ async function renderTxDetail(id){
     if(res.ok){const d=await res.json();tags=d.tags||[];notes=d.notes||'';if(d.original_sign!==undefined)t.original_sign=d.original_sign;if(d.status)t.status=d.status;}
   }catch(e){}
 
-  const sign=(t.type==='income'||t.type==='refund')?1:-1;
+  const sign=t.amount<0?1:-1; // negative amount = money in = positive display
   const isPos=sign===1;
   const account=accounts.find(a=>a.account_id===t.account_id);
 
   $('txdetail-body').innerHTML=`
     <div class="txd-vendor">${t.desc}</div>
-    <div class="txd-amount ${isPos?'pos':'neg'}">${isPos?'+':'-'}${money(t.amount)}</div>
+    <div class="txd-amount ${isPos?'pos':'neg'}">${isPos?'+':'-'}${money(Math.abs(t.amount))}</div>
     <div class="txd-meta">
       <span>${t.date}</span>
       ${t.pending?'<span class="txd-pending">Pending</span>':''}
@@ -2296,7 +2303,7 @@ async function applyRecat(newCat){
 // ─── TYPE BREAKDOWN SHEET ─────────────────────────────────────────
 function openTypeSheet(type){
   const txs=currentMonth().filter(t=>t.type===type).sort((a,b)=>b.amount-a.amount);
-  const total=txs.reduce((a,t)=>a+t.amount,0);
+  const total=txs.reduce((a,t)=>a+Math.abs(t.amount),0);
   const typeMap={income:{label:'Income',icon:'\u{1F4B0}'},expense:{label:'Expenses',icon:'\u{1F4B8}'},refund:{label:'Refunds',icon:'\u21A9'},transfer:{label:'Transfers',icon:'\u21C4'}};
   const info=typeMap[type]||typeMap.expense;
   $('catdrill-title').textContent=info.label;
@@ -2343,9 +2350,9 @@ function openVendorSheet(vendor){
   openPage('page-catdrill',()=>{
     const body=$('catdrill-body');
     const txs=currentMonth().filter(t=>t.desc===vendor).sort((a,b)=>new Date(b.date)-new Date(a.date));
-    const expTotal=txs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
-    const refTotal=txs.filter(t=>t.type==='refund').reduce((a,t)=>a+t.amount,0);
-    const incTotal=txs.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0);
+    const expTotal=txs.filter(t=>t.type==='expense').reduce((a,t)=>a+Math.abs(t.amount),0);
+    const refTotal=txs.filter(t=>t.type==='refund').reduce((a,t)=>a+Math.abs(t.amount),0);
+    const incTotal=txs.filter(t=>t.type==='income').reduce((a,t)=>a+Math.abs(t.amount),0);
     body.innerHTML=`
       <div class="catd-summary">
         <div class="catd-header">
@@ -2496,8 +2503,8 @@ async function openCatDrill(cat){
     body.innerHTML='<div class="empty-msg">Loading...</div>';
     const mtxs=currentMonth().filter(t=>t.cat===cat);
     const expenseTotal=mtxs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
-    const refundTotal=mtxs.filter(t=>t.type==='refund').reduce((a,t)=>a+t.amount,0);
-    const total=expenseTotal-refundTotal;
+    const refundAbs=mtxs.filter(t=>t.type==='refund').reduce((a,t)=>a+Math.abs(t.amount),0);
+    const total=expenseTotal-refundAbs;
     const budgetAmt=budgets[cat];
     const txCount=mtxs.length;
 
@@ -2593,7 +2600,7 @@ async function openReviewQueue(){
               <div class="review-tx-row" data-txid="${t.id}" onclick="openTxDetail('${t.id}')">
                 <div class="review-tx-date">${t.date}</div>
                 <div class="review-tx-desc">${t.desc}</div>
-                <div class="review-tx-amt">-${money(t.amount)}</div>
+                <div class="review-tx-amt">-${money(Math.abs(t.amount))}</div>
               </div>`).join('')}
             <div class="review-type-row">
               ${['expense','income','refund','transfer'].map(tp=>`<div class="review-type-btn ${tp==='expense'?'active':''}" onclick="setReviewType('${esc}','${tp}',this)">${tp}</div>`).join('')}
@@ -2715,7 +2722,7 @@ async function openIncomeBreakdown(){
     const body=$('income-body');
     body.innerHTML='<div class="empty-msg">Loading...</div>';
     const mtxs=currentMonth().filter(t=>t.type==='income'||t.type==='refund');
-    const total=mtxs.reduce((a,t)=>a+t.amount,0);
+    const total=mtxs.reduce((a,t)=>a+Math.abs(t.amount),0);
     // By category
     const byCat={};
     mtxs.forEach(t=>{byCat[t.cat]=(byCat[t.cat]||0)+t.amount;});
@@ -2967,11 +2974,13 @@ function hideSync(msg){$('sync-msg').textContent=msg;setTimeout(()=>$('sync-bann
 // ─── TRANSACTIONS ─────────────────────────────────────────────────
 async function submitTx(){
   const desc=$('f-desc').value.trim();
-  const amt=parseFloat($('f-amt').value);
+  const rawAmt=parseFloat($('f-amt').value);
   const type=$('f-type').value;
   const cat=$('f-cat').value;
   const date=$('f-date').value;
-  if(!desc||!amt||!date){alert('Please fill all fields.');return;}
+  if(!desc||!rawAmt||!date){alert('Please fill all fields.');return;}
+  // Store with Plaid convention: positive=expense, negative=income
+  const amt=(type==='income'||type==='refund')?-Math.abs(rawAmt):Math.abs(rawAmt);
   try{
     const res=await fetch(`${API}/api/transactions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,desc,amount:amt,type,cat,date})});
     if(!res.ok)throw new Error('Save failed');

@@ -86,9 +86,11 @@ function initDB() {
     run("UPDATE transactions SET original_sign = -1 WHERE type IN ('expense','transfer')");
   }
   if (!txCols.includes('status')) db.exec("ALTER TABLE transactions ADD COLUMN status TEXT DEFAULT 'confirmed'");
-  // Always ensure income/refund types that were Plaid credits have correct sign
-  // This catches cases where the backfill defaulted to -1 but type was already set
-  run("UPDATE transactions SET original_sign = 1 WHERE type IN ('income','refund') AND original_sign = -1 AND source = 'plaid'");
+  // Migrate: flip income/refund amounts to negative (Plaid convention)
+  // Only flip if amount is still positive (hasn't been migrated yet)
+  run("UPDATE transactions SET amount = -ABS(amount) WHERE type IN ('income','refund') AND amount > 0");
+  // Ensure original_sign matches the amount sign
+  run("UPDATE transactions SET original_sign = CASE WHEN amount < 0 THEN 1 ELSE -1 END");
 
   db.exec(`CREATE TABLE IF NOT EXISTS transaction_tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -253,11 +255,12 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
           desc.includes('PAYMENT - THANK')
         )) cat = 'Transfer';
       }
-      // Type determined by original sign, not vendor rule
-      type = cat === 'Transfer' ? 'transfer' : (originalSign === 1 ? 'income' : 'expense');
+      // Type determined by Plaid amount sign
+      type = cat === 'Transfer' ? 'transfer' : (t.amount < 0 ? 'income' : 'expense');
+      // Store the RAW Plaid amount (positive=debit/expense, negative=credit/income)
       upsertTx.run(
         t.transaction_id, household, userId, t.name,
-        Math.abs(t.amount), type, cat,
+        t.amount, type, cat,
         t.date, t.pending ? 1 : 0, t.account_id, plaidCat, originalSign
       );
     }
