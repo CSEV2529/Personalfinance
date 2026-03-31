@@ -85,6 +85,68 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
 .view.on{display:block;}
 @keyframes fadeUp{from{transform:translateY(10px);opacity:0;}to{transform:none;opacity:1;}}
 
+/* ─── PAGE OVERLAYS (slide-in views) ──────────────────────── */
+.page-overlay{position:fixed;inset:0;z-index:200;background:var(--bg);transform:translateX(100%);transition:transform 280ms cubic-bezier(0.32,0.72,0,1);overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
+.page-overlay.open{transform:translateX(0);}
+.page-header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:linear-gradient(180deg,var(--bg),rgba(5,5,16,.95));border-bottom:1px solid var(--border);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+.page-back{display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;padding:8px;margin:-8px;letter-spacing:.5px;}
+.page-back:active{opacity:.6;}
+.page-title{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;position:absolute;left:50%;transform:translateX(-50%);}
+.page-close{width:36px;height:36px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-dim);font-size:16px;}
+.page-close:active{transform:scale(.9);}
+.page-body{padding:16px;padding-bottom:calc(40px + var(--safe-b));}
+
+/* ─── TRANSACTION DETAIL ─────────────────────────────────── */
+.txd-amount{font-family:'Playfair Display',serif;font-size:48px;text-align:center;margin:20px 0 4px;line-height:1;}
+.txd-amount.pos{color:var(--green);text-shadow:0 0 30px rgba(0,255,135,.25);}
+.txd-amount.neg{color:var(--red);text-shadow:0 0 30px rgba(255,58,110,.25);}
+.txd-meta{text-align:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:20px;}
+.txd-meta span{margin:0 6px;}
+.txd-pending{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:rgba(255,159,28,.12);color:#ff9f1c;font-size:9px;letter-spacing:1px;text-transform:uppercase;animation:pendPulse 2s ease-in-out infinite;}
+@keyframes pendPulse{0%,100%{opacity:1;}50%{opacity:.5;}}
+.txd-section{margin-bottom:20px;}
+.txd-label{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;}
+.txd-vendor{font-size:16px;font-weight:500;margin-bottom:16px;text-align:center;}
+.txd-cat-pill{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:14px;background:var(--surface2);border:1px solid var(--border2);cursor:pointer;font-size:13px;transition:all .15s;width:100%;}
+.txd-cat-pill:active{transform:scale(.98);}
+.txd-cat-pill .emoji{font-size:20px;}
+.txd-cat-pill .name{flex:1;font-weight:500;}
+.txd-cat-pill .arrow{color:var(--text-dim);font-size:12px;}
+.txd-type-row{display:flex;gap:8px;}
+.txd-type-btn{flex:1;padding:10px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.5px;text-align:center;cursor:pointer;transition:all .15s;}
+.txd-type-btn.active{border-color:var(--gold);color:var(--gold);background:rgba(255,215,0,.08);box-shadow:0 0 12px rgba(255,215,0,.1);}
+.txd-type-btn:active{transform:scale(.96);}
+.txd-tags{display:flex;flex-wrap:wrap;gap:6px;}
+.txd-tag{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:20px;background:rgba(191,90,242,.1);border:1px solid rgba(191,90,242,.25);font-family:'DM Mono',monospace;font-size:10px;color:var(--purple);}
+.txd-tag-x{cursor:pointer;opacity:.6;font-size:12px;}
+.txd-tag-x:hover{opacity:1;}
+.txd-tag-add{padding:5px 10px;border-radius:20px;border:1px dashed var(--border2);background:transparent;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;}
+.txd-tag-add:hover{border-color:var(--gold);color:var(--gold);}
+.txd-notes{width:100%;min-height:60px;padding:12px;border-radius:12px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical;outline:none;transition:border-color .15s;}
+.txd-notes:focus{border-color:var(--gold);}
+.txd-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:12px;background:var(--surface2);border:1px solid var(--border2);margin-bottom:8px;}
+.txd-toggle-label{font-size:13px;}
+.txd-toggle-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:2px;}
+.txd-switch{width:44px;height:24px;border-radius:12px;background:var(--border2);position:relative;cursor:pointer;transition:background .2s;}
+.txd-switch.on{background:var(--gold);}
+.txd-switch::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+.txd-switch.on::after{transform:translateX(20px);}
+.txd-footer{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);padding:16px 0;border-top:1px solid var(--border);margin-top:20px;}
+.txd-footer div{margin-bottom:4px;}
+
+/* ─── DAY-BUCKETED LEDGER ────────────────────────────────── */
+.day-group{margin-bottom:4px;}
+.day-header{display:flex;justify-content:space-between;align-items:center;padding:8px 18px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--text-dim);}
+.day-header-date{font-weight:500;text-transform:uppercase;}
+.day-header-total{color:var(--red);text-shadow:0 0 10px rgba(255,58,110,.15);}
+.tx-pending-badge{font-family:'DM Mono',monospace;font-size:8px;color:#ff9f1c;letter-spacing:1px;text-transform:uppercase;}
+.tx-amt.pending{color:#ff9f1c !important;text-shadow:0 0 10px rgba(255,159,28,.25) !important;}
+
+/* ─── EDIT MODE ──────────────────────────────────────────── */
+.edit-mode-btn{padding:6px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s;}
+.edit-mode-btn:hover{border-color:var(--gold);color:var(--gold);}
+.edit-mode-btn.active{background:rgba(255,215,0,.1);border-color:var(--gold);color:var(--gold);}
+
 /* ─── HERO ──────────────────────────────────────────────────── */
 .hero{
   padding:28px 20px 22px;
@@ -714,7 +776,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px" id="ledger-kpis"></div>
         </div>
-        <div class="sec-head"><div class="sec-title" id="ledger-count">Transactions</div></div>
+        <div class="sec-head"><div class="sec-title" id="ledger-count">Transactions</div><button class="edit-mode-btn" id="edit-mode-btn" onclick="toggleEditMode()">Edit</button></div>
         <div class="tx-list" id="ledger-list"></div>
         <div class="spacer"></div>
       </div>
@@ -869,6 +931,26 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;
     <div class="recat-tx-info" id="recat-info"></div>
     <div class="recat-options" id="recat-options"></div>
   </div>
+</div>
+
+<!-- TRANSACTION DETAIL PAGE -->
+<div class="page-overlay" id="page-txdetail">
+  <div class="page-header">
+    <button class="page-back" onclick="closePage('page-txdetail')">&larr; Back</button>
+    <div class="page-title">Transaction</div>
+    <div class="page-close" onclick="closePage('page-txdetail')">&times;</div>
+  </div>
+  <div class="page-body" id="txdetail-body"></div>
+</div>
+
+<!-- CATEGORY DRILLDOWN PAGE -->
+<div class="page-overlay" id="page-catdrill">
+  <div class="page-header">
+    <button class="page-back" onclick="closePage('page-catdrill')">&larr; Back</button>
+    <div class="page-title" id="catdrill-title">Category</div>
+    <div class="page-close" onclick="closePage('page-catdrill')">&times;</div>
+  </div>
+  <div class="page-body" id="catdrill-body"></div>
 </div>
 
 <!-- EMOJI PICKER -->
@@ -1119,15 +1201,15 @@ function renderHome(){
 
 function renderLedger(){
   const mtxs=currentMonth();
-  const all=[...mtxs].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const sorted=[...mtxs].sort((a,b)=>new Date(b.date)-new Date(a.date));
   const s=stats(mtxs);
   $('ledger-month-label').textContent=selectedMonth.toLocaleString('default',{month:'long',year:'numeric'});
-  $('ledger-count').textContent=`Transactions (${all.length})`;
+  $('ledger-count').textContent=`Transactions (${sorted.length})`;
   $('ledger-kpis').innerHTML=`
     <div class="kcard" style="--kc:var(--green);width:auto"><div class="kcard-lbl">Income</div><div class="kcard-val" style="font-size:17px">${money(s.income)}</div></div>
     <div class="kcard" style="--kc:var(--red);width:auto"><div class="kcard-lbl">Expenses</div><div class="kcard-val" style="font-size:17px">${money(s.expenses)}</div></div>
     <div class="kcard" style="--kc:var(--blue);width:auto;grid-column:1/-1"><div class="kcard-lbl">Net Cash Flow</div><div class="kcard-val" style="font-size:17px;color:${s.net>=0?'var(--green)':'var(--red)'}">${s.net>=0?'+':'-'}${money(s.net)}</div></div>`;
-  $('ledger-list').innerHTML=txRows(all,true);
+  $('ledger-list').innerHTML=dayBucketedTxRows(sorted);
 }
 
 function renderBudget(){
@@ -1240,17 +1322,40 @@ function renderAccounts(){
   `;
 }
 
-// ─── MULTI-SELECT ────────────────────────────────────────────────
+// ─── PAGE STACK NAVIGATION ───────────────────────────────────────
+const pageStack=[];
+function openPage(id,renderFn){
+  if(renderFn)renderFn();
+  $(id).classList.add('open');
+  pageStack.push(id);
+}
+function closePage(id){
+  $(id)?.classList.remove('open');
+  const idx=pageStack.indexOf(id);
+  if(idx>=0)pageStack.splice(idx,1);
+}
+function closeAllPages(){
+  pageStack.forEach(id=>$(id)?.classList.remove('open'));
+  pageStack.length=0;
+}
+
+// ─── EDIT MODE (replaces long-press multi-select) ────────────────
 let selectMode=false;
 let selectedTxIds=new Set();
-let longPressTimer=null;
-let longPressFired=false;
+
+function toggleEditMode(){
+  selectMode=!selectMode;
+  $('edit-mode-btn').classList.toggle('active',selectMode);
+  $('edit-mode-btn').textContent=selectMode?'Done':'Edit';
+  if(!selectMode)clearSelection();
+  else document.querySelectorAll('.tx-list').forEach(l=>l.classList.add('select-mode'));
+}
 
 function toggleSelectTx(id){
   if(selectedTxIds.has(id))selectedTxIds.delete(id);
   else selectedTxIds.add(id);
-  if(!selectedTxIds.size)clearSelection();
-  else updateSelectUI();
+  if(!selectedTxIds.size&&selectMode){$('select-bar').classList.remove('on');updateSelectUI();return;}
+  updateSelectUI();
 }
 
 function updateSelectUI(){
@@ -1262,38 +1367,10 @@ function updateSelectUI(){
 }
 
 function clearSelection(){
-  selectMode=false;
   selectedTxIds.clear();
   $('select-bar').classList.remove('on');
   document.querySelectorAll('.tx-row.selected').forEach(r=>r.classList.remove('selected'));
   document.querySelectorAll('.tx-list').forEach(l=>l.classList.remove('select-mode'));
-}
-
-function enterSelectMode(id){
-  selectMode=true;
-  selectedTxIds.add(id);
-  document.querySelectorAll('.tx-list').forEach(l=>l.classList.add('select-mode'));
-  updateSelectUI();
-}
-
-function txRowClick(e,id){
-  if(longPressFired){e.preventDefault();e.stopPropagation();longPressFired=false;return;}
-  if(selectMode){e.preventDefault();e.stopPropagation();toggleSelectTx(id);return;}
-}
-
-function txRowLongPress(id){
-  longPressFired=true;
-  if(!selectMode)enterSelectMode(id);
-  else toggleSelectTx(id);
-}
-
-function txRowPointerDown(id){
-  longPressFired=false;
-  longPressTimer=setTimeout(()=>txRowLongPress(id),500);
-}
-
-function txRowPointerUp(){
-  clearTimeout(longPressTimer);
 }
 
 async function openBulkRecat(){
@@ -1310,26 +1387,28 @@ async function openBulkRecat(){
   $('recat-sheet').classList.add('on');
 }
 
+function onTxRowClick(e,id){
+  if(selectMode){e.stopPropagation();toggleSelectTx(id);return;}
+  openTxDetail(id);
+}
+
 // ─── TX ROWS ──────────────────────────────────────────────────────
 function txRows(txs,deletable){
   if(!txs.length)return`<div class="empty-msg">No transactions yet</div>`;
   return txs.map(t=>`
-    <div class="tx-row ${selectedTxIds.has(t.id)?'selected':''}" data-txid="${t.id}"
-      onclick="txRowClick(event,'${t.id}')"
-      onpointerdown="txRowPointerDown('${t.id}')"
-      onpointerup="txRowPointerUp()" onpointerleave="txRowPointerUp()">
+    <div class="tx-row ${selectedTxIds.has(t.id)?'selected':''}" data-txid="${t.id}" onclick="onTxRowClick(event,'${t.id}')">
       <div class="tx-check">\u2713</div>
       <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}22">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
       <div class="tx-body">
         <div class="tx-desc">${t.desc}</div>
         <div class="tx-meta">
           ${t.user_name?`<span class="tx-who" style="background:${USER_COLORS[t.user_id]||'#888'}22;color:${USER_COLORS[t.user_id]||'var(--text-dim)'}">${t.user_name}</span>`:''}
-          <span class="tx-cat" onclick="event.stopPropagation();openRecat('${t.id}','${(t.desc||'').replace(/'/g,"\\'")}','${t.cat}')">${t.cat}</span>
+          <span class="tx-cat">${t.cat}</span>
+          ${t.pending?'<span class="tx-pending-badge">PENDING</span>':''}
           <span class="tx-date">\u00B7 ${t.date}</span>
         </div>
       </div>
-      <div class="tx-amt ${t.type==='income'?'pos':t.type==='refund'?'pos':'neg'}">${t.type==='income'?'+':t.type==='refund'?'+':'-'}${money(t.amount)}${t.type==='refund'?' \u21A9':''}</div>
-      ${deletable?`<div class="tx-del" onclick="event.stopPropagation();deleteTx('${t.id}')">\u2715</div>`:''}
+      <div class="tx-amt ${t.pending?'pending':t.type==='income'?'pos':t.type==='refund'?'pos':'neg'}">${t.type==='income'?'+':t.type==='refund'?'+':'-'}${money(t.amount)}${t.type==='refund'?' \u21A9':''}</div>
     </div>`).join('');
 }
 
@@ -1337,23 +1416,172 @@ function txRows(txs,deletable){
 function rankedTxRows(txs, startRank){
   if(!txs.length) return '<div class="empty-msg">No expenses this month</div>';
   return txs.map((t,i) => `
-    <div class="tx-row ${selectedTxIds.has(t.id)?'selected':''}" data-txid="${t.id}"
-      onclick="txRowClick(event,'${t.id}')"
-      onpointerdown="txRowPointerDown('${t.id}')"
-      onpointerup="txRowPointerUp()" onpointerleave="txRowPointerUp()">
-      <div class="tx-check">\u2713</div>
+    <div class="tx-row" data-txid="${t.id}" onclick="openTxDetail('${t.id}')">
       <div class="tx-rank">${startRank+i+1}</div>
       <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}22">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
       <div class="tx-body">
         <div class="tx-desc">${t.desc}</div>
         <div class="tx-meta">
           ${t.user_name?`<span class="tx-who" style="background:${USER_COLORS[t.user_id]||'#888'}22;color:${USER_COLORS[t.user_id]||'var(--text-dim)'}">${t.user_name}</span>`:''}
-          <span class="tx-cat" onclick="event.stopPropagation();openRecat('${t.id}','${(t.desc||'').replace(/'/g,"\\'")}','${t.cat}')">${t.cat}</span>
+          <span class="tx-cat">${t.cat}</span>
           <span class="tx-date">\u00B7 ${t.date}</span>
         </div>
       </div>
       <div class="tx-amt neg">-${money(t.amount)}</div>
     </div>`).join('');
+}
+
+// ─── DAY-BUCKETED TX LIST ────────────────────────────────────────
+function dayBucketedTxRows(txs){
+  if(!txs.length)return'<div class="empty-msg">No transactions this month</div>';
+  const groups={};
+  txs.forEach(t=>{
+    if(!groups[t.date])groups[t.date]=[];
+    groups[t.date].push(t);
+  });
+  const today=new Date().toISOString().split('T')[0];
+  const yesterday=new Date(Date.now()-86400000).toISOString().split('T')[0];
+  return Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(date=>{
+    const dayTxs=groups[date];
+    const dayTotal=dayTxs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+    let label;
+    if(date===today)label='Today';
+    else if(date===yesterday)label='Yesterday';
+    else{const d=new Date(date+'T12:00:00');label=d.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});}
+    return`<div class="day-group">
+      <div class="day-header"><span class="day-header-date">${label}</span>${dayTotal>0?`<span class="day-header-total">-${money(dayTotal)}</span>`:''}</div>
+      <div class="tx-list">${txRows(dayTxs,true)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── TRANSACTION DETAIL PAGE ─────────────────────────────────────
+let txDetailId=null;
+
+function openTxDetail(id){
+  txDetailId=id;
+  openPage('page-txdetail',()=>renderTxDetail(id));
+}
+
+async function renderTxDetail(id){
+  const t=transactions.find(tx=>tx.id===id);
+  if(!t){$('txdetail-body').innerHTML='<div class="empty-msg">Transaction not found</div>';return;}
+  // Fetch full detail from API for tags/notes
+  let tags=[],notes=t.notes||'';
+  try{
+    const res=await fetch(`${API}/api/transactions/${id}`);
+    if(res.ok){const d=await res.json();tags=d.tags||[];notes=d.notes||'';}
+  }catch(e){}
+
+  const isPos=t.type==='income'||t.type==='refund';
+  const allCats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].sort();
+
+  $('txdetail-body').innerHTML=`
+    <div class="txd-vendor">${t.desc}</div>
+    <div class="txd-amount ${isPos?'pos':'neg'}">${isPos?'+':'-'}${money(t.amount)}</div>
+    <div class="txd-meta">
+      <span>${t.date}</span>
+      ${t.pending?'<span class="txd-pending">Pending</span>':''}
+      ${t.user_name?`<span>\u00B7 ${t.user_name}</span>`:''}
+    </div>
+
+    <div class="txd-section">
+      <div class="txd-label">Category</div>
+      <div class="txd-cat-pill" onclick="openRecat('${t.id}','${(t.desc||'').replace(/'/g,"\\'")}','${t.cat}')">
+        <span class="emoji">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</span>
+        <span class="name">${t.cat}</span>
+        <span class="arrow">\u203A</span>
+      </div>
+    </div>
+
+    <div class="txd-section">
+      <div class="txd-label">Type</div>
+      <div class="txd-type-row">
+        ${['expense','income','refund','transfer'].map(tp=>`
+          <div class="txd-type-btn ${t.type===tp?'active':''}" onclick="changeTxType('${id}','${tp}')">${tp}</div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="txd-section">
+      <div class="txd-label">Tags</div>
+      <div class="txd-tags" id="txd-tags">
+        ${tags.map(tag=>`<div class="txd-tag">${tag}<span class="txd-tag-x" onclick="removeTxTag('${id}','${tag}')">\u2715</span></div>`).join('')}
+        <button class="txd-tag-add" onclick="addTxTag('${id}')">+ Add tag</button>
+      </div>
+    </div>
+
+    <div class="txd-section">
+      <div class="txd-label">Notes</div>
+      <textarea class="txd-notes" placeholder="Add notes..." onblur="saveTxNotes('${id}',this.value)">${notes}</textarea>
+    </div>
+
+    <div class="txd-toggle-row" onclick="toggleTxApplyVendor(this)">
+      <div><div class="txd-toggle-label">Apply to all "${t.desc}"</div>
+      <div class="txd-toggle-sub">Category & type changes apply to all transactions from this vendor</div></div>
+      <div class="txd-switch ${window._txdApplyVendor?'on':''}" id="txd-vendor-switch"></div>
+    </div>
+
+    <div class="txd-toggle-row" onclick="toggleTxRecurring('${id}',this)">
+      <div><div class="txd-toggle-label">Mark as recurring</div>
+      <div class="txd-toggle-sub">Track this as a recurring charge</div></div>
+      <div class="txd-switch ${t.is_recurring?'on':''}" id="txd-recurring-switch"></div>
+    </div>
+
+    <div class="txd-footer">
+      <div>Source: ${t.source||'manual'}</div>
+      ${t.original_cat?`<div>Plaid category: ${t.original_cat}</div>`:''}
+      <div>ID: ${t.id}</div>
+    </div>
+  `;
+  window._txdApplyVendor=true; // default on per spec
+}
+
+async function changeTxType(id,newType){
+  const applyToVendor=window._txdApplyVendor;
+  try{
+    await fetch(`${API}/api/transactions/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:newType,applyToVendor})});
+    if(applyToVendor){
+      const t=transactions.find(tx=>tx.id===id);
+      transactions.filter(tx=>tx.desc===t?.desc).forEach(tx=>{tx.type=newType;});
+    }else{
+      const t=transactions.find(tx=>tx.id===id);if(t)t.type=newType;
+    }
+    renderTxDetail(id);
+    renderAll();
+  }catch(e){alert('Failed: '+e.message);}
+}
+
+async function saveTxNotes(id,notes){
+  try{await fetch(`${API}/api/transactions/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes})});}catch(e){}
+}
+
+async function addTxTag(id){
+  const tag=prompt('Tag name:');
+  if(!tag||!tag.trim())return;
+  try{
+    await fetch(`${API}/api/transactions/${id}/tags`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag:tag.trim()})});
+    renderTxDetail(id);
+  }catch(e){}
+}
+
+async function removeTxTag(id,tag){
+  try{
+    await fetch(`${API}/api/transactions/${id}/tags/${encodeURIComponent(tag)}`,{method:'DELETE'});
+    renderTxDetail(id);
+  }catch(e){}
+}
+
+function toggleTxApplyVendor(el){
+  window._txdApplyVendor=!window._txdApplyVendor;
+  el.querySelector('.txd-switch').classList.toggle('on',window._txdApplyVendor);
+}
+
+async function toggleTxRecurring(id,el){
+  const sw=el.querySelector('.txd-switch');
+  const newVal=!sw.classList.contains('on');
+  sw.classList.toggle('on',newVal);
+  try{await fetch(`${API}/api/transactions/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_recurring:newVal})});}catch(e){}
 }
 
 function toggleTop20(){
@@ -1513,6 +1741,7 @@ async function applyRecat(newCat){
     window._bulkIds=null;
     clearSelection();
     closeSheet('recat-sheet');
+    if(txDetailId)renderTxDetail(txDetailId);
     renderAll();
   }catch(e){alert('Failed to update: '+e.message);}
 }
