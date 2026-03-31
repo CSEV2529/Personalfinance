@@ -1021,6 +1021,13 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opa
     <div class="sheet-handle"></div>
     <div class="sheet-title" id="budget-sheet-title">Edit Budget</div>
     <div class="fstack">
+      <div class="fg">
+        <label class="flbl">Emoji</label>
+        <div id="fb-emoji-row" style="display:flex;align-items:center;gap:10px;">
+          <div id="fb-emoji-btn" onclick="openEmojiForBudget()" style="width:48px;height:48px;border-radius:12px;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;">📌</div>
+          <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);">Tap to change</span>
+        </div>
+      </div>
       <div class="fg"><label class="flbl">Category</label><input class="finput" id="fb-cat" placeholder="e.g. Pets"></div>
       <div class="fg"><label class="flbl">Monthly Budget ($)</label><input class="finput" id="fb-amt" type="number" placeholder="0.00" step="0.01" inputmode="decimal"></div>
     </div>
@@ -1431,18 +1438,24 @@ function renderBudget(){
     const spent=bd[cat]||0,limit=budgets[cat];
     const pct=Math.min((spent/limit)*100,100);
     const over=spent>limit,color=over?'var(--red)':pct>75?'var(--gold)':'var(--green)';
-    return`<div class="bcard" onclick="openCatDrill('${cat.replace(/'/g,"\\'")}')">
-      <div class="bcard-top">
-        <div class="bcard-left"><div class="bcard-dot" style="background:${CAT_COLORS[cat]||'#888'}"></div>${CAT_ICONS[cat]||'\u{1F4CC}'} ${cat}</div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="bcard-nums"><span>${money(spent)}<span style="color:var(--text-dim)"> / ${money(limit)}</span></span>${over?`<div class="bcard-over">\u25B2 ${money(spent-limit)} over</div>`:''}</div>
-          <div class="bcard-actions">
-            <button class="bcard-edit" onclick="event.stopPropagation();openBudgetEdit('${cat.replace(/'/g,"\\'")}',${limit})" title="Edit">&#x270E;</button>
-            <button class="bcard-del" onclick="event.stopPropagation();deleteBudget('${cat.replace(/'/g,"\\'")}')" title="Delete">&#x2715;</button>
-          </div>
-        </div>
+    const esc=cat.replace(/'/g,"\\'");
+    return`<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;margin:0 14px 8px;">
+      <div onclick="event.stopPropagation();openEmojiForCategory('${esc}')" style="font-size:24px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:${CAT_COLORS[cat]||'#888'}15;cursor:pointer;flex-shrink:0;position:relative;">
+        ${CAT_ICONS[cat]||'\u{1F4CC}'}
+        <div style="position:absolute;bottom:-2px;right:-2px;width:16px;height:16px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:7px;color:var(--text-dim);">✎</div>
       </div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div style="flex:1;min-width:0;cursor:pointer;" onclick="openCatDrill('${esc}')">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:14px;font-weight:500;">${cat}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:12px;">${money(spent)}<span style="color:var(--text-dim);font-size:10px;"> / ${money(limit)}</span></span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        ${over?`<div style="color:var(--red);font-family:'DM Mono',monospace;font-size:10px;margin-top:3px;">\u25B2 ${money(spent-limit)} over budget</div>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+        <button onclick="event.stopPropagation();openBudgetEdit('${esc}',${limit})" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text-dim);padding:4px;">&#x270E;</button>
+        <button onclick="event.stopPropagation();deleteBudget('${esc}')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text-muted);padding:4px;">&#x2715;</button>
+      </div>
     </div>`;
   }).join('')+`<button class="add-budget-btn" onclick="openAddBudget()">+ Add Budget</button>`;
 }
@@ -2825,9 +2838,13 @@ function changeMonth(delta){
 
 // ─── BUDGET EDITING ──────────────────────────────────────────────
 let editingBudgetCat=null;
+let _budgetEmoji='📌';
+
 function openBudgetEdit(cat,amt){
   editingBudgetCat=cat;
+  _budgetEmoji=CAT_ICONS[cat]||'📌';
   $('budget-sheet-title').textContent='Edit Budget';
+  $('fb-emoji-btn').textContent=_budgetEmoji;
   $('fb-cat').value=cat;
   $('fb-cat').disabled=true;
   $('fb-amt').value=amt;
@@ -2835,11 +2852,46 @@ function openBudgetEdit(cat,amt){
 }
 function openAddBudget(){
   editingBudgetCat=null;
+  _budgetEmoji='📌';
   $('budget-sheet-title').textContent='Add Budget';
+  $('fb-emoji-btn').textContent=_budgetEmoji;
   $('fb-cat').value='';
   $('fb-cat').disabled=false;
   $('fb-amt').value='';
   $('budget-sheet').classList.add('on');
+}
+
+function openEmojiForBudget(){
+  emojiPickerCat='__budget__';
+  const picker=$('emoji-picker');
+  let html=`<div class="emoji-picker-title">Choose emoji</div><div class="emoji-picker-cat">Budget Item</div>`;
+  for(const[section,emojis] of Object.entries(EMOJI_SECTIONS)){
+    html+=`<div class="emoji-section"><div class="emoji-section-lbl">${section}</div><div class="emoji-grid">`;
+    html+=emojis.map(e=>`<div class="emoji-pick ${e===_budgetEmoji?'current':''}" onclick="event.stopPropagation();pickBudgetEmoji('${e}')">${e}</div>`).join('');
+    html+=`</div></div>`;
+  }
+  picker.innerHTML=html;
+  $('emoji-overlay').classList.add('on');
+}
+
+function pickBudgetEmoji(emoji){
+  _budgetEmoji=emoji;
+  $('fb-emoji-btn').textContent=emoji;
+  $('emoji-overlay').classList.remove('on');
+}
+
+function openEmojiForCategory(cat){
+  emojiPickerCat=cat;
+  const currentIcon=CAT_ICONS[cat]||'📌';
+  const picker=$('emoji-picker');
+  let html=`<div class="emoji-picker-title">Change icon for</div><div class="emoji-picker-cat">${cat}</div>`;
+  for(const[section,emojis] of Object.entries(EMOJI_SECTIONS)){
+    html+=`<div class="emoji-section"><div class="emoji-section-lbl">${section}</div><div class="emoji-grid">`;
+    html+=emojis.map(e=>`<div class="emoji-pick ${e===currentIcon?'current':''}" onclick="event.stopPropagation();pickEmoji('${e}')">${e}</div>`).join('');
+    html+=`</div></div>`;
+  }
+  picker.innerHTML=html;
+  $('emoji-overlay').classList.add('on');
 }
 async function saveBudget(){
   const cat=$('fb-cat').value.trim();
@@ -2849,8 +2901,16 @@ async function saveBudget(){
     const res=await fetch(`${API}/api/budgets`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:cat,amount:amt})});
     if(!res.ok)throw new Error('Save failed');
     budgets[cat]=amt;
+    // Save emoji
+    if(_budgetEmoji&&_budgetEmoji!=='📌'){
+      CAT_ICONS[cat]=_budgetEmoji;
+      fetch(`${API}/api/category-icons`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:cat,icon:_budgetEmoji})});
+    }
+    if(!CAT_COLORS[cat])CAT_COLORS[cat]='#6E6C8E';
+    if(!CAT_ICONS[cat])CAT_ICONS[cat]=_budgetEmoji||'📌';
     closeSheet('budget-sheet');
     renderBudget();
+    renderAll();
     animateBars();
   }catch(e){alert('Error: '+e.message);}
 }
