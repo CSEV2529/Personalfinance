@@ -1859,7 +1859,7 @@ let txDetailId=null;
 
 function openTxDetail(id){
   txDetailId=id;
-  window._txdApplyVendor=true;
+  window._txdApplyVendor=false;
   openPage('page-txdetail',()=>renderTxDetail(id));
 }
 
@@ -1908,7 +1908,8 @@ async function saveTxDetail(){
       applyToVendor
     })});
     if(applyToVendor){
-      transactions.filter(tx=>tx.desc===t.desc).forEach(tx=>{tx.cat=t.cat;tx.type=t.type;});
+      // Only category is applied to all — type stays per-transaction
+      transactions.filter(tx=>tx.desc===t.desc).forEach(tx=>{tx.cat=t.cat;});
     }
     btn.textContent='\u2713 Saved';btn.classList.add('saved');
     setTimeout(()=>{btn.textContent='Save';btn.classList.remove('saved');},2000);
@@ -2001,19 +2002,14 @@ async function renderTxDetail(id){
       <div>ID: ${t.id}</div>
     </div>
   `;
-  window._txdApplyVendor=true;
+  window._txdApplyVendor=false;
 }
 
 async function changeTxType(id,newType){
-  const applyToVendor=window._txdApplyVendor;
+  // Type is ALWAYS per-transaction only — never bulk-applied
   try{
-    await fetch(`${API}/api/transactions/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:newType,applyToVendor})});
-    if(applyToVendor){
-      const t=transactions.find(tx=>tx.id===id);
-      transactions.filter(tx=>tx.desc===t?.desc).forEach(tx=>{tx.type=newType;});
-    }else{
-      const t=transactions.find(tx=>tx.id===id);if(t)t.type=newType;
-    }
+    await fetch(`${API}/api/transactions/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:newType})});
+    const t=transactions.find(tx=>tx.id===id);if(t)t.type=newType;
     renderTxDetail(id);
     renderAll();
   }catch(e){alert('Failed: '+e.message);}
