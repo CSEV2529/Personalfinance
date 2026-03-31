@@ -191,18 +191,34 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opa
 .catd-vendor-txs.open{display:block;}
 
 /* ─── REVIEW QUEUE ───────────────────────────────────────── */
-.review-vendor{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px;}
-.review-vendor-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.review-progress{margin-bottom:18px;}
+.review-progress-text{font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:6px;display:flex;justify-content:space-between;}
+.review-vendor{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden;transition:opacity .3s,transform .3s;}
+.review-vendor.done{opacity:0;transform:translateX(100%);height:0;margin:0;padding:0;border:0;overflow:hidden;}
+.review-vendor-top{display:flex;align-items:center;justify-content:space-between;padding:16px;cursor:pointer;transition:background .15s;}
+.review-vendor-top:active{background:var(--surface-elevated);}
 .review-vendor-name{font-size:14px;font-weight:500;}
-.review-vendor-info{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);}
-.review-pills{display:flex;gap:6px;flex-wrap:wrap;}
+.review-vendor-info{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:2px;}
+.review-vendor-expand{color:var(--text-muted);transition:transform .2s;font-size:14px;}
+.review-vendor-body{padding:0 16px 16px;display:none;}
+.review-vendor.expanded .review-vendor-body{display:block;}
+.review-vendor.expanded .review-vendor-expand{transform:rotate(180deg);}
+.review-tx-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;}
+.review-tx-row:last-child{border-bottom:none;}
+.review-tx-row:active{opacity:.7;}
+.review-tx-date{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);width:70px;flex-shrink:0;}
+.review-tx-desc{flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.review-tx-amt{font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--red);flex-shrink:0;}
+.review-type-row{display:flex;gap:6px;margin:12px 0 10px;}
+.review-type-btn{padding:6px 12px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;transition:all .15s;}
+.review-type-btn.active{border-color:var(--gold);color:var(--gold);background:rgba(245,197,24,.08);}
+.review-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
 .review-pill{padding:6px 12px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;transition:all .15s;}
 .review-pill:hover{border-color:var(--gold);color:var(--gold);}
 .review-pill:active{transform:scale(.95);}
 .review-pill.more{color:var(--text-dim);border-style:dashed;}
-.review-vendor-txs{max-height:0;overflow:hidden;transition:max-height .3s ease;padding:0 2px;}
-.review-vendor.expanded .review-vendor-txs{max-height:500px;overflow-y:auto;}
-.review-vendor.expanded .review-vendor-expand{transform:rotate(180deg);}
+.review-actions{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.review-actions .sht-btn{flex:1;text-align:center;padding:10px;}
 
 /* ─── RECURRING MODULE ───────────────────────────────────── */
 .rec-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;}
@@ -234,6 +250,20 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opa
 .exp-bar-fill{height:100%;border-radius:4px;transition:width .5s cubic-bezier(.4,0,.2,1);box-shadow:0 0 8px currentColor;}
 .exp-bar-amt{font-family:'DM Mono',monospace;font-size:11px;width:80px;text-align:right;flex-shrink:0;}
 .exp-bar-pct{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);width:35px;text-align:right;flex-shrink:0;}
+
+/* ─── CATEGORY PICKER (vertical list) ────────────────────── */
+.catp-row{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:6px;cursor:pointer;transition:all .15s;}
+.catp-row:active{transform:scale(.98);background:var(--surface-elevated);}
+.catp-row.selected{border-color:var(--gold);background:rgba(245,197,24,.06);}
+.catp-emoji{font-size:24px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;flex-shrink:0;position:relative;}
+.catp-emoji-edit{position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--text-dim);cursor:pointer;}
+.catp-emoji-edit:hover{border-color:var(--gold);color:var(--gold);}
+.catp-name{font-size:15px;font-weight:500;flex:1;}
+.catp-check{color:var(--gold);font-size:18px;opacity:0;}
+.catp-row.selected .catp-check{opacity:1;}
+.catp-add{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-radius:14px;border:1px dashed var(--border2);background:transparent;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;width:100%;margin-top:6px;}
+.catp-add:hover{border-color:var(--gold);color:var(--gold);}
+.catp-type-row{display:flex;gap:8px;margin-bottom:16px;}
 
 /* ─── TREND ROWS ─────────────────────────────────────────── */
 .trend-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);}
@@ -1102,6 +1132,16 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:-1;opa
   <div class="page-body" id="recurring-body"></div>
 </div>
 
+<!-- CATEGORY PICKER PAGE -->
+<div class="page-overlay" id="page-catpicker" style="z-index:260;">
+  <div class="page-header">
+    <button class="page-back" onclick="closePage('page-catpicker')">&larr; Back</button>
+    <div class="page-title" id="catpicker-title">Choose Category</div>
+    <div class="page-close" onclick="closePage('page-catpicker')">&times;</div>
+  </div>
+  <div class="page-body" id="catpicker-body"></div>
+</div>
+
 <!-- EMOJI PICKER -->
 <div class="emoji-overlay" id="emoji-overlay" onclick="if(event.target===this)closeEmojiPicker()">
   <div class="emoji-picker" id="emoji-picker"></div>
@@ -1179,7 +1219,7 @@ function stats(txs){
 }
 function monthTxs(txs,y,m){return txs.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});}
 function currentMonth(){return monthTxs(transactions,selectedMonth.getFullYear(),selectedMonth.getMonth());}
-function catBreak(txs){const m={};txs.filter(t=>t.type==='expense').forEach(t=>{m[t.cat]=(m[t.cat]||0)+t.amount;});return m;}
+function catBreak(txs){const m={};txs.filter(t=>t.type==='expense').forEach(t=>{m[t.cat]=(m[t.cat]||0)+t.amount;});txs.filter(t=>t.type==='refund').forEach(t=>{m[t.cat]=(m[t.cat]||0)-t.amount;});return m;}
 function userName(id){return users.find(u=>u.id===id)?.name||id;}
 
 // ─── ONLINE/OFFLINE ───────────────────────────────────────────────
@@ -1766,7 +1806,7 @@ async function renderTxDetail(id){
 
     <div class="txd-section">
       <div class="txd-label">Category</div>
-      <div class="txd-cat-pill" onclick="openRecat('${t.id}','${(t.desc||'').replace(/'/g,"\\'")}','${t.cat}')">
+      <div class="txd-cat-pill" onclick="openCatPickerForTxDetail('${t.id}','${t.cat}')">
         <span class="emoji">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</span>
         <span class="name">${t.cat}</span>
         <span class="arrow">\u203A</span>
@@ -1877,15 +1917,74 @@ let recatCurrentCat=null;
 let recatDesc=null;
 
 function openRecat(txId, desc, currentCat){
-  window._bulkIds=null;
-  recatVendorChecked=false;
   recatTxId=txId;
   recatDesc=desc;
   recatCurrentCat=currentCat;
-  const tx=transactions.find(t=>t.id===txId);
+  const tx=txId?transactions.find(t=>t.id===txId):null;
   recatCurrentType=tx?.type||'expense';
-  renderRecatSheet();
-  $('recat-sheet').classList.add('on');
+  openCatPicker((newCat)=>{
+    // Apply the category change
+    if(window._bulkIds&&window._bulkIds.length){
+      applyRecat(newCat);
+    }else if(recatTxId){
+      applyRecat(newCat);
+    }
+  },currentCat);
+}
+
+// ─── FULL-PAGE CATEGORY PICKER ───────────────────────────────────
+let _catPickerCallback=null;
+
+function openCatPicker(onSelect,currentCat){
+  _catPickerCallback=onSelect;
+  $('catpicker-title').textContent='Choose Category';
+  openPage('page-catpicker',()=>renderCatPicker(currentCat));
+}
+
+function renderCatPicker(currentCat){
+  const allCats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].filter(c=>c!=='Transfer').sort();
+  const body=$('catpicker-body');
+  body.innerHTML=allCats.map(cat=>`
+    <div class="catp-row ${cat===currentCat?'selected':''}" onclick="selectCatFromPicker('${cat.replace(/'/g,"\\'")}')">
+      <div class="catp-emoji" style="background:${CAT_COLORS[cat]||'#888'}15">
+        ${CAT_ICONS[cat]||'📌'}
+        <div class="catp-emoji-edit" onclick="event.stopPropagation();openEmojiPickerForCat('${cat.replace(/'/g,"\\'")}')">✎</div>
+      </div>
+      <div class="catp-name">${cat}</div>
+      <div class="catp-check">✓</div>
+    </div>`).join('')+`
+    <button class="catp-add" onclick="addCatFromPicker()">+ New Category</button>`;
+}
+
+function selectCatFromPicker(cat){
+  closePage('page-catpicker');
+  if(_catPickerCallback)_catPickerCallback(cat);
+  _catPickerCallback=null;
+}
+
+function openCatPickerForTxDetail(txId,currentCat){
+  openCatPicker(async(newCat)=>{
+    const applyToVendor=window._txdApplyVendor||false;
+    try{
+      await fetch(`${API}/api/transactions/${txId}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:newCat,applyToVendor})});
+      const t=transactions.find(tx=>tx.id===txId);
+      if(t){
+        if(applyToVendor){transactions.filter(tx=>tx.desc===t.desc).forEach(tx=>{tx.cat=newCat;});}
+        else{t.cat=newCat;}
+      }
+      if(txDetailId)renderTxDetail(txDetailId);
+      renderAll();
+    }catch(e){alert('Failed: '+e.message);}
+  },currentCat);
+}
+
+function addCatFromPicker(){
+  const name=prompt('New category name:');
+  if(!name||!name.trim())return;
+  const cat=name.trim();
+  if(!CAT_COLORS[cat])CAT_COLORS[cat]='#6E6C8E';
+  if(!CAT_ICONS[cat])CAT_ICONS[cat]='📌';
+  selectCatFromPicker(cat);
 }
 
 function renderRecatSheet(){
@@ -2167,7 +2266,9 @@ async function openCatDrill(cat){
     const body=$('catdrill-body');
     body.innerHTML='<div class="empty-msg">Loading...</div>';
     const mtxs=currentMonth().filter(t=>t.cat===cat);
-    const total=mtxs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+    const expenseTotal=mtxs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+    const refundTotal=mtxs.filter(t=>t.type==='refund').reduce((a,t)=>a+t.amount,0);
+    const total=expenseTotal-refundTotal;
     const budgetAmt=budgets[cat];
     const txCount=mtxs.length;
 
@@ -2235,39 +2336,69 @@ async function openReviewQueue(){
       const cats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].filter(c=>c!=='Transfer').sort();
       const quickCats=cats.slice(0,8);
       window._reviewTypes={};
-      body.innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:16px">${total_unreviewed} transactions from ${queue.length} vendors need categorization</div>`+
+      window._reviewTotal=queue.length;
+      window._reviewDone=0;
+
+      body.innerHTML=`
+        <div class="review-progress">
+          <div class="review-progress-text">
+            <span>${total_unreviewed} transactions from ${queue.length} vendors</span>
+            <span id="review-done-count">0/${queue.length}</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill" id="review-progress-bar" style="width:0%;background:var(--gold)"></div></div>
+        </div>`+
         queue.map(v=>{
           window._reviewTypes[v.vendor]='expense';
-          return`<div class="review-vendor" id="rv-${v.vendor.replace(/[^a-z0-9]/gi,'_')}">
+          const esc=v.vendor.replace(/'/g,"\\'");
+          return`<div class="review-vendor" data-vendor="${v.vendor.replace(/"/g,'&quot;')}">
           <div class="review-vendor-top" onclick="this.parentElement.classList.toggle('expanded')">
             <div>
               <div class="review-vendor-name">${v.vendor}</div>
-              <div class="review-vendor-info">${v.cnt} transactions · ${money(v.total)}</div>
+              <div class="review-vendor-info">${v.cnt} transaction${v.cnt>1?'s':''} · ${money(v.total)}</div>
             </div>
-            <div style="color:var(--text-dim);transition:transform .2s" class="review-vendor-expand">&#x25BE;</div>
+            <div class="review-vendor-expand">&#x25BE;</div>
           </div>
-          <div class="review-vendor-txs">${(v.transactions||[]).map(t=>`
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
-              <span style="color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px">${t.date}</span>
-              <span style="color:var(--red);font-family:'DM Mono',monospace">-${money(t.amount)}</span>
-            </div>`).join('')}
-          </div>
-          <div style="display:flex;gap:6px;margin:10px 0 8px;flex-wrap:wrap">
-            ${['expense','income','refund','transfer'].map(tp=>`<div class="review-pill ${tp==='expense'?'active':''}" onclick="setReviewType('${v.vendor.replace(/'/g,"\\'")}','${tp}',this)" style="${tp==='expense'?'border-color:var(--gold);color:var(--gold)':''}">${tp}</div>`).join('')}
-          </div>
-          <div class="review-pills">
-            ${quickCats.map(c=>`<div class="review-pill" onclick="resolveReview('${v.vendor.replace(/'/g,"\\'")}','${c}',this)">${CAT_ICONS[c]||'📌'} ${c}</div>`).join('')}
-            <div class="review-pill more" onclick="openRecat(null,'${v.vendor.replace(/'/g,"\\'")}','Other')">More...</div>
+          <div class="review-vendor-body">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-bottom:8px">Tap a transaction to open details, or categorize all below</div>
+            ${(v.transactions||[]).map(t=>`
+              <div class="review-tx-row" onclick="openTxDetail('${t.id}')">
+                <div class="review-tx-date">${t.date}</div>
+                <div class="review-tx-desc">${t.desc}</div>
+                <div class="review-tx-amt">-${money(t.amount)}</div>
+              </div>`).join('')}
+            <div class="review-type-row">
+              ${['expense','income','refund','transfer'].map(tp=>`<div class="review-type-btn ${tp==='expense'?'active':''}" onclick="setReviewType('${esc}','${tp}',this)">${tp}</div>`).join('')}
+            </div>
+            <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-bottom:6px">Apply to ALL ${v.cnt} transactions from this vendor:</div>
+            <div class="review-pills">
+              ${quickCats.map(c=>`<div class="review-pill" onclick="resolveReview('${esc}','${c}',this)">${CAT_ICONS[c]||'📌'} ${c}</div>`).join('')}
+              <div class="review-pill more" onclick="openCatPickerForReview('${esc}')">More...</div>
+            </div>
           </div>
         </div>`;}).join('');
     }catch(e){body.innerHTML='<div class="empty-msg">Failed to load</div>';}
   });
 }
 
+function openCatPickerForReview(vendor){
+  window._reviewPickerVendor=vendor;
+  openCatPicker((cat)=>{
+    const type=window._reviewTypes?.[vendor]||'expense';
+    resolveReviewDirect(vendor,cat,type);
+  });
+}
+
 function setReviewType(vendor,type,el){
   window._reviewTypes[vendor]=type;
-  el.parentElement.querySelectorAll('.review-pill').forEach(p=>{p.style.borderColor='';p.style.color='';p.classList.remove('active');});
-  el.style.borderColor='var(--gold)';el.style.color='var(--gold)';el.classList.add('active');
+  el.parentElement.querySelectorAll('.review-type-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function updateReviewProgress(){
+  window._reviewDone++;
+  const pct=Math.round(window._reviewDone/window._reviewTotal*100);
+  const bar=$('review-progress-bar');if(bar)bar.style.width=pct+'%';
+  const cnt=$('review-done-count');if(cnt)cnt.textContent=window._reviewDone+'/'+window._reviewTotal;
 }
 
 async function resolveReview(vendor,category,el){
@@ -2275,8 +2406,20 @@ async function resolveReview(vendor,category,el){
   try{
     await fetch(`${API}/api/review-queue/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,vendor,category,type})});
     transactions.filter(t=>t.desc===vendor).forEach(t=>{t.cat=category;t.type=type;t.reviewed=1;});
-    CAT_COLORS[category]=CAT_COLORS[category]||'#6E6C8E';
-    el.closest('.review-vendor')?.remove();
+    const vendorEl=el.closest('.review-vendor');
+    if(vendorEl){vendorEl.classList.add('done');setTimeout(()=>vendorEl.remove(),400);}
+    updateReviewProgress();
+    renderAll();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function resolveReviewDirect(vendor,category,type){
+  try{
+    await fetch(`${API}/api/review-queue/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,vendor,category,type})});
+    transactions.filter(t=>t.desc===vendor).forEach(t=>{t.cat=category;t.type=type;t.reviewed=1;});
+    const vendorEl=document.querySelector(`.review-vendor[data-vendor="${vendor.replace(/"/g,'\\"')}"]`);
+    if(vendorEl){vendorEl.classList.add('done');setTimeout(()=>vendorEl.remove(),400);}
+    updateReviewProgress();
     renderAll();
   }catch(e){alert('Error: '+e.message);}
 }
