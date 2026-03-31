@@ -4,7 +4,7 @@
  * Transactions always try network first, fall back to cache.
  */
 
-const CACHE = 'ledger-v1';
+const CACHE = 'ledger-v3';
 const SHELL = [
   '/',
   '/manifest.json',
@@ -43,15 +43,13 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // App shell: cache first
+  // App shell: network first, fall back to cache
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      return cached || fetch(e.request).then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(cache => cache.put(e.request, clone));
-        return res;
-      });
-    })
+    fetch(e.request).then(res => {
+      const clone = res.clone();
+      caches.open(CACHE).then(cache => cache.put(e.request, clone));
+      return res;
+    }).catch(() => caches.match(e.request))
   );
 });
 
