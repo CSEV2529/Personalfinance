@@ -1954,17 +1954,6 @@ async function renderTxDetail(id){
       </div>
     </div>
 
-    <div class="txd-section">
-      <div class="txd-label">Money Direction</div>
-      <div class="txd-direction-row">
-        <div class="txd-dir-btn debit ${sign===-1?'active':''}" onclick="changeTxSign('${id}',-1)">
-          <span>\u2191</span> Money Out (Debit)
-        </div>
-        <div class="txd-dir-btn credit ${sign===1?'active':''}" onclick="changeTxSign('${id}',1)">
-          <span>\u2193</span> Money In (Credit)
-        </div>
-      </div>
-    </div>
 
     <div class="txd-section">
       <div class="txd-label">Status</div>
@@ -2002,7 +1991,6 @@ async function renderTxDetail(id){
     <div class="txd-footer">
       <div>Source: ${t.source||'manual'}</div>
       ${t.original_cat?`<div>Plaid category: ${t.original_cat}</div>`:''}
-      <div>Sign: ${sign===1?'Credit (money in)':'Debit (money out)'}</div>
       <div>ID: ${t.id}</div>
     </div>
   `;
