@@ -1899,9 +1899,9 @@ function renderRecatSheet(){
   </div>
   <div class="flbl" style="margin-bottom:8px">CATEGORY</div>`;
   $('recat-options').innerHTML=typeButtons+allCats.map(cat=>`
-    <div class="recat-option ${cat===recatCurrentCat?'selected':''}">
-      <span class="recat-option-icon" onclick="event.stopPropagation();openEmojiPicker('${cat.replace(/'/g,"\\'")}',this)" title="Change icon">${CAT_ICONS[cat]||'\u{1F4CC}'}</span>
-      <span class="recat-option-name" onclick="applyRecat('${cat.replace(/'/g,"\\'")}')">${cat}</span>
+    <div class="recat-option ${cat===recatCurrentCat?'selected':''}" onclick="applyRecat('${cat.replace(/'/g,"\\'")}')">
+      <span class="recat-option-icon">${CAT_ICONS[cat]||'\u{1F4CC}'}</span>
+      <span class="recat-option-name">${cat}</span>
     </div>`).join('')+`
     <div class="recat-option" onclick="recatNewCategory()" style="border-style:dashed;">
       <span class="recat-option-icon">+</span>

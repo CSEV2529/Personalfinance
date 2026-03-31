@@ -425,10 +425,26 @@ app.put('/api/transactions/:id', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Legacy endpoint (frontend compat)
+// Legacy endpoint (frontend compat — same logic as PUT /api/transactions/:id)
 app.put('/api/transactions/:id/category', (req, res) => {
-  req.url = `/api/transactions/${req.params.id}`;
-  app.handle(req, res);
+  const { category, type, applyToVendor } = req.body;
+  if (!category && !type) return res.status(400).json({ error: 'Missing category or type' });
+  try {
+    const tx = get('SELECT * FROM transactions WHERE id = ?', [req.params.id]);
+    if (!tx) return res.status(404).json({ error: 'Transaction not found' });
+    const newCat = category || tx.cat;
+    const newType = type || tx.type;
+    run('UPDATE transactions SET cat=?, type=?, reviewed=1 WHERE id=?', [newCat, newType, req.params.id]);
+    let updatedCount = 1;
+    if (applyToVendor) {
+      run(`INSERT OR REPLACE INTO vendor_rules (household, vendor, category, type) VALUES (?,?,?,?)`,
+        [tx.household, tx.desc, newCat, newType]);
+      const result = run('UPDATE transactions SET cat=?, type=?, reviewed=1 WHERE household=? AND desc=?',
+        [newCat, newType, tx.household, tx.desc]);
+      updatedCount = result.changes || 1;
+    }
+    res.json({ success: true, updated: updatedCount });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/transactions/:id/tags', (req, res) => {
