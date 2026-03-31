@@ -688,6 +688,18 @@ app.get('/api/subscriptions', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/recurring/dismiss', (req, res) => {
+  const { userId = 'christian', vendor } = req.body;
+  if (!vendor) return res.status(400).json({ error: 'Missing vendor' });
+  try {
+    const hh = getHousehold(userId);
+    const id = 'rec_dismissed_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    run(`INSERT OR REPLACE INTO recurring_rules (id,household,vendor,is_active,frequency) VALUES (?,?,?,0,'dismissed')`,
+      [id, hh, vendor]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ─── ANALYTICS & TRENDS ─────────────────────────────────────────
 app.get('/api/trends/categories', (req, res) => {
   const { userId = 'christian', months = 6 } = req.query;
@@ -799,10 +811,17 @@ app.get('/api/income/breakdown', (req, res) => {
 app.get('/api/review-queue', (req, res) => {
   try {
     const hh = getHousehold(req.query.userId || 'christian');
-    const vendors = all(`SELECT desc as vendor, COUNT(*) as cnt, SUM(amount) as total,
+    const vendorRows = all(`SELECT desc as vendor, COUNT(*) as cnt, SUM(amount) as total,
       GROUP_CONCAT(DISTINCT cat) as current_cats, MIN(date) as first_seen, MAX(date) as last_seen
       FROM transactions WHERE household=? AND cat='Other' AND reviewed=0
       GROUP BY desc ORDER BY total DESC`, [hh]);
+    // Include individual transactions per vendor
+    const vendors = vendorRows.map(v => {
+      const txs = all(`SELECT id, date, desc, amount, type FROM transactions
+        WHERE household=? AND desc=? AND cat='Other' AND reviewed=0
+        ORDER BY date DESC LIMIT 20`, [hh, v.vendor]);
+      return { ...v, transactions: txs };
+    });
     res.json({ queue: vendors, total_unreviewed: vendors.reduce((a,v) => a + v.cnt, 0) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
