@@ -359,7 +359,7 @@ body::after{display:none;}
 }
 .hstat-lbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px;}
 .hstat-val{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;}
-.hero-pills{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.hero-pills{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;}
 .hero-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.5px;cursor:pointer;transition:all .15s;}
 .hero-pill:hover{filter:brightness(1.2);}
 .hero-pill:active{transform:scale(.95);}
@@ -458,7 +458,9 @@ body::after{display:none;}
   position:relative;overflow:hidden;
 }
 .donut-card::before{display:none;}
-.donut-inner{display:flex;align-items:center;gap:20px;position:relative;}
+.donut-inner{display:flex;flex-direction:column;align-items:center;gap:16px;position:relative;}
+.dlegend{width:100%;}
+@media(min-width:768px){.donut-inner{flex-direction:row;align-items:center;}}
 .dlegend{}
 .dleg-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
 .dleg-row:last-child{margin-bottom:0;}
@@ -938,6 +940,7 @@ body::after{display:none;}
         </div>
 
         <div class="sec-head"><div class="sec-title">Spending by Category</div></div>
+        <div id="weekly-recap"></div>
         <div id="expense-bars-section" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin:0 14px 18px;max-height:500px;overflow-y:auto;"></div>
 
         <div class="sec-head"><div class="sec-title">Top Vendors</div></div>
@@ -1204,6 +1207,26 @@ body::after{display:none;}
   <div class="page-body" id="recurring-body"></div>
 </div>
 
+<!-- HEALTH SCORE BREAKDOWN PAGE -->
+<div class="page-overlay" id="page-health">
+  <div class="page-header">
+    <button class="page-back" onclick="closePage('page-health')">&larr; Back</button>
+    <div class="page-title">Health Score</div>
+    <div class="page-close" onclick="closePage('page-health')">&times;</div>
+  </div>
+  <div class="page-body" id="health-body"></div>
+</div>
+
+<!-- VENDORS LIST PAGE -->
+<div class="page-overlay" id="page-vendors">
+  <div class="page-header">
+    <button class="page-back" onclick="closePage('page-vendors')">&larr; Back</button>
+    <div class="page-title">All Vendors</div>
+    <div class="page-close" onclick="closePage('page-vendors')">&times;</div>
+  </div>
+  <div class="page-body" id="vendors-body"></div>
+</div>
+
 <!-- UNSURE PAGE -->
 <div class="page-overlay" id="page-unsure" style="z-index:210;">
   <div class="page-header">
@@ -1277,6 +1300,22 @@ const CAT_COLORS={Housing:'#F5C518',Food:'#34D399',Transport:'#60A5FA',Health:'#
 const CAT_ICONS={Housing:'\u{1F3E0}',Food:'\u{1F37D}\uFE0F',Transport:'\u{1F697}',Health:'\u{1F48A}',Entertainment:'\u{1F3AC}',Shopping:'\u{1F6CD}\uFE0F',Utilities:'\u26A1',Income:'\u{1F4B0}',Transfer:'\u{1F501}',Other:'\u{1F4CC}'};
 let budgets = {};
 const USER_COLORS={christian:'#F5C518',wife:'#60A5FA'};
+
+// Frontend version of server-side mapCategory
+function mapCategoryFrontend(plaidCat){
+  if(!plaidCat)return'Other';
+  const c=plaidCat.toUpperCase();
+  if(c.includes('RENT')||c.includes('MORTGAGE')||c.includes('HOME'))return'Housing';
+  if(c.includes('FOOD')||c.includes('RESTAURANT')||c.includes('GROCERY'))return'Food';
+  if(c.includes('TRANSPORT')||c.includes('TRAVEL')||c.includes('GAS')||c.includes('AUTO'))return'Transport';
+  if(c.includes('MEDICAL')||c.includes('HEALTH')||c.includes('PHARMACY'))return'Health';
+  if(c.includes('ENTERTAINMENT')||c.includes('RECREATION'))return'Entertainment';
+  if(c.includes('SHOPS')||c.includes('SHOPPING')||c.includes('MERCHANDISE'))return'Shopping';
+  if(c.includes('UTILITIES')||c.includes('TELECOM')||c.includes('INTERNET'))return'Utilities';
+  if(c.includes('TRANSFER')||c.includes('WIRE')||c.includes('ACH'))return'Transfer';
+  if(c.includes('PAYROLL')||c.includes('INCOME')||c.includes('DEPOSIT'))return'Income';
+  return'Other';
+}
 const USER_INITIALS={christian:'C',wife:'M'};
 
 // ─── STATE ────────────────────────────────────────────────────────
@@ -1304,7 +1343,6 @@ function currentMonth(){return monthTxs(transactions,selectedMonth.getFullYear()
 function catBreak(txs){
   const m={};
   txs.filter(t=>t.type==='expense').forEach(t=>{m[t.cat]=(m[t.cat]||0)+t.amount;});
-  txs.filter(t=>t.type==='income').forEach(t=>{m[t.cat]=(m[t.cat]||0)-t.amount;});
   return m;
 }
 function userName(id){return users.find(u=>u.id===id)?.name||id;}
@@ -1327,7 +1365,7 @@ async function loadData(){
       fetch(`${API}/api/accounts?userId=${currentUser}`),
       fetch(`${API}/api/status?userId=${currentUser}`),
       fetch(`${API}/api/budgets?userId=${currentUser}`),
-      fetch(`${API}/api/category-icons?userId=${currentUser}`),
+      fetch(`${API}/api/categories?userId=${currentUser}`),
     ]);
     if(txRes.ok){const d=await txRes.json();transactions=d.transactions||[];}
     if(acRes.ok){const d=await acRes.json();accounts=d.accounts||[];}
@@ -1339,7 +1377,10 @@ async function loadData(){
     }
     if(iconRes.ok){
       const d=await iconRes.json();
-      (d.icons||[]).forEach(i=>{CAT_ICONS[i.category]=i.icon;});
+      (d.categories||[]).forEach(c=>{
+        if(c.icon)CAT_ICONS[c.id]=c.icon;
+        if(c.color)CAT_COLORS[c.id]=c.color;
+      });
     }
     // Cache in localStorage for offline
     localStorage.setItem('ledger_cache_tx',JSON.stringify(transactions));
@@ -1472,6 +1513,7 @@ function renderHome(){
   // Gamification
   renderHealthScore();
   renderChallenges();
+  renderWeeklyRecap();
 
   // Top 20 biggest expenses
   const top20 = currentMonth()
@@ -1484,17 +1526,19 @@ function renderHome(){
   $('top-expenses').innerHTML = rankedTxRows(shown, 0);
   $('top-toggle').textContent = top20.length > 5 ? 'Show all \u2192' : '';
 
-  // Vendor breakdown
+  // Vendor breakdown — NET (debits minus credits)
   const vendorMap = {};
-  currentMonth().filter(t=>t.type==='expense').forEach(t=>{
-    if(!vendorMap[t.desc]) vendorMap[t.desc] = {total:0, count:0};
-    vendorMap[t.desc].total += t.amount;
+  currentMonth().forEach(t=>{
+    if(t.type==='transfer')return;
+    if(!vendorMap[t.desc]) vendorMap[t.desc]={debits:0,credits:0,count:0};
+    if(t.type==='expense')vendorMap[t.desc].debits+=t.amount;
+    else if(t.type==='income')vendorMap[t.desc].credits+=t.amount;
     vendorMap[t.desc].count++;
   });
-  const vendors = Object.entries(vendorMap).sort((a,b)=>b[1].total-a[1].total).slice(0,25);
-  const vendorTotal = vendors.reduce((a,v)=>a+v[1].total, 0);
+  const vendors = Object.entries(vendorMap).map(([name,v])=>[name,{...v,net:v.debits-v.credits}]).filter(([,v])=>v.net>0).sort((a,b)=>b[1].net-a[1].net).slice(0,25);
+  const vendorTotal = vendors.reduce((a,[,v])=>a+v.net, 0);
   $('vendor-breakdown').innerHTML = vendors.length ? vendors.map(([name, v], i) => {
-    const pct = vendorTotal > 0 ? (v.total / vendorTotal * 100) : 0;
+    const pct = vendorTotal > 0 ? (v.net / vendorTotal * 100) : 0;
     const colors = ['var(--gold)','var(--green)','var(--blue)','var(--purple)','var(--teal)','var(--orange)','var(--pink)','var(--red)','var(--text-dim)','var(--text-muted)'];
     return `<div class="vendor-row" onclick="openVendorSheet('${name.replace(/'/g,"\\'")}')">
       <div class="vendor-rank">${i+1}</div>
@@ -1503,12 +1547,37 @@ function renderHome(){
         <div class="vendor-meta">${v.count} transaction${v.count>1?'s':''}</div>
       </div>
       <div class="vendor-right">
-        <div class="vendor-amt">-${money(v.total)}</div>
+        <div class="vendor-amt">-${money(v.net)}</div>
         <div class="vendor-pct">${pct.toFixed(0)}%</div>
       </div>
       <div class="vendor-bar"><div class="vendor-bar-fill" style="width:${pct}%;background:${colors[i]||colors[0]}"></div></div>
     </div>`;
-  }).join('') : '<div class="empty-msg">No expense data</div>';
+  }).join('')+`<div style="text-align:center;padding:12px"><span class="sec-link" onclick="openVendorList()">View All Vendors \u2192</span></div>` : '<div class="empty-msg">No expense data</div>';
+}
+
+function openVendorList(){
+  openPage('page-vendors',()=>{
+    const mtxs=currentMonth();
+    const vm={};
+    mtxs.forEach(t=>{
+      if(t.type==='transfer')return;
+      if(!vm[t.desc])vm[t.desc]={debits:0,credits:0,count:0,cat:t.cat};
+      if(t.type==='expense')vm[t.desc].debits+=t.amount;
+      else if(t.type==='income')vm[t.desc].credits+=t.amount;
+      vm[t.desc].count++;
+    });
+    const vList=Object.entries(vm).map(([name,v])=>({name,...v,net:v.debits-v.credits})).sort((a,b)=>b.net-a.net);
+    const totalNet=vList.filter(v=>v.net>0).reduce((a,v)=>a+v.net,0);
+    $('vendors-body').innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:16px">${vList.length} vendors \u00B7 ${selectedMonth.toLocaleString('default',{month:'long',year:'numeric'})}</div>`+
+      vList.map((v,i)=>{
+        const isNet=v.net>0;const amtColor=isNet?'var(--red)':'var(--green)';const amtSign=isNet?'-':'+';
+        const pct=totalNet>0&&v.net>0?(v.net/totalNet*100).toFixed(0):'';
+        return`<div class="vendor-row" onclick="openVendorSheet('${v.name.replace(/'/g,"\\'")}')">
+          <div class="vendor-rank">${i+1}</div>
+          <div class="vendor-info"><div class="vendor-name">${v.name}</div><div class="vendor-meta">${v.count} txn${v.count!==1?'s':''} \u00B7 ${v.cat||'Uncategorized'}</div></div>
+          <div class="vendor-right"><div class="vendor-amt" style="color:${amtColor}">${amtSign}${money(Math.abs(v.net))}</div>${pct?`<div class="vendor-pct">${pct}%</div>`:''}</div>
+        </div>`;}).join('');
+  });
 }
 
 function renderLedger(){
@@ -1530,6 +1599,10 @@ function renderBudget(){
   const bd=catBreak(mtxs);
   const totalB=Object.values(budgets).reduce((a,b)=>a+b,0);
   const totalS=Object.keys(budgets).reduce((a,c)=>a+(bd[c]||0),0);
+  const _now=new Date();
+  const _dim=new Date(selectedMonth.getFullYear(),selectedMonth.getMonth()+1,0).getDate();
+  const _isCurr=selectedMonth.getFullYear()===_now.getFullYear()&&selectedMonth.getMonth()===_now.getMonth();
+  const _pacePct=_isCurr?(_now.getDate()/_dim*100):100;
   const rem=totalB-totalS;
   $('budget-kpis').innerHTML=`
     <div class="kcard" style="--kc:var(--gold);width:auto"><div class="kcard-lbl">Budget</div><div class="kcard-val" style="font-size:16px">${money(totalB)}</div></div>
@@ -1550,7 +1623,7 @@ function renderBudget(){
           <span style="font-size:14px;font-weight:500;">${cat}</span>
           <span style="font-family:'DM Mono',monospace;font-size:12px;">${money(spent)}<span style="color:var(--text-dim);font-size:10px;"> / ${money(limit)}</span></span>
         </div>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="bar-track" style="position:relative"><div class="bar-fill" style="width:${pct}%;background:${color}"></div>${_isCurr?`<div class="pace-marker" style="left:${_pacePct}%"></div>`:''}</div>
         ${over?`<div style="color:var(--red);font-family:'DM Mono',monospace;font-size:10px;margin-top:3px;">\u25B2 ${money(spent-limit)} over budget</div>`:''}
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
@@ -1725,6 +1798,13 @@ function renderAccounts(){
         </div>
         <button class="sbtn green" onclick="syncAll()">Sync</button>
       </div>
+      <div class="srow" onclick="openVendorWizard()">
+        <div class="srow-left">
+          <div class="sico" style="background:rgba(251,146,60,.1)">\u{1F3F7}\uFE0F</div>
+          <div><div class="sname">Vendor Wizard</div><div class="ssub">Categorize your vendors</div></div>
+        </div>
+        <button class="sbtn gold">Open</button>
+      </div>
     </div>
     <div class="spacer"></div>
   `;
@@ -1874,7 +1954,6 @@ let txDetailId=null;
 
 function openTxDetail(id){
   txDetailId=id;
-  window._txdApplyVendor=false;
   openPage('page-txdetail',()=>renderTxDetail(id));
 }
 
@@ -1924,25 +2003,19 @@ async function saveTxDetail(){
   if(!txDetailId)return;
   const t=transactions.find(tx=>tx.id===txDetailId);
   if(!t)return;
-  const applyToVendor=window._txdApplyVendor;
   const btn=$('txd-save-btn');
   btn.textContent='Saving...';
   try{
     await fetch(`${API}/api/transactions/${txDetailId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       category:t.cat,type:t.type,
       notes:document.querySelector('.txd-notes')?.value||'',
-      is_recurring:$('txd-recurring-switch')?.classList.contains('on')||false,
-      applyToVendor
+      is_recurring:false,
+      applyToVendor:false
     })});
-    if(applyToVendor){
-      // Only category is applied to all — type stays per-transaction
-      transactions.filter(tx=>tx.desc===t.desc).forEach(tx=>{tx.cat=t.cat;});
-    }
+    t.notes=document.querySelector('.txd-notes')?.value||'';
+    t.reviewed=1;
     btn.textContent='\u2713 Saved';btn.classList.add('saved');
     setTimeout(()=>{btn.textContent='Save';btn.classList.remove('saved');},2000);
-    // Mark as reviewed in local state
-    const saved=transactions.find(tx=>tx.id===txDetailId);
-    if(saved)saved.reviewed=1;
     if($('page-review')?.classList.contains('open')) refreshReviewQueue();
     renderAll();
   }catch(e){btn.textContent='Save';alert('Failed: '+e.message);}
@@ -2010,17 +2083,9 @@ async function renderTxDetail(id){
       <textarea class="txd-notes" placeholder="Add notes..." onblur="saveTxNotes('${id}',this.value)">${notes}</textarea>
     </div>
 
-    <div class="txd-toggle-row" onclick="toggleTxApplyVendor(this)">
-      <div><div class="txd-toggle-label">Apply category to all "${t.desc}"</div>
-      <div class="txd-toggle-sub">Category changes apply to all transactions from this vendor (type and sign are always per-transaction)</div></div>
-      <div class="txd-switch ${window._txdApplyVendor?'on':''}" id="txd-vendor-switch"></div>
-    </div>
-
-    <div class="txd-toggle-row" onclick="toggleTxRecurring('${id}',this)">
-      <div><div class="txd-toggle-label">Mark as recurring</div>
-      <div class="txd-toggle-sub">Track this as a recurring charge</div></div>
-      <div class="txd-switch ${t.is_recurring?'on':''}" id="txd-recurring-switch"></div>
-    </div>
+    ${(()=>{const vTxs=transactions.filter(tx=>tx.desc===t.desc);const hasRule=vTxs.length>1&&vTxs.every(tx=>tx.cat===vTxs[0].cat);
+      return hasRule?`<div style="padding:10px 14px;border-radius:12px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);margin-bottom:12px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted)">\u{1F3F7}\uFE0F This vendor is auto-categorized as <strong style="color:var(--text)">${t.cat}</strong> via vendor rules. <span style="color:var(--gold);cursor:pointer" onclick="openVendorWizard()">Manage \u2192</span></div>`:'';})()}
+    ${t.is_recurring?`<div style="padding:8px 14px;border-radius:12px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.15);margin-bottom:12px;font-family:'DM Mono',monospace;font-size:10px;color:var(--purple)">\u{1F504} Recurring \u00B7 <span onclick="openRecurringModule()" style="color:var(--gold);cursor:pointer">Manage \u2192</span></div>`:''}
 
     <div class="txd-footer">
       <div>Source: ${t.source||'manual'}</div>
@@ -2028,7 +2093,6 @@ async function renderTxDetail(id){
       <div>ID: ${t.id}</div>
     </div>
   `;
-  window._txdApplyVendor=false;
 }
 
 async function changeTxType(id,newType){
@@ -2061,17 +2125,6 @@ async function removeTxTag(id,tag){
   }catch(e){}
 }
 
-function toggleTxApplyVendor(el){
-  window._txdApplyVendor=!window._txdApplyVendor;
-  el.querySelector('.txd-switch').classList.toggle('on',window._txdApplyVendor);
-}
-
-async function toggleTxRecurring(id,el){
-  const sw=el.querySelector('.txd-switch');
-  const newVal=!sw.classList.contains('on');
-  sw.classList.toggle('on',newVal);
-  try{await fetch(`${API}/api/transactions/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_recurring:newVal})});}catch(e){}
-}
 
 async function changeTxSign(id,newSign){
   try{
@@ -2168,7 +2221,7 @@ function selectCatFromPicker(cat){
 
 function openCatPickerForTxDetail(txId,currentCat){
   openCatPicker(async(newCat)=>{
-    const applyToVendor=window._txdApplyVendor||false;
+    const applyToVendor=false;
     try{
       await fetch(`${API}/api/transactions/${txId}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:newCat,applyToVendor})});
       const t=transactions.find(tx=>tx.id===txId);
@@ -2214,7 +2267,7 @@ function renderRecatSheet(){
 async function applyType(newType){
   const ids=window._bulkIds||[recatTxId];
   if(!ids.length)return;
-  const applyToVendor=window._txdApplyVendor||false;
+  const applyToVendor=false;
   try{
     for(const id of ids){
       const res=await fetch(`${API}/api/transactions/${id}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:newType,applyToVendor})});
@@ -2282,13 +2335,11 @@ function closeEmojiPicker(){
 async function pickEmoji(emoji){
   if(emojiPickerCat){
     CAT_ICONS[emojiPickerCat]=emoji;
+    localStorage.setItem('ledger_cache_icons',JSON.stringify(CAT_ICONS));
     renderAll();
     try{
-      // Update categories table (source of truth)
       await fetch(`${API}/api/categories/${encodeURIComponent(emojiPickerCat)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,icon:emoji})});
-      // Also update legacy category_icons
-      await fetch(`${API}/api/category-icons`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:emojiPickerCat,icon:emoji})});
-    }catch(e){}
+    }catch(e){console.error('Failed to save emoji:',e);}
   }
   closeEmojiPicker();
 }
@@ -2296,7 +2347,7 @@ async function pickEmoji(emoji){
 async function applyRecat(newCat){
   const ids=window._bulkIds||[recatTxId];
   if(!ids.length)return;
-  const applyToVendor=window._txdApplyVendor||false;
+  const applyToVendor=false;
   try{
     for(const id of ids){
       const res=await fetch(`${API}/api/transactions/${id}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:newCat,applyToVendor})});
@@ -2371,21 +2422,20 @@ function openVendorSheet(vendor){
   openPage('page-catdrill',()=>{
     const body=$('catdrill-body');
     const txs=currentMonth().filter(t=>t.desc===vendor).sort((a,b)=>new Date(b.date)-new Date(a.date));
-    const expTotal=txs.filter(t=>t.type==='expense').reduce((a,t)=>a+Math.abs(t.amount),0);
-    const refTotal=0; // refund type eliminated
-    const incTotal=txs.filter(t=>t.type==='income').reduce((a,t)=>a+Math.abs(t.amount),0);
+    const debits=txs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+    const credits=txs.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0);
+    const net=debits-credits;
     body.innerHTML=`
       <div class="catd-summary">
         <div class="catd-header">
-          <div class="catd-icon" style="background:rgba(245,197,24,.1)">🏪</div>
+          <div class="catd-icon" style="background:rgba(245,197,24,.1)">\u{1F3EA}</div>
           <div class="catd-name">${vendor}</div>
         </div>
         <div class="catd-stats">
           <div class="catd-stat"><div class="catd-stat-val">${txs.length}</div><div class="catd-stat-lbl">Transactions</div></div>
-          <div class="catd-stat"><div class="catd-stat-val" style="color:var(--red)">${money(expTotal)}</div><div class="catd-stat-lbl">Expenses</div></div>
-          ${refTotal>0?`<div class="catd-stat"><div class="catd-stat-val" style="color:var(--green)">+${money(refTotal)}</div><div class="catd-stat-lbl">Refunds</div></div>`
-          :incTotal>0?`<div class="catd-stat"><div class="catd-stat-val" style="color:var(--green)">+${money(incTotal)}</div><div class="catd-stat-lbl">Income</div></div>`
-          :`<div class="catd-stat"><div class="catd-stat-val" style="color:var(--red)">${money(expTotal-refTotal)}</div><div class="catd-stat-lbl">Net</div></div>`}
+          <div class="catd-stat"><div class="catd-stat-val" style="color:var(--red)">-${money(debits)}</div><div class="catd-stat-lbl">Debits</div></div>
+          ${credits>0?`<div class="catd-stat"><div class="catd-stat-val" style="color:var(--green)">+${money(credits)}</div><div class="catd-stat-lbl">Credits</div></div>`
+          :`<div class="catd-stat"><div class="catd-stat-val" style="color:${net>0?'var(--red)':'var(--green)'}">${net>0?'-':'+'} ${money(Math.abs(net))}</div><div class="catd-stat-lbl">Net</div></div>`}
         </div>
       </div>
       <div class="txd-label">Tap any transaction to view details</div>
@@ -2401,7 +2451,7 @@ function renderDonut(bd,total){
   let chartEntries=entries.slice(0,7);
   if(entries.length>7){
     const otherAmt=entries.slice(7).reduce((a,[,v])=>a+v,0);
-    chartEntries.push(['All Other',otherAmt]);
+    if(otherAmt>0)chartEntries.push(['All Other',otherAmt]);
   }
   const r=38,cx=50,cy=50,sw=13;let offset=-90,paths='';
   chartEntries.forEach(([cat,amt])=>{
@@ -2414,7 +2464,7 @@ function renderDonut(bd,total){
   });
   const legend=chartEntries.map(([cat,amt])=>`<div class="dleg-row" onclick="openCatDrill('${cat.replace(/'/g,"\\'")}')"><div class="dleg-swatch" style="background:${cat==='All Other'?'#555':CAT_COLORS[cat]||'#888'}"></div><span class="dleg-name">${cat}</span><span class="dleg-pct">${((amt/total)*100).toFixed(0)}%</span></div>`).join('');
   return`<div class="donut-inner">
-    <svg viewBox="0 0 100 100" width="150" height="150" style="flex-shrink:0;filter:drop-shadow(0 0 15px rgba(191,90,242,.25)) drop-shadow(0 0 30px rgba(191,90,242,.1))">
+    <svg viewBox="0 0 100 100" width="180" height="180" style="flex-shrink:0">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border2)" stroke-width="${sw}"/>
       ${paths}
       <text x="${cx}" y="${cy-3}" text-anchor="middle" fill="var(--text-dim)" font-size="6.5" font-family="DM Mono,monospace" letter-spacing="1">TOTAL</text>
@@ -2541,7 +2591,7 @@ async function openCatDrill(cat){
         <div class="catd-name">${cat}</div>
       </div>
       <div class="catd-stats">
-        <div class="catd-stat"><div class="catd-stat-val" style="color:var(--red)">${money(total)}</div><div class="catd-stat-lbl">Spent</div></div>
+        ${(()=>{const isInc=cat==='Income'||mtxs.every(t=>t.type==='income');return isInc?`<div class="catd-stat"><div class="catd-stat-val" style="color:var(--green)">+${money(credits)}</div><div class="catd-stat-lbl">Received</div></div>`:`<div class="catd-stat"><div class="catd-stat-val" style="color:${total>=0?'var(--red)':'var(--green)'}">${total>=0?'-':'+'} ${money(Math.abs(total))}</div><div class="catd-stat-lbl">Net Spend</div></div>`;})()}
         <div class="catd-stat"><div class="catd-stat-val">${txCount}</div><div class="catd-stat-lbl">Transactions</div></div>
         <div class="catd-stat"><div class="catd-stat-val" style="color:${momChange>0?'var(--red)':'var(--green)'}">${momChange!==null?(momChange>0?'▲':'▼')+Math.abs(momChange)+'%':'—'}</div><div class="catd-stat-lbl">vs Last Month</div></div>
       </div>
@@ -2566,16 +2616,24 @@ function renderCatDrillTxs(cat,mode,btn){
   const el=$('catdrill-txs');
   if(mode==='vendor'){
     const groups={};
-    mtxs.forEach(t=>{if(!groups[t.desc])groups[t.desc]={total:0,count:0,txs:[]};groups[t.desc].total+=t.amount;groups[t.desc].count++;groups[t.desc].txs.push(t);});
-    const sorted=Object.entries(groups).sort((a,b)=>b[1].total-a[1].total);
-    el.innerHTML=sorted.map(([vendor,g])=>`
-      <div class="catd-vendor-group">
+    mtxs.forEach(t=>{
+      if(!groups[t.desc])groups[t.desc]={debits:0,credits:0,count:0,txs:[]};
+      if(t.type==='expense')groups[t.desc].debits+=t.amount;
+      else groups[t.desc].credits+=t.amount;
+      groups[t.desc].count++;groups[t.desc].txs.push(t);
+    });
+    const sorted=Object.entries(groups).sort((a,b)=>(b[1].debits-b[1].credits)-(a[1].debits-a[1].credits));
+    el.innerHTML=sorted.map(([vendor,g])=>{
+      const net=g.debits-g.credits;const isCredit=net<0;
+      const displayAmt=isCredit?`+${money(Math.abs(net))}`:`-${money(net)}`;
+      const amtColor=isCredit?'var(--green)':'var(--red)';
+      return`<div class="catd-vendor-group">
         <div class="catd-vendor-header" onclick="this.nextElementSibling.classList.toggle('open')">
-          <div><div class="catd-vendor-name">${vendor}</div><div class="catd-vendor-meta">${g.count} transactions</div></div>
-          <div class="catd-vendor-amt">-${money(g.total)}</div>
+          <div><div class="catd-vendor-name">${vendor}</div><div class="catd-vendor-meta">${g.count} transaction${g.count!==1?'s':''}</div></div>
+          <div class="catd-vendor-amt" style="color:${amtColor}">${displayAmt}</div>
         </div>
         <div class="catd-vendor-txs"><div class="tx-list">${txRows(g.txs,false)}</div></div>
-      </div>`).join('')||'<div class="empty-msg">No transactions</div>';
+      </div>`;}).join('')||'<div class="empty-msg">No transactions</div>';
   }else{
     el.innerHTML=`<div class="tx-list">${txRows(mtxs,false)}</div>`;
   }
@@ -2702,7 +2760,7 @@ async function openVendorWizard(){
       const needsReview=noRule.filter(v=>!v.plaid_category||v.plaid_category==='Other'||v.tx_count<2);
       const highPriority=needsReview.filter(v=>v.total_spend>=25||v.tx_count>=2);
       const lowPriority=needsReview.filter(v=>v.total_spend<25&&v.tx_count<2);
-      preAccepted.forEach(v=>{const m=mapCategory(v.plaid_category);if(m&&m!=='Other')window._wizardAssignments[v.vendor]={category:m,type:v.inferred_type||'expense',auto:true};});
+      preAccepted.forEach(v=>{const m=mapCategoryFrontend(v.plaid_category);if(m&&m!=='Other')window._wizardAssignments[v.vendor]={category:m,type:v.inferred_type||'expense',auto:true};});
 
       let html=`<div style="text-align:center;padding:16px 0;border-bottom:1px solid var(--border);margin-bottom:16px">
         <div style="font-family:'Playfair Display',serif;font-size:22px;margin-bottom:4px">Organize Your Spending</div>
@@ -2722,7 +2780,7 @@ async function openVendorWizard(){
 
 function wizardVendorRow(v,cats,preAccepted){
   const existing=window._wizardAssignments[v.vendor];
-  const currentCat=existing?.category||(preAccepted?mapCategory(v.plaid_category):null);
+  const currentCat=existing?.category||(preAccepted?mapCategoryFrontend(v.plaid_category):null);
   const esc=v.vendor.replace(/'/g,"\\'");
   return`<div class="wizard-vendor-row ${currentCat?'done':''}" data-vendor="${v.vendor.replace(/"/g,'&quot;')}">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
@@ -2852,7 +2910,7 @@ function renderExpenseBarChart(container){
   const entries=Object.entries(bd).sort((a,b)=>b[1]-a[1]);
   const total=entries.reduce((a,[,v])=>a+v,0);
   if(!entries.length){container.innerHTML='<div class="empty-msg">No expense data</div>';return;}
-  container.innerHTML=`<div class="txd-label" style="margin-bottom:10px">Spending by Category</div>`+entries.map(([cat,amt])=>{
+  container.innerHTML=entries.map(([cat,amt])=>{
     const pct=total>0?(amt/total*100).toFixed(0):'0';
     return`<div class="exp-bar-row" onclick="openCatDrill('${cat.replace(/'/g,"\\'")}')">
       <div class="exp-bar-label">${CAT_ICONS[cat]||'📌'} ${cat}</div>
@@ -2969,25 +3027,75 @@ async function checkStreak(){
   try{
     const res=await fetch(`${API}/api/streak/check-in?userId=${currentUser}`,{method:'POST'});
     const data=await res.json();
-    if(data.streak>0){$('streak-pill').style.display='inline-flex';$('streak-count').textContent=data.streak;}
+    if(data.streak>0){$('streak-pill').style.display='inline-flex';$('streak-pill').innerHTML=`<span style="font-size:13px">\u{1F525}</span> <span>${data.streak} day${data.streak!==1?'s':''}</span>`;}
   }catch(e){}
 }
 
 async function renderHealthScore(){
   try{
     const res=await fetch(`${API}/api/health-score?userId=${currentUser}`);
-    const{score,color}=await res.json();
+    const{score,color,breakdown}=await res.json();
+    window._healthBreakdown={score,color,breakdown};
     const circ=2*Math.PI*42;
     const offset=circ-(score/100)*circ;
-    $('health-score-container').innerHTML=`<div style="text-align:center;margin:12px 0">
-      <svg viewBox="0 0 100 100" width="80" height="80">
-        <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border2)" stroke-width="5"/>
-        <circle cx="50" cy="50" r="42" fill="none" stroke="${color}" stroke-width="5"
+    const rating=score>=80?'Excellent':score>=60?'Good':score>=40?'Fair':'Needs Work';
+    $('health-score-container').innerHTML=`<div style="text-align:center;padding:16px 0;cursor:pointer" onclick="openHealthBreakdown()">
+      <svg viewBox="0 0 100 100" width="120" height="120">
+        <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border2)" stroke-width="6"/>
+        <circle cx="50" cy="50" r="42" fill="none" stroke="${color}" stroke-width="6"
           stroke-dasharray="${circ}" stroke-dashoffset="${offset}" stroke-linecap="round"
-          transform="rotate(-90 50 50)" style="transition:stroke-dashoffset 1.5s cubic-bezier(.4,0,.2,1)"/>
-        <text x="50" y="46" text-anchor="middle" fill="var(--text)" font-size="20" font-family="Playfair Display,serif" font-weight="700">${score}</text>
-        <text x="50" y="60" text-anchor="middle" fill="var(--text-muted)" font-size="7" font-family="DM Mono,monospace" letter-spacing="1">HEALTH</text>
+          transform="rotate(-90 50 50)" style="transition:stroke-dashoffset 1.5s ease"/>
+        <text x="50" y="44" text-anchor="middle" fill="var(--text)" font-size="24" font-family="Playfair Display,serif" font-weight="700">${score}</text>
+        <text x="50" y="58" text-anchor="middle" fill="${color}" font-size="8" font-family="DM Mono,monospace" letter-spacing="1">${rating.toUpperCase()}</text>
       </svg>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:4px">Financial Health \u00B7 Tap for details</div>
+    </div>`;
+  }catch(e){}
+}
+
+async function openHealthBreakdown(){
+  openPage('page-health',async()=>{
+    const d=window._healthBreakdown;
+    if(!d){$('health-body').innerHTML='<div class="empty-msg">Loading...</div>';return;}
+    const factors=[
+      {label:'Savings Rate',score:d.breakdown.savings.score,max:d.breakdown.savings.max,detail:`${(d.breakdown.savings.rate*100).toFixed(0)}% of income saved`,tip:'Save 20%+ of income for full marks',color:'var(--green)'},
+      {label:'Budget Adherence',score:d.breakdown.budget.score,max:d.breakdown.budget.max,detail:`${d.breakdown.budget.score}/${d.breakdown.budget.max} points`,tip:'Stay under budget in all categories',color:'var(--gold)'},
+      {label:'Categorization',score:d.breakdown.coverage.score,max:d.breakdown.coverage.max,detail:`${(d.breakdown.coverage.pct*100).toFixed(0)}% of vendors categorized`,tip:'Use the Vendor Wizard to reach 100%',color:'var(--blue)'},
+      {label:'Recurring Control',score:d.breakdown.recurring.score,max:d.breakdown.recurring.max,detail:`${(d.breakdown.recurring.pct*100).toFixed(0)}% of income is recurring`,tip:'Keep recurring charges under 50% of income',color:'var(--purple)'},
+      {label:'Consistency',score:d.breakdown.consistency.score,max:d.breakdown.consistency.max,detail:`Spending variance: ${d.breakdown.consistency.cv.toFixed(2)}`,tip:'Steady daily spending scores higher than spikes',color:'var(--teal)'},
+    ];
+    $('health-body').innerHTML=`<div style="text-align:center;margin-bottom:20px">
+      <div style="font-family:'Playfair Display',serif;font-size:48px;color:${d.color}">${d.score}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted)">Financial Health Score</div>
+    </div>`+factors.map(f=>`<div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:13px;font-weight:500">${f.label}</span>
+        <span style="font-family:'DM Mono',monospace;font-size:12px;color:${f.color}">${f.score}/${f.max}</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(f.score/f.max)*100}%;background:${f.color}"></div></div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:4px">${f.detail}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:2px">\u{1F4A1} ${f.tip}</div>
+    </div>`).join('');
+  });
+}
+
+async function renderWeeklyRecap(){
+  try{
+    const res=await fetch(`${API}/api/weekly-recap?userId=${currentUser}`);
+    const r=await res.json();
+    if(!r.total_spent&&!r.transaction_count)return;
+    const changeIcon=r.change_pct>0?'\u25B2':'\u25BC';
+    const changeColor=r.change_pct>0?'var(--red)':'var(--green)';
+    $('weekly-recap').innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin:0 14px 18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase">This Week</div>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:${changeColor}">${changeIcon} ${Math.abs(r.change_pct).toFixed(0)}% vs last week</div>
+      </div>
+      <div style="font-family:'Playfair Display',serif;font-size:28px;color:var(--red);margin-bottom:8px">-${money(r.total_spent)}</div>
+      <div style="display:flex;gap:16px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted)">
+        <span>${r.transaction_count} transactions</span>
+        ${r.biggest_purchase?`<span>Biggest: ${r.biggest_purchase.vendor.slice(0,20)} ${money(r.biggest_purchase.amount)}</span>`:''}
+      </div>
     </div>`;
   }catch(e){}
 }
@@ -3189,7 +3297,7 @@ async function saveBudget(){
     // Save emoji
     if(_budgetEmoji&&_budgetEmoji!=='📌'){
       CAT_ICONS[cat]=_budgetEmoji;
-      fetch(`${API}/api/category-icons`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:cat,icon:_budgetEmoji})});
+      fetch(`${API}/api/categories/${encodeURIComponent(cat)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,icon:_budgetEmoji})});
     }
     if(!CAT_COLORS[cat])CAT_COLORS[cat]='#6E6C8E';
     if(!CAT_ICONS[cat])CAT_ICONS[cat]=_budgetEmoji||'📌';

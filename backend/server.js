@@ -268,6 +268,15 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
         a.name, a.mask, a.type, a.subtype, a.balances.current
       );
     }
+
+    // Remove duplicate pending transactions (posted version exists)
+    const dupes = all(`
+      SELECT p.id as pending_id FROM transactions p
+      INNER JOIN transactions posted ON p.desc = posted.desc AND p.amount = posted.amount
+        AND p.date = posted.date AND p.account_id = posted.account_id AND p.household = posted.household
+      WHERE p.household = ? AND p.pending = 1 AND posted.pending = 0 AND p.id != posted.id`, [household]);
+    for (const d of dupes) run('DELETE FROM transactions WHERE id = ?', [d.pending_id]);
+    if (dupes.length) console.log(`  Removed ${dupes.length} duplicate pending transactions`);
   });
   insertMany();
   return { count: allTransactions.length, accounts: allAccounts.length };
@@ -402,6 +411,26 @@ app.post('/api/transactions', (req, res) => {
 });
 
 // ─── TRANSACTION DETAIL ─────────────────────────────────────────
+// Static routes MUST come before parameterized /:id routes
+app.get('/api/transactions/unsure', (req, res) => {
+  try {
+    const hh = getHousehold(req.query.userId || 'christian');
+    const txs = all(`SELECT t.*, u.name as user_name FROM transactions t
+      LEFT JOIN users u ON t.user_id=u.id
+      WHERE t.household=? AND t.status='unsure' ORDER BY t.date DESC`, [hh]);
+    res.json({ transactions: txs });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/transactions/:id/status', (req, res) => {
+  const { status } = req.body;
+  if (!status) return res.status(400).json({ error: 'Missing status' });
+  try {
+    run('UPDATE transactions SET status=? WHERE id=?', [status, req.params.id]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/transactions/:id', (req, res) => {
   try {
     const tx = get(`SELECT t.*, u.name as user_name FROM transactions t
@@ -594,25 +623,6 @@ app.get('/api/categories/:id/transactions', (req, res) => {
 });
 
 // ─── TRANSACTION STATUS (unsure/confirmed) ──────────────────────
-app.put('/api/transactions/:id/status', (req, res) => {
-  const { status } = req.body;
-  if (!status) return res.status(400).json({ error: 'Missing status' });
-  try {
-    run('UPDATE transactions SET status=? WHERE id=?', [status, req.params.id]);
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/transactions/unsure', (req, res) => {
-  try {
-    const hh = getHousehold(req.query.userId || 'christian');
-    const txs = all(`SELECT t.*, u.name as user_name FROM transactions t
-      LEFT JOIN users u ON t.user_id=u.id
-      WHERE t.household=? AND t.status='unsure' ORDER BY t.date DESC`, [hh]);
-    res.json({ transactions: txs });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 // ─── VENDOR RULES ───────────────────────────────────────────────
 app.get('/api/vendor-rules', (req, res) => {
   try {
@@ -1086,6 +1096,20 @@ When answering:
     console.error('Chat error:', e.message);
     res.status(500).json({ error: e.message });
   }
+});
+
+// ─── MAINTENANCE ────────────────────────────────────────────────
+app.post('/api/maintenance/dedup', (req, res) => {
+  const { userId = 'christian' } = req.body;
+  try {
+    const hh = getHousehold(userId);
+    const dupes = all(`SELECT p.id as pending_id FROM transactions p
+      INNER JOIN transactions posted ON p.desc = posted.desc AND p.amount = posted.amount
+        AND p.date = posted.date AND p.account_id = posted.account_id AND p.household = posted.household
+      WHERE p.household = ? AND p.pending = 1 AND posted.pending = 0 AND p.id != posted.id`, [hh]);
+    for (const d of dupes) run('DELETE FROM transactions WHERE id = ?', [d.pending_id]);
+    res.json({ success: true, removed: dupes.length });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // ─── VENDOR SUMMARY + BULK RULES ────────────────────────────────
