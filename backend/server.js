@@ -50,116 +50,95 @@ function initDB() {
     name TEXT, mask TEXT, type TEXT, subtype TEXT,
     balance REAL, updated_at TEXT DEFAULT (datetime('now')))`);
   db.exec(`CREATE TABLE IF NOT EXISTS budgets (
-    household TEXT NOT NULL,
-    category TEXT NOT NULL,
-    amount REAL NOT NULL,
-    updated_at TEXT DEFAULT (datetime('now')),
-    PRIMARY KEY (household, category)
+    household TEXT NOT NULL, category TEXT NOT NULL, amount REAL NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (household, category)
   )`);
   db.exec(`CREATE TABLE IF NOT EXISTS vendor_rules (
-    household TEXT NOT NULL,
-    vendor TEXT NOT NULL,
-    category TEXT NOT NULL,
-    type TEXT NOT NULL DEFAULT 'expense',
-    updated_at TEXT DEFAULT (datetime('now')),
+    household TEXT NOT NULL, vendor TEXT NOT NULL, category TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'expense', updated_at TEXT DEFAULT (datetime('now')),
     PRIMARY KEY (household, vendor)
   )`);
   db.exec(`CREATE TABLE IF NOT EXISTS category_icons (
-    household TEXT NOT NULL,
-    category TEXT NOT NULL,
-    icon TEXT NOT NULL,
+    household TEXT NOT NULL, category TEXT NOT NULL, icon TEXT NOT NULL,
     PRIMARY KEY (household, category)
   )`);
 
-  // ─── V3 SCHEMA ────────────────────────────────────────────────
-  // Add new columns to transactions (safe if already exist)
-  const txCols = all("PRAGMA table_info(transactions)").map(c => c.name);
-  if (!txCols.includes('notes')) db.exec("ALTER TABLE transactions ADD COLUMN notes TEXT");
-  if (!txCols.includes('is_recurring')) db.exec("ALTER TABLE transactions ADD COLUMN is_recurring INTEGER DEFAULT 0");
-  if (!txCols.includes('recurring_group_id')) db.exec("ALTER TABLE transactions ADD COLUMN recurring_group_id TEXT");
-  if (!txCols.includes('reviewed')) db.exec("ALTER TABLE transactions ADD COLUMN reviewed INTEGER DEFAULT 0");
-  if (!txCols.includes('original_cat')) db.exec("ALTER TABLE transactions ADD COLUMN original_cat TEXT");
-  if (!txCols.includes('original_sign')) {
-    db.exec("ALTER TABLE transactions ADD COLUMN original_sign INTEGER DEFAULT -1");
-    // Backfill: income and refunds are credits (+1), expenses and transfers are debits (-1)
-    run("UPDATE transactions SET original_sign = 1 WHERE type IN ('income','refund')");
-    run("UPDATE transactions SET original_sign = -1 WHERE type IN ('expense','transfer')");
-  }
-  if (!txCols.includes('status')) db.exec("ALTER TABLE transactions ADD COLUMN status TEXT DEFAULT 'confirmed'");
-  // Migrate: flip income/refund amounts to negative (Plaid convention)
-  // Only flip if amount is still positive (hasn't been migrated yet)
-  run("UPDATE transactions SET amount = -ABS(amount) WHERE type IN ('income','refund') AND amount > 0");
-  // Ensure original_sign matches the amount sign
-  run("UPDATE transactions SET original_sign = CASE WHEN amount < 0 THEN 1 ELSE -1 END");
+  // ── SAFE COLUMN ADDITIONS ──
+  const addCol = (table, col, type) => {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); }
+    catch(e) { /* column already exists */ }
+  };
+  addCol('transactions', 'notes', 'TEXT');
+  addCol('transactions', 'is_recurring', 'INTEGER DEFAULT 0');
+  addCol('transactions', 'recurring_group_id', 'TEXT');
+  addCol('transactions', 'reviewed', 'INTEGER DEFAULT 0');
+  addCol('transactions', 'original_cat', 'TEXT');
+  addCol('transactions', 'original_sign', 'INTEGER DEFAULT -1');
+  addCol('transactions', 'status', "TEXT DEFAULT 'confirmed'");
+  addCol('users', 'health_score', 'INTEGER DEFAULT 0');
+  addCol('users', 'health_updated', 'TEXT');
+  addCol('users', 'streak_count', 'INTEGER DEFAULT 0');
+  addCol('users', 'streak_best', 'INTEGER DEFAULT 0');
+  addCol('users', 'last_active_date', 'TEXT');
 
+  // ── NEW TABLES ──
   db.exec(`CREATE TABLE IF NOT EXISTS transaction_tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    transaction_id TEXT NOT NULL,
-    tag TEXT NOT NULL,
-    household TEXT NOT NULL,
+    transaction_id TEXT NOT NULL, tag TEXT NOT NULL, household TEXT NOT NULL,
     UNIQUE(transaction_id, tag)
   )`);
 
   db.exec(`CREATE TABLE IF NOT EXISTS categories (
-    id TEXT NOT NULL,
-    household TEXT NOT NULL,
-    icon TEXT,
-    color TEXT,
-    type TEXT DEFAULT 'expense',
-    sort_order INTEGER DEFAULT 0,
-    is_active INTEGER DEFAULT 1,
-    PRIMARY KEY (household, id)
+    id TEXT NOT NULL, household TEXT NOT NULL,
+    icon TEXT DEFAULT '📌', color TEXT DEFAULT '#7a78a0',
+    type TEXT DEFAULT 'expense', sort_order INTEGER DEFAULT 0, is_active INTEGER DEFAULT 1,
+    PRIMARY KEY (id, household)
   )`);
 
   db.exec(`CREATE TABLE IF NOT EXISTS recurring_rules (
-    id TEXT PRIMARY KEY,
-    household TEXT NOT NULL,
-    vendor TEXT NOT NULL,
-    category TEXT,
-    expected_amount REAL,
-    frequency TEXT,
-    is_subscription INTEGER DEFAULT 0,
-    last_seen TEXT,
-    is_active INTEGER DEFAULT 1,
+    id TEXT PRIMARY KEY, household TEXT NOT NULL, vendor TEXT NOT NULL,
+    category TEXT, expected_amount REAL, frequency TEXT,
+    is_subscription INTEGER DEFAULT 0, last_seen TEXT, is_active INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now'))
   )`);
 
-  db.exec(`CREATE TABLE IF NOT EXISTS tags (
-    name TEXT NOT NULL,
-    household TEXT NOT NULL,
-    color TEXT,
-    PRIMARY KEY (household, name)
+  db.exec(`CREATE TABLE IF NOT EXISTS challenges (
+    id TEXT PRIMARY KEY, household TEXT NOT NULL, month TEXT NOT NULL,
+    title TEXT NOT NULL, description TEXT, target_value REAL,
+    current_value REAL DEFAULT 0, challenge_type TEXT NOT NULL, category TEXT,
+    is_completed INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
   )`);
 
-  // Seed categories from category_icons + defaults if empty
-  const catCount = get('SELECT COUNT(*) as c FROM categories WHERE household = ?', ['spenziero']);
-  if (!catCount || catCount.c === 0) {
-    const defaultCats = {
-      Housing:  { icon: '🏠', color: '#ffd700', type: 'expense' },
-      Food:     { icon: '🍽️', color: '#00ff87', type: 'expense' },
-      Transport:{ icon: '🚗', color: '#00d4ff', type: 'expense' },
-      Health:   { icon: '💊', color: '#ff6ec7', type: 'expense' },
-      Entertainment: { icon: '🎬', color: '#bf5af2', type: 'expense' },
-      Shopping: { icon: '🛍️', color: '#ff9f1c', type: 'expense' },
-      Utilities:{ icon: '⚡', color: '#00ffd5', type: 'expense' },
-      Income:   { icon: '💰', color: '#00ff87', type: 'income' },
-      Transfer: { icon: '🔁', color: '#bf5af2', type: 'transfer' },
-      Other:    { icon: '📌', color: '#7a78a0', type: 'expense' },
-    };
-    // Merge any user-saved icons from category_icons table
-    const savedIcons = all('SELECT category, icon FROM category_icons WHERE household = ?', ['spenziero']);
-    savedIcons.forEach(si => { if (defaultCats[si.category]) defaultCats[si.category].icon = si.icon; });
-    let order = 0;
-    for (const [name, c] of Object.entries(defaultCats)) {
-      run('INSERT OR IGNORE INTO categories (id, household, icon, color, type, sort_order) VALUES (?,?,?,?,?,?)',
-        [name, 'spenziero', c.icon, c.color, c.type, order++]);
-    }
+  // ── SEED CATEGORIES ──
+  const defaultCats = {
+    Housing: { icon: '🏠', color: '#ffd700' }, Food: { icon: '🍽️', color: '#34d399' },
+    Transport: { icon: '🚗', color: '#60a5fa' }, Health: { icon: '💊', color: '#f472b6' },
+    Entertainment: { icon: '🎬', color: '#a78bfa' }, Shopping: { icon: '🛍️', color: '#fb923c' },
+    Utilities: { icon: '⚡', color: '#2dd4bf' }, Income: { icon: '💰', color: '#34d399' },
+    Transfer: { icon: '🔁', color: '#a78bfa' }, Other: { icon: '📌', color: '#6e6c8e' },
+    Vacation: { icon: '🏖️', color: '#f59e0b' }, Subscriptions: { icon: '🔄', color: '#818cf8' },
+    Pets: { icon: '🐾', color: '#fb7185' }, Personal: { icon: '💆', color: '#c084fc' },
+    Education: { icon: '🎓', color: '#38bdf8' }, Insurance: { icon: '🛡️', color: '#94a3b8' }
+  };
+  const seedCat = db.prepare('INSERT OR IGNORE INTO categories (id, household, icon, color) VALUES (?, ?, ?, ?)');
+  for (const [name, info] of Object.entries(defaultCats)) {
+    seedCat.run(name, 'spenziero', info.icon, info.color);
   }
+  // Migrate existing category_icons
+  try {
+    const existingIcons = all('SELECT category, icon FROM category_icons WHERE household = ?', ['spenziero']);
+    const updateCatIcon = db.prepare('UPDATE categories SET icon = ? WHERE id = ? AND household = ?');
+    for (const row of existingIcons) updateCatIcon.run(row.icon, row.category, 'spenziero');
+  } catch(e) {}
 
-  run(`INSERT OR IGNORE INTO users (id, name, household) VALUES (?, ?, ?)`,
-    ['christian', 'Christian', 'spenziero']);
-  run(`INSERT OR IGNORE INTO users (id, name, household) VALUES (?, ?, ?)`,
-    ['wife', 'Marisol', 'spenziero']);
+  // ── MIGRATE REFUND → INCOME (Phase 4) ──
+  run("UPDATE transactions SET type = 'income' WHERE type = 'refund'");
+  run("UPDATE vendor_rules SET type = 'income' WHERE type = 'refund'");
+  // Ensure all amounts are positive (Math.abs) — undo any negative amount migration
+  run("UPDATE transactions SET amount = ABS(amount) WHERE amount < 0");
+
+  run(`INSERT OR IGNORE INTO users (id, name, household) VALUES (?, ?, ?)`, ['christian', 'Christian', 'spenziero']);
+  run(`INSERT OR IGNORE INTO users (id, name, household) VALUES (?, ?, ?)`, ['wife', 'Marisol', 'spenziero']);
   const defaultBudgets = {Housing:2000,Food:800,Transport:400,Health:300,Entertainment:200,Shopping:400,Utilities:250};
   for (const [cat, amt] of Object.entries(defaultBudgets)) {
     run('INSERT OR IGNORE INTO budgets (household, category, amount) VALUES (?, ?, ?)', ['spenziero', cat, amt]);
@@ -202,66 +181,85 @@ function mapCategory(plaidCat) {
 async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
   const household = getHousehold(userId);
   const today = new Date();
-  const start = new Date(); start.setDate(today.getDate() - 365);
+  const start = new Date();
+  start.setDate(today.getDate() - 365); // 12 MONTHS — NOT 90 DAYS
   const fmt = d => d.toISOString().split('T')[0];
 
-  // Paginate: fetch 500 at a time until we have all transactions
-  let allTransactions = [], allAccounts = [];
+  // ── PAGINATED FETCH ──
+  let allTransactions = [];
+  let allAccounts = [];
   let offset = 0;
   const batchSize = 500;
-  while (true) {
+  let totalAvailable = Infinity;
+
+  while (offset < totalAvailable) {
     const resp = await plaid.transactionsGet({
       access_token: accessToken,
-      start_date: fmt(start), end_date: fmt(today),
+      start_date: fmt(start),
+      end_date: fmt(today),
       options: { count: batchSize, offset },
     });
     allTransactions.push(...resp.data.transactions);
     if (offset === 0) allAccounts = resp.data.accounts;
-    offset += resp.data.transactions.length;
-    if (offset >= resp.data.total_transactions) break;
+    totalAvailable = resp.data.total_transactions;
+    offset += batchSize;
   }
 
-  const upsertTx = db.prepare(`INSERT INTO transactions
-    (id, household, user_id, desc, amount, type, cat, date, pending, account_id, source, original_cat, reviewed, original_sign)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'plaid', ?, 0, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      amount=excluded.amount, date=excluded.date, pending=excluded.pending, original_sign=excluded.original_sign,
-      cat=CASE WHEN transactions.reviewed=1 THEN transactions.cat ELSE excluded.cat END,
-      type=CASE WHEN transactions.reviewed=1 THEN transactions.type ELSE excluded.type END`);
-  const upsertAcct = db.prepare(`INSERT OR REPLACE INTO accounts
-    (account_id, user_id, household, name, mask, type, subtype, balance, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`);
+  console.log(`  Fetched ${allTransactions.length} of ${totalAvailable} transactions (${Math.ceil(totalAvailable / batchSize)} pages)`);
 
-  // Load vendor rules to override Plaid categories
+  // ── LOAD VENDOR RULES ──
   const vendorRules = {};
   all('SELECT vendor, category, type FROM vendor_rules WHERE household = ?', [household])
     .forEach(r => { vendorRules[r.vendor] = { cat: r.category, type: r.type }; });
 
+  // ── UPSERT WITH THREE-TIER CATEGORIZATION ──
+  const upsertTx = db.prepare(`INSERT OR REPLACE INTO transactions
+    (id, household, user_id, desc, amount, type, cat, date, pending, account_id, source, original_cat, reviewed)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'plaid', ?, ?)`);
+  const upsertAcct = db.prepare(`INSERT OR REPLACE INTO accounts
+    (account_id, user_id, household, name, mask, type, subtype, balance, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`);
+
   const insertMany = db.transaction(() => {
     for (const t of allTransactions) {
-      const plaidCat = t.personal_finance_category?.primary || t.category?.[0] || 'Other';
       const rule = vendorRules[t.name];
-      const originalSign = t.amount > 0 ? -1 : 1; // Plaid: positive=debit, negative=credit
-      let cat, type;
+      let cat, type, reviewed;
+
       if (rule) {
+        // TIER 1: Vendor rule — highest priority
         cat = rule.cat;
+        type = rule.type;
+        reviewed = 1;
       } else {
-        cat = mapCategory(plaidCat);
-        const desc = (t.name || '').toUpperCase();
-        if (cat !== 'Transfer' && (
-          desc.includes('TRANSFER') || desc.includes('CREDIT CARD') && desc.includes('PAYMENT') ||
-          desc.includes('CD DEPOSIT') || desc.includes('SAVINGS') && desc.includes('WITHDRAWAL') ||
-          desc.includes('AUTOMATIC PAYMENT') || desc.includes('AUTOPAY') ||
-          desc.includes('PAYMENT - THANK')
-        )) cat = 'Transfer';
+        // TIER 2: Check if this transaction was manually reviewed
+        const existing = get('SELECT cat, type, reviewed FROM transactions WHERE id = ?', [t.transaction_id]);
+        if (existing && existing.reviewed) {
+          cat = existing.cat;
+          type = existing.type;
+          reviewed = 1;
+        } else {
+          // TIER 3: Plaid categorization
+          cat = mapCategory(t.personal_finance_category?.primary || t.category?.[0]);
+          const desc = (t.name || '').toUpperCase();
+          if (cat !== 'Transfer' && (
+            desc.includes('TRANSFER') || (desc.includes('CREDIT CARD') && desc.includes('PAYMENT')) ||
+            desc.includes('CD DEPOSIT') || (desc.includes('SAVINGS') && desc.includes('WITHDRAWAL')) ||
+            desc.includes('AUTOMATIC PAYMENT') || desc.includes('AUTOPAY') ||
+            desc.includes('PAYMENT - THANK')
+          )) cat = 'Transfer';
+          // NO REFUND TYPE — only income, expense, transfer
+          type = cat === 'Transfer' ? 'transfer' : (t.amount > 0 ? 'expense' : 'income');
+          reviewed = 0;
+        }
       }
-      // Type determined by Plaid amount sign
-      type = cat === 'Transfer' ? 'transfer' : (t.amount < 0 ? 'income' : 'expense');
-      // Store the RAW Plaid amount (positive=debit/expense, negative=credit/income)
+
+      const originalCat = t.personal_finance_category?.primary || t.category?.[0] || null;
+
       upsertTx.run(
         t.transaction_id, household, userId, t.name,
-        t.amount, type, cat,
-        t.date, t.pending ? 1 : 0, t.account_id, plaidCat, originalSign
+        Math.abs(t.amount), type, cat,
+        t.date, t.pending ? 1 : 0, t.account_id,
+        originalCat, reviewed
       );
     }
     for (const a of allAccounts) {
@@ -814,24 +812,24 @@ app.get('/api/trends/vendors', (req, res) => {
 });
 
 app.get('/api/trends/cashflow', (req, res) => {
-  const { userId = 'christian', months = 6, startDate, endDate } = req.query;
+  const { userId = 'christian', months = '6' } = req.query;
   try {
     const hh = getHousehold(userId);
-    let dateFilter, params;
-    if (startDate && endDate) {
-      dateFilter = 'AND date >= ? AND date <= ?';
-      params = [hh, startDate, endDate];
-    } else {
-      dateFilter = "AND date >= date('now', '-' || ? || ' months')";
-      params = [hh, months];
+    const numMonths = parseInt(months) || 6;
+    const now = new Date();
+    const data = [];
+    for (let i = numMonths - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const start = d.toISOString().split('T')[0];
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+      const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const txs = all('SELECT type, SUM(amount) as total FROM transactions WHERE household = ? AND date >= ? AND date <= ? GROUP BY type', [hh, start, end]);
+      const income = txs.find(t => t.type === 'income')?.total || 0;
+      const expenses = txs.find(t => t.type === 'expense')?.total || 0;
+      data.push({ month, income, expenses, net: income - expenses });
     }
-    const data = all(`SELECT strftime('%Y-%m', date) as month,
-      SUM(CASE WHEN type='income' OR type='refund' THEN amount ELSE 0 END) as income,
-      SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) as expenses
-      FROM transactions WHERE household=? ${dateFilter}
-      GROUP BY month ORDER BY month`, params);
-    res.json({ data: data.map(d => ({ ...d, net: d.income - d.expenses })) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    res.json({ data });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/trends/daily-average', (req, res) => {
@@ -870,10 +868,10 @@ app.get('/api/income/breakdown', (req, res) => {
     const dateFilter = startDate && endDate ? 'AND date>=? AND date<=?' : "AND date >= date('now', '-12 months')";
     const params = startDate && endDate ? [hh, startDate, endDate] : [hh];
     const byCategory = all(`SELECT cat as category, SUM(amount) as total, COUNT(*) as cnt
-      FROM transactions WHERE household=? AND (type='income' OR type='refund') ${dateFilter}
+      FROM transactions WHERE household=? AND type='income' ${dateFilter}
       GROUP BY cat ORDER BY total DESC`, params);
     const byMerchant = all(`SELECT desc as merchant, SUM(amount) as total, COUNT(*) as cnt, cat
-      FROM transactions WHERE household=? AND (type='income' OR type='refund') ${dateFilter}
+      FROM transactions WHERE household=? AND type='income' ${dateFilter}
       GROUP BY desc ORDER BY total DESC`, params);
     res.json({ by_category: byCategory, by_merchant: byMerchant });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1088,6 +1086,183 @@ When answering:
     console.error('Chat error:', e.message);
     res.status(500).json({ error: e.message });
   }
+});
+
+// ─── VENDOR SUMMARY + BULK RULES ────────────────────────────────
+app.get('/api/vendor-summary', (req, res) => {
+  const { userId = 'christian' } = req.query;
+  try {
+    const hh = getHousehold(userId);
+    const vendors = all(`
+      SELECT t.desc as vendor, COUNT(*) as tx_count, SUM(t.amount) as total_spend,
+        MIN(t.date) as first_seen, MAX(t.date) as last_seen, t.cat as plaid_category,
+        t.type as inferred_type, vr.category as rule_category, vr.type as rule_type,
+        CASE WHEN vr.vendor IS NOT NULL THEN 1 ELSE 0 END as has_rule
+      FROM transactions t
+      LEFT JOIN vendor_rules vr ON vr.vendor = t.desc AND vr.household = t.household
+      WHERE t.household = ? GROUP BY t.desc ORDER BY SUM(t.amount) DESC`, [hh]);
+    const withRules = vendors.filter(v => v.has_rule);
+    res.json({
+      vendors,
+      stats: {
+        total_vendors: vendors.length, categorized: withRules.length,
+        needs_review: vendors.length - withRules.length,
+        total_spend: vendors.reduce((a, v) => a + v.total_spend, 0),
+        coverage_pct: vendors.length > 0 ? Math.round(withRules.length / vendors.length * 100) : 0
+      }
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/vendor-rules/bulk', (req, res) => {
+  const { userId = 'christian', assignments } = req.body;
+  if (!assignments || !assignments.length) return res.status(400).json({ error: 'No assignments' });
+  try {
+    const hh = getHousehold(userId);
+    const upsertRule = db.prepare(`INSERT OR REPLACE INTO vendor_rules (household, vendor, category, type, updated_at) VALUES (?, ?, ?, ?, datetime('now'))`);
+    const updateTxs = db.prepare('UPDATE transactions SET cat = ?, type = ?, reviewed = 1 WHERE household = ? AND desc = ?');
+    const ensureCat = db.prepare('INSERT OR IGNORE INTO categories (id, household) VALUES (?, ?)');
+    const applyAll = db.transaction(() => {
+      let totalUpdated = 0;
+      for (const a of assignments) {
+        upsertRule.run(hh, a.vendor, a.category, a.type || 'expense');
+        const result = updateTxs.run(a.category, a.type || 'expense', hh, a.vendor);
+        totalUpdated += result.changes;
+        ensureCat.run(a.category, hh);
+      }
+      return totalUpdated;
+    });
+    const updated = applyAll();
+    res.json({ success: true, rules_created: assignments.length, transactions_updated: updated });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── HEALTH SCORE ───────────────────────────────────────────────
+app.get('/api/health-score', (req, res) => {
+  const { userId = 'christian' } = req.query;
+  try {
+    const hh = getHousehold(userId);
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+    const monthEnd = new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().split('T')[0];
+    const mtxs = all('SELECT * FROM transactions WHERE household = ? AND date >= ? AND date <= ?', [hh, monthStart, monthEnd]);
+    const income = mtxs.filter(t => t.type === 'income').reduce((a,t) => a + t.amount, 0);
+    const expenses = mtxs.filter(t => t.type === 'expense').reduce((a,t) => a + t.amount, 0);
+    const savingsRate = income > 0 ? (income - expenses) / income : 0;
+    const savingsScore = Math.min(30, Math.max(0, Math.round(savingsRate * 150)));
+    const budgetRows = all('SELECT category, amount FROM budgets WHERE household = ?', [hh]);
+    let budgetScore = 25;
+    for (const b of budgetRows) {
+      const spent = mtxs.filter(t => t.type === 'expense' && t.cat === b.category).reduce((a,t) => a + t.amount, 0);
+      if (spent > b.amount) budgetScore -= Math.min(5, Math.round((spent - b.amount) / b.amount * 10));
+    }
+    budgetScore = Math.max(0, budgetScore);
+    const totalVendors = all('SELECT COUNT(DISTINCT desc) as cnt FROM transactions WHERE household = ?', [hh])[0]?.cnt || 1;
+    const ruledVendors = all('SELECT COUNT(*) as cnt FROM vendor_rules WHERE household = ?', [hh])[0]?.cnt || 0;
+    const coverageScore = Math.round((ruledVendors / totalVendors) * 15);
+    const recurringTotal = all('SELECT SUM(expected_amount) as total FROM recurring_rules WHERE household = ? AND is_active = 1', [hh])[0]?.total || 0;
+    const recurringPct = income > 0 ? recurringTotal / income : 0;
+    const recurringScore = recurringPct < 0.5 ? 15 : Math.max(0, 15 - Math.round((recurringPct - 0.5) * 30));
+    const daySpends = {};
+    mtxs.filter(t => t.type === 'expense').forEach(t => { daySpends[t.date] = (daySpends[t.date] || 0) + t.amount; });
+    const dayValues = Object.values(daySpends);
+    const avgDay = dayValues.length > 0 ? dayValues.reduce((a,b) => a+b, 0) / dayValues.length : 0;
+    const variance = dayValues.length > 0 ? dayValues.reduce((a,v) => a + Math.pow(v - avgDay, 2), 0) / dayValues.length : 0;
+    const cv = avgDay > 0 ? Math.sqrt(variance) / avgDay : 0;
+    const consistencyScore = Math.max(0, Math.round(15 * (1 - Math.min(cv, 1.5) / 1.5)));
+    const total = Math.min(100, Math.max(0, savingsScore + budgetScore + coverageScore + recurringScore + consistencyScore));
+    const color = total >= 80 ? '#34D399' : total >= 60 ? '#F5C518' : total >= 40 ? '#FB923C' : '#F87171';
+    res.json({ score: total, color, breakdown: { savings: { score: savingsScore, max: 30, rate: savingsRate }, budget: { score: budgetScore, max: 25 }, coverage: { score: coverageScore, max: 15, pct: ruledVendors / totalVendors }, recurring: { score: recurringScore, max: 15, pct: recurringPct }, consistency: { score: consistencyScore, max: 15, cv } } });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── STREAK ─────────────────────────────────────────────────────
+app.post('/api/streak/check-in', (req, res) => {
+  const { userId = 'christian' } = req.query;
+  try {
+    const user = get('SELECT * FROM users WHERE id = ?', [userId]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    let streak = user.streak_count || 0;
+    let best = user.streak_best || 0;
+    if (user.last_active_date === today) { /* already checked in */ }
+    else if (user.last_active_date === yesterday) { streak++; }
+    else if (!user.last_active_date) { streak = 1; }
+    else { streak = 1; }
+    if (streak > best) best = streak;
+    run('UPDATE users SET streak_count = ?, streak_best = ?, last_active_date = ? WHERE id = ?', [streak, best, today, userId]);
+    res.json({ streak, best, is_new_day: user.last_active_date !== today, milestone: [7,30,100,365].includes(streak) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── CHALLENGES ─────────────────────────────────────────────────
+app.get('/api/challenges', (req, res) => {
+  const { userId = 'christian' } = req.query;
+  try {
+    const hh = getHousehold(userId);
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    let challenges = all('SELECT * FROM challenges WHERE household = ? AND month = ?', [hh, currentMonth]);
+    if (!challenges.length) {
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevStart = prev.toISOString().split('T')[0];
+      const prevEnd = new Date(prev.getFullYear(), prev.getMonth()+1, 0).toISOString().split('T')[0];
+      const prevTxs = all('SELECT * FROM transactions WHERE household = ? AND date >= ? AND date <= ?', [hh, prevStart, prevEnd]);
+      const prevExpenses = prevTxs.filter(t => t.type === 'expense');
+      const prevTotal = prevExpenses.reduce((a,t) => a + t.amount, 0);
+      const prevIncome = prevTxs.filter(t => t.type === 'income').reduce((a,t) => a + t.amount, 0);
+      const daysInPrev = new Date(prev.getFullYear(), prev.getMonth()+1, 0).getDate();
+      const prevDailyAvg = daysInPrev > 0 ? prevTotal / daysInPrev : 0;
+      const uuid = () => 'ch_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+      const newChallenges = [];
+      if (prevDailyAvg > 0) newChallenges.push({ id: uuid(), household: hh, month: currentMonth, title: `Daily avg under $${Math.round(prevDailyAvg)}`, description: `Beat last month's $${Math.round(prevDailyAvg)}/day average`, target_value: prevDailyAvg, challenge_type: 'daily_average' });
+      if (prevIncome > 0) { const prevRate = (prevIncome - prevTotal) / prevIncome; const target = Math.min(0.30, prevRate + 0.05); newChallenges.push({ id: uuid(), household: hh, month: currentMonth, title: `Save ${Math.round(target * 100)}% of income`, description: `Improve from ${Math.round(prevRate * 100)}% last month`, target_value: target, challenge_type: 'savings_rate' }); }
+      newChallenges.push({ id: uuid(), household: hh, month: currentMonth, title: 'Stay organized', description: '100% vendor coverage', target_value: 100, challenge_type: 'coverage' });
+      const insert = db.prepare('INSERT INTO challenges (id, household, month, title, description, target_value, challenge_type, category) VALUES (?,?,?,?,?,?,?,?)');
+      for (const c of newChallenges) insert.run(c.id, c.household, c.month, c.title, c.description, c.target_value, c.challenge_type, c.category || null);
+      challenges = newChallenges;
+    }
+    const monthStart = `${currentMonth}-01`;
+    const monthEnd = new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().split('T')[0];
+    const currTxs = all('SELECT * FROM transactions WHERE household = ? AND date >= ? AND date <= ?', [hh, monthStart, monthEnd]);
+    const currExpenses = currTxs.filter(t => t.type === 'expense');
+    const currIncome = currTxs.filter(t => t.type === 'income').reduce((a,t) => a + t.amount, 0);
+    const currTotal = currExpenses.reduce((a,t) => a + t.amount, 0);
+    const daysElapsed = now.getDate();
+    challenges = challenges.map(c => {
+      let current = 0, progress = 0;
+      switch(c.challenge_type) {
+        case 'daily_average': current = daysElapsed > 0 ? currTotal / daysElapsed : 0; progress = c.target_value > 0 ? Math.min(100, Math.max(0, (1 - current / c.target_value) * 100)) : 0; break;
+        case 'savings_rate': current = currIncome > 0 ? (currIncome - currTotal) / currIncome : 0; progress = c.target_value > 0 ? Math.min(100, (current / c.target_value) * 100) : 0; break;
+        case 'coverage': const tv = all('SELECT COUNT(DISTINCT desc) as cnt FROM transactions WHERE household = ?', [hh])[0]?.cnt || 1; const rv = all('SELECT COUNT(*) as cnt FROM vendor_rules WHERE household = ?', [hh])[0]?.cnt || 0; current = Math.round(rv / tv * 100); progress = current; break;
+      }
+      return { ...c, current_value: current, progress: Math.max(0, progress), is_completed: progress >= 100 && daysElapsed >= 28 };
+    });
+    res.json({ challenges });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── WEEKLY RECAP ───────────────────────────────────────────────
+app.get('/api/weekly-recap', (req, res) => {
+  const { userId = 'christian' } = req.query;
+  try {
+    const hh = getHousehold(userId);
+    const now = new Date();
+    const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+    const prevWeekStart = new Date(weekAgo); prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+    const thisWeek = all('SELECT * FROM transactions WHERE household = ? AND date >= ? AND date <= ?', [hh, weekAgo.toISOString().split('T')[0], now.toISOString().split('T')[0]]);
+    const prevWeek = all('SELECT * FROM transactions WHERE household = ? AND date >= ? AND date <= ?', [hh, prevWeekStart.toISOString().split('T')[0], weekAgo.toISOString().split('T')[0]]);
+    const thisExp = thisWeek.filter(t => t.type === 'expense');
+    const prevExp = prevWeek.filter(t => t.type === 'expense');
+    const thisTotal = thisExp.reduce((a,t) => a + t.amount, 0);
+    const prevTotal = prevExp.reduce((a,t) => a + t.amount, 0);
+    const change = prevTotal > 0 ? ((thisTotal - prevTotal) / prevTotal * 100) : 0;
+    const biggest = thisExp.sort((a,b) => b.amount - a.amount)[0];
+    const vendorCounts = {}; thisExp.forEach(t => { vendorCounts[t.desc] = (vendorCounts[t.desc]||0) + 1; });
+    const topVendor = Object.entries(vendorCounts).sort((a,b) => b[1] - a[1])[0];
+    res.json({ period: { start: weekAgo.toISOString().split('T')[0], end: now.toISOString().split('T')[0] }, total_spent: thisTotal, prev_total_spent: prevTotal, change_pct: change, transaction_count: thisWeek.length, biggest_purchase: biggest ? { vendor: biggest.desc, amount: biggest.amount, date: biggest.date } : null, most_frequent_vendor: topVendor ? { vendor: topVendor[0], count: topVendor[1] } : null });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // Serve frontend

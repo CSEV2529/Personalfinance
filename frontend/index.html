@@ -291,6 +291,19 @@ body::after{display:none;}
 .income-tab{flex:1;padding:10px;text-align:center;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.5px;color:var(--text-muted);cursor:pointer;background:var(--surface);transition:all .15s;}
 .income-tab.active{color:var(--gold);background:var(--surface2);}
 
+/* ─── VENDOR WIZARD ──────────────────────────────────────── */
+.wizard-vendor-row{padding:14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);margin-bottom:8px;transition:all .2s;}
+.wizard-vendor-row.done{border-color:rgba(52,211,153,.3);background:linear-gradient(135deg,rgba(52,211,153,.05),var(--surface));}
+.wizard-pill{padding:6px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;white-space:nowrap;cursor:pointer;transition:all .15s;flex-shrink:0;}
+.wizard-pill:active{transform:scale(.95);}
+.wizard-pill.selected{background:rgba(245,197,24,.12);border-color:var(--gold);color:var(--gold);font-weight:500;}
+
+/* ─── STREAK PILL ────────────────────────────────────────── */
+.streak-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.25);font-family:'DM Mono',monospace;font-size:11px;color:var(--orange);}
+
+/* ─── PACE MARKER ────────────────────────────────────────── */
+.pace-marker{position:absolute;top:-2px;width:2px;height:12px;background:var(--text-muted);border-radius:1px;transform:translateX(-50%);opacity:.5;}
+
 /* ─── CATEGORY PICKER (vertical list) ────────────────────── */
 .catp-row{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:6px;cursor:pointer;transition:all .15s;}
 .catp-row:active{transform:scale(.98);background:var(--surface-elevated);}
@@ -362,8 +375,8 @@ body::after{display:none;}
 .hscroll-outer::-webkit-scrollbar{display:none;}
 .hscroll{display:flex;gap:12px;width:max-content;}
 .kcard{
-  width:155px;
-  border-radius:18px;padding:18px;position:relative;overflow:hidden;flex-shrink:0;
+  width:auto;min-width:0;
+  border-radius:14px;padding:14px 16px;position:relative;overflow:hidden;flex-shrink:0;
   transition:transform .2s,box-shadow .2s;
   border:1px solid transparent;
   /* Colored via --kc custom property set inline */
@@ -376,7 +389,7 @@ body::after{display:none;}
 .kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--kc,var(--gold));border-radius:18px 18px 0 0;opacity:.8;}
 .kcard::after{display:none;}
 .kcard-lbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;position:relative;}
-.kcard-val{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--kc,var(--text));position:relative;line-height:1.1;}
+.kcard-val{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--kc,var(--text));position:relative;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .kcard-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:6px;position:relative;}
 
 /* ─── DASHBOARD GRID (desktop) ─────────────────────────────── */
@@ -839,6 +852,7 @@ body::after{display:none;}
     <div class="topbar-left">
       <div class="logo-mark">Ledger</div>
       <div class="net-pill" id="net-pill">+$0.00</div>
+      <div class="streak-pill" id="streak-pill" style="display:none"><span style="font-size:13px">🔥</span><span id="streak-count">0</span></div>
     </div>
     <div class="topbar-right">
       <div class="user-chip" id="user-chip" onclick="openUserPicker()">
@@ -894,6 +908,10 @@ body::after{display:none;}
         </div>
         <div class="kpi-grid" id="kpi-cards"></div>
         <div class="quick-actions" id="quick-actions"></div>
+
+        <div class="sec-head"><div class="sec-title">Challenges</div></div>
+        <div class="kpi-grid" id="challenge-cards" style="margin-bottom:20px"></div>
+        <div id="health-score-container"></div>
 
         <div class="sec-head"><div class="sec-title">Biggest Expenses</div><div class="sec-link" id="top-toggle" onclick="toggleTop20()">Show all &rarr;</div></div>
         <div class="tx-list" id="top-expenses"></div>
@@ -1276,25 +1294,17 @@ let selectedMonth = new Date();
 const $ = id => document.getElementById(id);
 const money = n => '$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 function stats(txs){
-  // Amount from DB: positive = money OUT (expense), negative = money IN (income)
-  // Type is a classification label only — the raw amount determines the math
-  let income=0,expenses=0,transfers=0;
-  txs.forEach(t=>{
-    if(t.type==='transfer')return; // exclude transfers from income/expense totals
-    if(t.amount<0) income+=Math.abs(t.amount); // negative = money came in
-    else expenses+=t.amount; // positive = money went out
-  });
-  return{income,expenses,transfers,net:income-expenses};
+  const inc=txs.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0);
+  const exp=txs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+  return{income:inc,expenses:exp,net:inc-exp};
 }
 function truncate(str,len){return str&&str.length>len?str.substring(0,len)+'\u2026':str||'';}
 function monthTxs(txs,y,m){return txs.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});}
 function currentMonth(){return monthTxs(transactions,selectedMonth.getFullYear(),selectedMonth.getMonth());}
 function catBreak(txs){
-  // Use raw amount: positive = expense, negative = refund/income
   const m={};
-  txs.filter(t=>t.type!=='transfer'&&t.type!=='income').forEach(t=>{
-    m[t.cat]=(m[t.cat]||0)+t.amount; // positive adds, negative subtracts naturally
-  });
+  txs.filter(t=>t.type==='expense').forEach(t=>{m[t.cat]=(m[t.cat]||0)+t.amount;});
+  txs.filter(t=>t.type==='income').forEach(t=>{m[t.cat]=(m[t.cat]||0)-t.amount;});
   return m;
 }
 function userName(id){return users.find(u=>u.id===id)?.name||id;}
@@ -1348,6 +1358,7 @@ async function loadData(){
     if(ci)Object.assign(CAT_ICONS,JSON.parse(ci));
   }
   renderAll();
+  checkStreak();
 }
 
 async function syncAll(){
@@ -1432,20 +1443,15 @@ function renderHome(){
   const cards=[
     {lbl:'Income',val:money(s.income),color:'var(--green)',sub:'This month'},
     {lbl:'Expenses',val:money(s.expenses),color:'var(--red)',sub:'This month'},
-    {lbl:'Net Cash Flow',val:(s.net>=0?'+':'-')+money(s.net),color:'var(--blue)',sub:'Income - Expenses'},
+    {lbl:'Net Cash Flow',val:(s.net>=0?'+':'')+money(s.net),color:s.net>=0?'var(--green)':'var(--red)',sub:'Income - Expenses'},
     {lbl:'Avg/Day',val:money(dailyAvg),color:'var(--orange)',sub:`${daysElapsed} days`},
-    {lbl:'Savings',val:savings+'%',color:'var(--teal)',sub:'Of income'},
-    ...(accounts.length?[{lbl:'Bank Balance',val:money(totalBal),color:'var(--blue)',sub:`${accounts.length} accounts`}]:[{lbl:'Transactions',val:mtxs.length,color:'var(--gold)',sub:'This month'}]),
   ];
   $('kpi-cards').innerHTML=cards.map(c=>`<div class="kcard" style="--kc:${c.color}"><div class="kcard-lbl">${c.lbl}</div><div class="kcard-val">${c.val}</div><div class="kcard-sub">${c.sub}</div></div>`).join('');
 
   // Quick actions row
-  const refundTotal=mtxs.filter(t=>t.type==='refund').reduce((a,t)=>a+Math.abs(t.amount),0);
-  const refundCount=mtxs.filter(t=>t.type==='refund').length;
-  const transferTotal=mtxs.filter(t=>t.type==='transfer').reduce((a,t)=>a+Math.abs(t.amount),0);
+  const transferTotal=mtxs.filter(t=>t.type==='transfer').reduce((a,t)=>a+t.amount,0);
   const transferCount=mtxs.filter(t=>t.type==='transfer').length;
   let qaCards='';
-  if(refundCount)qaCards+=`<div class="qa-card" onclick="openTypeSheet('refund')"><div class="qa-card-icon">\u21A9</div><div><div class="qa-card-label">Refunds (${refundCount})</div><div class="qa-card-value" style="color:var(--teal)">+${money(refundTotal)}</div></div></div>`;
   if(transferCount)qaCards+=`<div class="qa-card" onclick="openTypeSheet('transfer')"><div class="qa-card-icon">\u21C4</div><div><div class="qa-card-label">Transfers (${transferCount})</div><div class="qa-card-value" style="color:var(--purple)">${money(transferTotal)}</div></div></div>`;
   qaCards+=`<div class="qa-card" onclick="openRecurringModule()"><div class="qa-card-icon">\u{1F504}</div><div><div class="qa-card-label">Recurring</div><div class="qa-card-value" style="color:var(--blue)">View All</div></div></div>`;
   $('quick-actions').innerHTML=qaCards;
@@ -1462,6 +1468,10 @@ function renderHome(){
 
   // Expense category bar chart
   renderExpenseBarChart($('expense-bars-section'));
+
+  // Gamification
+  renderHealthScore();
+  renderChallenges();
 
   // Top 20 biggest expenses
   const top20 = currentMonth()
@@ -1591,17 +1601,23 @@ function renderReports(){
   // MoM vendor trends
   renderVendorTrends($('reports-vendor-trends'));
 
-  // Monthly P&L
+  // Monthly P&L — show income, expenses, and net per row
   const rows=[];
   for(let i=11;i>=0;i--){
     const d=new Date(now.getFullYear(),now.getMonth()-i,1);
     const txs=monthTxs(transactions,d.getFullYear(),d.getMonth());
     const ms=stats(txs);
-    const rate=ms.income>0?Math.round((ms.net/ms.income)*100):0;
+    const rate=ms.income>0?Math.round((ms.net/ms.income)*100):(ms.expenses>0?-100:0);
     rows.push(`<div class="rrow">
       <div class="rmonth">${d.toLocaleString('default',{month:'short'})} ${d.getFullYear()}</div>
-      <div class="rbar-wrap"><div class="rbar"><div class="rbar-fill" style="width:${Math.max(0,Math.min(100,rate))}%"></div></div></div>
-      <div class="rright"><div class="rnet" style="color:${ms.net>=0?'var(--green)':'var(--red)'}">${ms.net>=0?'+':'-'}${money(ms.net)}</div><div class="rrate">${ms.income>0?rate+'% saved':'\u2014'}</div></div>
+      <div style="flex:1;text-align:center">
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green)">+${money(ms.income)}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--red)">-${money(ms.expenses)}</div>
+      </div>
+      <div class="rright">
+        <div class="rnet" style="color:${ms.net>=0?'var(--green)':'var(--red)'}">${ms.net>=0?'+':'-'}${money(Math.abs(ms.net))}</div>
+        <div class="rrate">${ms.income>0?rate+'% saved':(ms.expenses>0?'No income':'\u2014')}</div>
+      </div>
     </div>`);
   }
   $('report-panel').innerHTML=rows.join('');
@@ -1791,8 +1807,7 @@ function onTxRowClick(e,id){
 function txRows(txs,deletable){
   if(!txs.length)return`<div class="empty-msg">No transactions yet</div>`;
   return txs.map(t=>{
-    const sign=t.amount<0?1:-1; // negative amount = money in = positive display
-    const isPos=sign===1;
+    const isIncome=t.type==='income';
     return`<div class="tx-row ${selectedTxIds.has(t.id)?'selected':''}" data-txid="${t.id}" onclick="onTxRowClick(event,'${t.id}')">
       <div class="tx-check">\u2713</div>
       <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}22">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
@@ -1807,7 +1822,7 @@ function txRows(txs,deletable){
           <span class="tx-date">\u00B7 ${t.date}</span>
         </div>
       </div>
-      <div class="tx-amt ${t.pending?'pending':isPos?'pos':'neg'}">${isPos?'+':'-'}${money(Math.abs(t.amount))}${t.type==='refund'?' \u21A9':''}</div>
+      <div class="tx-amt ${t.pending?'pending':isIncome?'pos':'neg'}">${isIncome?'+':'-'}${money(t.amount)}</div>
     </div>`;}).join('');
 }
 
@@ -1942,13 +1957,12 @@ async function renderTxDetail(id){
     if(res.ok){const d=await res.json();tags=d.tags||[];notes=d.notes||'';if(d.original_sign!==undefined)t.original_sign=d.original_sign;if(d.status)t.status=d.status;}
   }catch(e){}
 
-  const sign=t.amount<0?1:-1; // negative amount = money in = positive display
-  const isPos=sign===1;
+  const isPos=t.type==='income';
   const account=accounts.find(a=>a.account_id===t.account_id);
 
   $('txdetail-body').innerHTML=`
     <div class="txd-vendor">${t.desc}</div>
-    <div class="txd-amount ${isPos?'pos':'neg'}">${isPos?'+':'-'}${money(Math.abs(t.amount))}</div>
+    <div class="txd-amount ${isPos?'pos':'neg'}">${isPos?'+':'-'}${money(t.amount)}</div>
     <div class="txd-meta">
       <span>${t.date}</span>
       ${t.pending?'<span class="txd-pending">Pending</span>':''}
@@ -1968,7 +1982,7 @@ async function renderTxDetail(id){
     <div class="txd-section">
       <div class="txd-label">Type</div>
       <div class="txd-type-row">
-        ${['expense','income','refund','transfer'].map(tp=>`
+        ${['expense','income','transfer'].map(tp=>`
           <div class="txd-type-btn ${t.type===tp?'active':''}" onclick="changeTxType('${id}','${tp}')">${tp}</div>
         `).join('')}
       </div>
@@ -2183,7 +2197,6 @@ function renderRecatSheet(){
   const typeButtons=`<div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;">
     <button class="recat-type-btn ${recatCurrentType==='expense'?'active':''}" onclick="applyType('expense')">Expense</button>
     <button class="recat-type-btn ${recatCurrentType==='income'?'active':''}" onclick="applyType('income')">Income</button>
-    <button class="recat-type-btn ${recatCurrentType==='refund'?'active':''}" onclick="applyType('refund')" style="--tc:var(--teal)">Refund</button>
     <button class="recat-type-btn ${recatCurrentType==='transfer'?'active':''}" onclick="applyType('transfer')" style="--tc:var(--purple)">Transfer</button>
   </div>
   <div class="flbl" style="margin-bottom:8px">CATEGORY</div>`;
@@ -2312,7 +2325,7 @@ async function applyRecat(newCat){
 function openTypeSheet(type){
   const txs=currentMonth().filter(t=>t.type===type).sort((a,b)=>b.amount-a.amount);
   const total=txs.reduce((a,t)=>a+Math.abs(t.amount),0);
-  const typeMap={income:{label:'Income',icon:'\u{1F4B0}'},expense:{label:'Expenses',icon:'\u{1F4B8}'},refund:{label:'Refunds',icon:'\u21A9'},transfer:{label:'Transfers',icon:'\u21C4'}};
+  const typeMap={income:{label:'Income',icon:'\u{1F4B0}'},expense:{label:'Expenses',icon:'\u{1F4B8}'},transfer:{label:'Transfers',icon:'\u21C4'}};
   const info=typeMap[type]||typeMap.expense;
   $('catdrill-title').textContent=info.label;
   openPage('page-catdrill',()=>{
@@ -2359,7 +2372,7 @@ function openVendorSheet(vendor){
     const body=$('catdrill-body');
     const txs=currentMonth().filter(t=>t.desc===vendor).sort((a,b)=>new Date(b.date)-new Date(a.date));
     const expTotal=txs.filter(t=>t.type==='expense').reduce((a,t)=>a+Math.abs(t.amount),0);
-    const refTotal=txs.filter(t=>t.type==='refund').reduce((a,t)=>a+Math.abs(t.amount),0);
+    const refTotal=0; // refund type eliminated
     const incTotal=txs.filter(t=>t.type==='income').reduce((a,t)=>a+Math.abs(t.amount),0);
     body.innerHTML=`
       <div class="catd-summary">
@@ -2510,9 +2523,9 @@ async function openCatDrill(cat){
     const body=$('catdrill-body');
     body.innerHTML='<div class="empty-msg">Loading...</div>';
     const mtxs=currentMonth().filter(t=>t.cat===cat);
-    const expenseTotal=mtxs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
-    const refundAbs=mtxs.filter(t=>t.type==='refund').reduce((a,t)=>a+Math.abs(t.amount),0);
-    const total=expenseTotal-refundAbs;
+    const debits=mtxs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
+    const credits=mtxs.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0);
+    const total=debits-credits;
     const budgetAmt=budgets[cat];
     const txCount=mtxs.length;
 
@@ -2611,7 +2624,7 @@ async function openReviewQueue(){
                 <div class="review-tx-amt">-${money(Math.abs(t.amount))}</div>
               </div>`).join('')}
             <div class="review-type-row">
-              ${['expense','income','refund','transfer'].map(tp=>`<div class="review-type-btn ${tp==='expense'?'active':''}" onclick="setReviewType('${esc}','${tp}',this)">${tp}</div>`).join('')}
+              ${['expense','income','transfer'].map(tp=>`<div class="review-type-btn ${tp==='expense'?'active':''}" onclick="setReviewType('${esc}','${tp}',this)">${tp}</div>`).join('')}
             </div>
             <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-bottom:6px">Apply to ALL ${v.cnt} transactions from this vendor:</div>
             <div class="review-pills">
@@ -2676,51 +2689,76 @@ async function resolveReviewDirect(vendor,category,type){
 async function openVendorWizard(){
   openPage('page-wizard',async()=>{
     const body=$('wizard-body');
-    body.innerHTML='<div class="empty-msg">Loading...</div>';
+    body.innerHTML='<div class="empty-msg">Loading vendors...</div>';
     try{
-      const res=await fetch(`${API}/api/wizard/uncategorized-vendors?userId=${currentUser}`);
-      const{vendors}=await res.json();
-      if(!vendors.length){body.innerHTML='<div class="empty-msg">All vendors categorized! 🎉</div>';return;}
-      const cats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].filter(c=>c!=='Transfer').sort();
+      const res=await fetch(`${API}/api/vendor-summary?userId=${currentUser}`);
+      const{vendors,stats}=await res.json();
       window._wizardAssignments={};
-      body.innerHTML=`<div style="margin-bottom:16px">
-        <div style="font-size:16px;font-weight:500;margin-bottom:4px">Let's organize your spending</div>
-        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim)">${vendors.length} vendors to categorize</div>
-        <div class="bar-track" style="margin-top:10px"><div class="bar-fill" id="wizard-progress" style="width:0%;background:var(--gold)"></div></div>
-      </div>`+vendors.map(v=>`
-        <div class="review-vendor" id="wz-${v.vendor.replace(/[^a-z0-9]/gi,'_')}">
-          <div class="review-vendor-top"><div>
-            <div class="review-vendor-name">${v.vendor}</div>
-            <div class="review-vendor-info">${v.cnt} txns · ${money(v.total)} · currently: ${v.current_cat}</div>
-          </div></div>
-          <div class="review-pills">
-            ${cats.slice(0,6).map(c=>`<div class="review-pill" onclick="wizardAssign('${v.vendor.replace(/'/g,"\\'")}','${c}',this)">${CAT_ICONS[c]||'📌'} ${c}</div>`).join('')}
-            <div class="review-pill more" onclick="wizardAssignCustom('${v.vendor.replace(/'/g,"\\'")}')")">More...</div>
-          </div>
-        </div>`).join('')+`
-        <button class="sht-btn primary" style="width:100%;margin-top:16px" onclick="submitWizard()">Save All</button>`;
-    }catch(e){body.innerHTML='<div class="empty-msg">Failed to load</div>';}
+      window._wizardVendors=vendors;
+      const cats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].filter(c=>c!=='Transfer'&&c!=='Other').sort();
+      const withRules=vendors.filter(v=>v.has_rule);
+      const noRule=vendors.filter(v=>!v.has_rule);
+      const preAccepted=noRule.filter(v=>v.plaid_category&&v.plaid_category!=='Other'&&v.tx_count>=2);
+      const needsReview=noRule.filter(v=>!v.plaid_category||v.plaid_category==='Other'||v.tx_count<2);
+      const highPriority=needsReview.filter(v=>v.total_spend>=25||v.tx_count>=2);
+      const lowPriority=needsReview.filter(v=>v.total_spend<25&&v.tx_count<2);
+      preAccepted.forEach(v=>{const m=mapCategory(v.plaid_category);if(m&&m!=='Other')window._wizardAssignments[v.vendor]={category:m,type:v.inferred_type||'expense',auto:true};});
+
+      let html=`<div style="text-align:center;padding:16px 0;border-bottom:1px solid var(--border);margin-bottom:16px">
+        <div style="font-family:'Playfair Display',serif;font-size:22px;margin-bottom:4px">Organize Your Spending</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted)">${stats.total_vendors} vendors \u00B7 ${money(stats.total_spend)} total</div>
+        <div class="bar-track" style="margin:12px 20px 0"><div class="bar-fill" id="wizard-progress" style="width:${stats.coverage_pct}%;background:var(--gold)"></div></div>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--gold);margin-top:6px" id="wizard-progress-label">${stats.coverage_pct}% categorized</div>
+      </div>`;
+      if(highPriority.length){html+=`<div class="txd-label">${highPriority.length} vendors need your input</div>`;html+=highPriority.map(v=>wizardVendorRow(v,cats)).join('');}
+      if(preAccepted.length){html+=`<div class="txd-label" style="color:var(--green);margin-top:16px">\u2713 ${preAccepted.length} auto-categorized</div>`;html+=preAccepted.map(v=>wizardVendorRow(v,cats,true)).join('');}
+      if(lowPriority.length){html+=`<div class="txd-label" style="margin-top:16px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">${lowPriority.length} small vendors \u25BE</div><div style="display:none">${lowPriority.map(v=>wizardVendorRow(v,cats)).join('')}</div>`;}
+      if(withRules.length){html+=`<div class="txd-label" style="margin-top:16px;cursor:pointer;color:var(--text-muted)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">\u2713 ${withRules.length} already categorized \u25BE</div><div style="display:none">${withRules.map(v=>`<div style="padding:10px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);margin-bottom:6px;opacity:.6;display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">${v.vendor}</div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted)">${v.tx_count} txns \u00B7 ${v.rule_category}</div></div><div style="color:var(--green)">\u2713</div></div>`).join('')}</div>`;}
+      html+=`<div style="position:sticky;bottom:0;padding:16px 0;background:linear-gradient(0deg,var(--bg) 80%,transparent)"><button class="sht-btn primary" style="width:100%" onclick="submitVendorWizard()">Save All Assignments</button></div>`;
+      body.innerHTML=html;
+    }catch(e){body.innerHTML='<div class="empty-msg">Failed: '+e.message+'</div>';}
   });
 }
 
-function wizardAssign(vendor,category,el){
-  window._wizardAssignments[vendor]=category;
-  el.closest('.review-vendor').style.opacity='.5';
-  el.closest('.review-vendor').style.borderColor='var(--gold)';
-  // Update progress
-  const total=document.querySelectorAll('#wizard-body .review-vendor').length;
-  const done=Object.keys(window._wizardAssignments).length;
-  const pEl=$('wizard-progress');if(pEl)pEl.style.width=(done/total*100)+'%';
+function wizardVendorRow(v,cats,preAccepted){
+  const existing=window._wizardAssignments[v.vendor];
+  const currentCat=existing?.category||(preAccepted?mapCategory(v.plaid_category):null);
+  const esc=v.vendor.replace(/'/g,"\\'");
+  return`<div class="wizard-vendor-row ${currentCat?'done':''}" data-vendor="${v.vendor.replace(/"/g,'&quot;')}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+      <div><div style="font-size:14px;font-weight:500">${v.vendor}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted)">${v.tx_count} txn${v.tx_count!==1?'s':''} ${v.plaid_category&&v.plaid_category!=='Other'?'\u00B7 Plaid: '+v.plaid_category:''}</div></div>
+      <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--red)">${money(v.total_spend)}</div>
+    </div>
+    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none">
+      ${cats.map(c=>`<div class="wizard-pill ${currentCat===c?'selected':''}" onclick="wizardAssignVendor('${esc}','${c}',this)">${CAT_ICONS[c]||'\u{1F4CC}'} ${c}</div>`).join('')}
+    </div>
+  </div>`;
 }
 
-async function submitWizard(){
-  const assignments=Object.entries(window._wizardAssignments).map(([vendor,category])=>({vendor,category,type:'expense'}));
+function wizardAssignVendor(vendor,category,el){
+  const v=window._wizardVendors?.find(x=>x.vendor===vendor);
+  window._wizardAssignments[vendor]={category,type:v?.inferred_type||'expense'};
+  const row=el.closest('.wizard-vendor-row');
+  row.classList.add('done');
+  row.querySelectorAll('.wizard-pill').forEach(p=>p.classList.remove('selected'));
+  el.classList.add('selected');
+  const total=window._wizardVendors?.length||1;
+  const done=Object.keys(window._wizardAssignments).length;
+  const pct=Math.round(done/total*100);
+  const fill=$('wizard-progress');if(fill)fill.style.width=pct+'%';
+  const label=$('wizard-progress-label');if(label)label.textContent=pct+'% categorized';
+}
+
+async function submitVendorWizard(){
+  const assignments=Object.entries(window._wizardAssignments).filter(([,d])=>d.category).map(([vendor,d])=>({vendor,category:d.category,type:d.type||'expense'}));
   if(!assignments.length){alert('No assignments to save');return;}
   try{
-    await fetch(`${API}/api/wizard/bulk-assign`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,assignments})});
-    assignments.forEach(a=>{transactions.filter(t=>t.desc===a.vendor).forEach(t=>{t.cat=a.category;t.reviewed=1;});});
+    const res=await fetch(`${API}/api/vendor-rules/bulk`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,assignments})});
+    const result=await res.json();
+    if(!result.success)throw new Error(result.error||'Save failed');
     closePage('page-wizard');
-    renderAll();
+    await loadData();
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -2729,7 +2767,7 @@ async function openIncomeBreakdown(){
   openPage('page-income',async()=>{
     const body=$('income-body');
     body.innerHTML='<div class="empty-msg">Loading...</div>';
-    const mtxs=currentMonth().filter(t=>t.type==='income'||t.type==='refund');
+    const mtxs=currentMonth().filter(t=>t.type==='income');
     const total=mtxs.reduce((a,t)=>a+Math.abs(t.amount),0);
     // By category
     const byCat={};
@@ -2926,6 +2964,61 @@ async function dismissRecurring(vendor,el){
   }catch(e){alert('Error: '+e.message);}
 }
 
+// ─── GAMIFICATION ────────────────────────────────────────────────
+async function checkStreak(){
+  try{
+    const res=await fetch(`${API}/api/streak/check-in?userId=${currentUser}`,{method:'POST'});
+    const data=await res.json();
+    if(data.streak>0){$('streak-pill').style.display='inline-flex';$('streak-count').textContent=data.streak;}
+  }catch(e){}
+}
+
+async function renderHealthScore(){
+  try{
+    const res=await fetch(`${API}/api/health-score?userId=${currentUser}`);
+    const{score,color}=await res.json();
+    const circ=2*Math.PI*42;
+    const offset=circ-(score/100)*circ;
+    $('health-score-container').innerHTML=`<div style="text-align:center;margin:12px 0">
+      <svg viewBox="0 0 100 100" width="80" height="80">
+        <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border2)" stroke-width="5"/>
+        <circle cx="50" cy="50" r="42" fill="none" stroke="${color}" stroke-width="5"
+          stroke-dasharray="${circ}" stroke-dashoffset="${offset}" stroke-linecap="round"
+          transform="rotate(-90 50 50)" style="transition:stroke-dashoffset 1.5s cubic-bezier(.4,0,.2,1)"/>
+        <text x="50" y="46" text-anchor="middle" fill="var(--text)" font-size="20" font-family="Playfair Display,serif" font-weight="700">${score}</text>
+        <text x="50" y="60" text-anchor="middle" fill="var(--text-muted)" font-size="7" font-family="DM Mono,monospace" letter-spacing="1">HEALTH</text>
+      </svg>
+    </div>`;
+  }catch(e){}
+}
+
+async function renderChallenges(){
+  try{
+    const res=await fetch(`${API}/api/challenges?userId=${currentUser}`);
+    const{challenges}=await res.json();
+    if(!challenges.length){$('challenge-cards').innerHTML='';return;}
+    $('challenge-cards').innerHTML=challenges.map(c=>{
+      const ring=Math.round(c.progress);
+      const color=c.is_completed?'var(--green)':ring>60?'var(--gold)':'var(--orange)';
+      const circ=2*Math.PI*16;
+      return`<div class="kcard" style="--kc:${color};padding:14px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <svg viewBox="0 0 40 40" width="36" height="36" style="flex-shrink:0">
+            <circle cx="20" cy="20" r="16" fill="none" stroke="var(--border2)" stroke-width="3"/>
+            <circle cx="20" cy="20" r="16" fill="none" stroke="${color}" stroke-width="3"
+              stroke-dasharray="${circ}" stroke-dashoffset="${circ*(1-ring/100)}"
+              stroke-linecap="round" transform="rotate(-90 20 20)"/>
+            ${c.is_completed?'<text x="20" y="23" text-anchor="middle" fill="var(--green)" font-size="14">\u2713</text>'
+              :`<text x="20" y="23" text-anchor="middle" fill="var(--text)" font-size="9" font-family="DM Mono,monospace">${ring}%</text>`}
+          </svg>
+          <div><div style="font-size:12px;font-weight:500">${c.title}</div>
+            <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-top:2px">${c.description}</div></div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){}
+}
+
 // ─── PLAID ────────────────────────────────────────────────────────
 function plaidCallbacks(){
   return {
@@ -2987,8 +3080,7 @@ async function submitTx(){
   const cat=$('f-cat').value;
   const date=$('f-date').value;
   if(!desc||!rawAmt||!date){alert('Please fill all fields.');return;}
-  // Store with Plaid convention: positive=expense, negative=income
-  const amt=(type==='income'||type==='refund')?-Math.abs(rawAmt):Math.abs(rawAmt);
+  const amt=Math.abs(rawAmt); // always positive — type determines sign in stats
   try{
     const res=await fetch(`${API}/api/transactions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,desc,amount:amt,type,cat,date})});
     if(!res.ok)throw new Error('Save failed');

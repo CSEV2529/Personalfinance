@@ -4,7 +4,7 @@
  * Transactions always try network first, fall back to cache.
  */
 
-const CACHE = 'ledger-v43';
+const CACHE = 'ledger-v50';
 const SHELL = [
   '/',
   '/manifest.json',
