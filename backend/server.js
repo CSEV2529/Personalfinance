@@ -1166,21 +1166,63 @@ app.get('/api/spending/by-vendor', async (req, res) => {
 // ─── AI CHAT ─────────────────────────────────────────────────────
 const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
 
+// ─── AI AGENT TOOLS ─────────────────────────────────────────────
+const agentTools = [
+  { name: 'change_vendor_category', description: 'Change the category for ALL transactions from a specific vendor. This creates a vendor rule so future transactions are also categorized.', input_schema: { type: 'object', properties: { vendor: { type: 'string', description: 'Exact vendor name as it appears in transactions' }, category: { type: 'string', description: 'Target category name (e.g., Food, Shopping, Housing)' } }, required: ['vendor', 'category'] } },
+  { name: 'set_budget', description: 'Set or update the monthly budget amount for a category', input_schema: { type: 'object', properties: { category: { type: 'string', description: 'Category name' }, amount: { type: 'number', description: 'Monthly budget amount in dollars' } }, required: ['category', 'amount'] } },
+  { name: 'create_category', description: 'Create a new spending category', input_schema: { type: 'object', properties: { name: { type: 'string', description: 'New category name' }, icon: { type: 'string', description: 'Emoji icon for the category' }, budget: { type: 'number', description: 'Optional monthly budget amount' } }, required: ['name'] } },
+  { name: 'get_vendor_transactions', description: 'Look up all transactions from a specific vendor', input_schema: { type: 'object', properties: { vendor: { type: 'string', description: 'Vendor name to search for (partial match supported)' } }, required: ['vendor'] } },
+];
+
+async function executeAgentTool(toolName, toolInput, hh, userId) {
+  switch (toolName) {
+    case 'change_vendor_category': {
+      const { vendor, category } = toolInput;
+      await pool.query(`INSERT INTO vendor_rules (household, vendor, category, type, updated_at) VALUES ($1,$2,$3,'expense',NOW()) ON CONFLICT (household, vendor) DO UPDATE SET category=EXCLUDED.category, updated_at=NOW()`, [hh, vendor, category]);
+      const r = await pool.query('UPDATE transactions SET cat=$1, reviewed=TRUE WHERE household=$2 AND "desc"=$3', [category, hh, vendor]);
+      await pool.query('INSERT INTO categories (id, household) VALUES ($1,$2) ON CONFLICT DO NOTHING', [category, hh]);
+      return `Changed ${r.rowCount} transactions from "${vendor}" to category "${category}". Future transactions will also be categorized automatically.`;
+    }
+    case 'set_budget': {
+      const { category, amount } = toolInput;
+      await pool.query(`INSERT INTO categories (id, household, budget_amount) VALUES ($1,$2,$3) ON CONFLICT (id, household) DO UPDATE SET budget_amount=EXCLUDED.budget_amount`, [category, hh, amount]);
+      return `Set monthly budget for "${category}" to $${amount.toFixed(2)}.`;
+    }
+    case 'create_category': {
+      const { name, icon, budget } = toolInput;
+      await pool.query(`INSERT INTO categories (id, household, icon, budget_amount) VALUES ($1,$2,$3,$4) ON CONFLICT (id, household) DO UPDATE SET icon=COALESCE(EXCLUDED.icon, categories.icon), budget_amount=COALESCE(EXCLUDED.budget_amount, categories.budget_amount)`, [name, hh, icon || '📌', budget || 0]);
+      return `Created category "${name}"${icon ? ' with icon ' + icon : ''}${budget ? ' and $' + budget + '/month budget' : ''}.`;
+    }
+    case 'get_vendor_transactions': {
+      const { vendor } = toolInput;
+      const txs = await all(`SELECT "desc", amount, type, cat, date FROM transactions WHERE household=$1 AND "desc" ILIKE $2 ORDER BY date DESC LIMIT 20`, [hh, `%${vendor}%`]);
+      if (!txs.length) return `No transactions found matching "${vendor}".`;
+      return txs.map(t => `${t.date} | ${t.type} | ${t.cat} | ${t.desc} | $${parseFloat(t.amount).toFixed(2)}`).join('\n');
+    }
+    default: return 'Unknown tool';
+  }
+}
+
 app.post('/api/chat', async (req, res) => {
   if (!anthropic) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-  const { userId = 'christian', message, history = [] } = req.body;
-  if (!message) return res.status(400).json({ error: 'Missing message' });
+  const { userId = 'christian', message, history = [], confirmAction } = req.body;
+  if (!message && !confirmAction) return res.status(400).json({ error: 'Missing message' });
 
   try {
     const hh = await getHousehold(userId);
+
+    // If confirming a pending action, execute it
+    if (confirmAction) {
+      const result = await executeAgentTool(confirmAction.tool, confirmAction.input, hh, userId);
+      return res.json({ reply: `✅ Done! ${result}`, actionExecuted: true });
+    }
+
     const now = new Date();
     const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
     const lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
     const monthEnd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
 
-    // Gather financial context
-    const monthTxs = await all(`SELECT "desc", amount, type, cat, date FROM transactions
-      WHERE household = ? AND date >= ? AND date <= ? ORDER BY date DESC`, [hh, monthStart, monthEnd]);
+    const monthTxs = await all(`SELECT "desc", amount, type, cat, date FROM transactions WHERE household = ? AND date >= ? AND date <= ? ORDER BY date DESC`, [hh, monthStart, monthEnd]);
     const income = monthTxs.filter(t=>t.type==='income').reduce((a,t)=>a+parseFloat(t.amount),0);
     const expenses = monthTxs.filter(t=>t.type==='expense').reduce((a,t)=>a+parseFloat(t.amount),0);
     const catSpend = {};
@@ -1188,47 +1230,44 @@ app.post('/api/chat', async (req, res) => {
     const vendorSpend = {};
     monthTxs.filter(t=>t.type==='expense').forEach(t=>{ vendorSpend[t.desc]=(vendorSpend[t.desc]||0)+parseFloat(t.amount); });
     const topVendors = Object.entries(vendorSpend).sort((a,b)=>b[1]-a[1]).slice(0,15);
-    const budgetRows = await all('SELECT category, amount FROM budgets WHERE household = ?', [hh]);
-    const accts = await all(`SELECT a.name, a.type, a.subtype, a.balance FROM accounts a
-      JOIN users u ON a.user_id = u.id WHERE u.household = ?`, [hh]);
-    const recentTxs = monthTxs.slice(0, 30);
+    const budgetRows = await all('SELECT id as category, budget_amount as amount FROM categories WHERE household = ? AND budget_amount > 0', [hh]);
+    const categories = await all('SELECT id, icon, budget_amount FROM categories WHERE household = ? AND is_active = TRUE', [hh]);
+    const accts = await all(`SELECT a.name, a.type, a.subtype, a.balance FROM accounts a JOIN users u ON a.user_id = u.id WHERE u.household = ?`, [hh]);
 
-    const context = `
-## Financial Data for ${now.toLocaleString('default',{month:'long',year:'numeric'})}
-
+    const context = `## Financial Data for ${now.toLocaleString('default',{month:'long',year:'numeric'})}
 ### Summary
-- Income: $${income.toFixed(2)}
-- Expenses: $${expenses.toFixed(2)}
-- Net: $${(income-expenses).toFixed(2)}
-- Savings rate: ${income>0?((income-expenses)/income*100).toFixed(0):'0'}%
-- Total transactions: ${monthTxs.length}
-
+- Income: $${income.toFixed(2)} | Expenses: $${expenses.toFixed(2)} | Net: $${(income-expenses).toFixed(2)}
+- Savings rate: ${income>0?((income-expenses)/income*100).toFixed(0):'0'}% | Transactions: ${monthTxs.length}
 ### Spending by Category
 ${Object.entries(catSpend).sort((a,b)=>b[1]-a[1]).map(([c,a])=>`- ${c}: $${a.toFixed(2)}`).join('\n')}
-
-### Budgets vs Actual
-${budgetRows.map(b=>{const spent=catSpend[b.category]||0;return `- ${b.category}: $${spent.toFixed(2)} / $${parseFloat(b.amount).toFixed(2)} (${(spent/parseFloat(b.amount)*100).toFixed(0)}%)`;}).join('\n')}
-
-### Top Vendors
+### Budgets
+${budgetRows.map(b=>{const spent=catSpend[b.category]||0;return `- ${b.category}: $${spent.toFixed(2)}/$${parseFloat(b.amount).toFixed(2)} (${(spent/parseFloat(b.amount)*100).toFixed(0)}%)`;}).join('\n')}
+### Available Categories
+${categories.map(c=>`${c.icon||'📌'} ${c.id}`).join(', ')}
+### Top 15 Vendors
 ${topVendors.map(([v,a])=>`- ${v}: $${a.toFixed(2)}`).join('\n')}
-
 ### Accounts
-${accts.length?accts.map(a=>`- ${a.name} (${a.type}/${a.subtype}): $${(parseFloat(a.balance)||0).toFixed(2)}`).join('\n'):'No linked accounts'}
+${accts.length?accts.map(a=>`- ${a.name} (${a.type}): $${(parseFloat(a.balance)||0).toFixed(2)}`).join('\n'):'No linked accounts'}
+### Recent Transactions (last 20)
+${monthTxs.slice(0,20).map(t=>`- ${t.date} | ${t.type} | ${t.cat} | ${t.desc} | $${parseFloat(t.amount).toFixed(2)}`).join('\n')}`;
 
-### Recent Transactions (last 30)
-${recentTxs.map(t=>`- ${t.date} | ${t.type} | ${t.cat} | ${t.desc} | $${parseFloat(t.amount).toFixed(2)}`).join('\n')}
-`;
-
-    const systemPrompt = `You are a helpful personal finance assistant for the Spenziero household. You have access to their real financial data below. Give concise, actionable advice. Use specific numbers from their data. Be conversational but brief.
+    const systemPrompt = `You are Obsidian, an AI finance assistant for the Spenziero household. You have real financial data and can take actions on their behalf.
 
 ${context}
 
-When answering:
-- Reference actual numbers and transactions
-- Be specific about where money is going
-- If asked about budgets, compare actual vs budgeted
-- Keep responses under 200 words unless detail is needed
-- Use $ formatting for amounts`;
+CAPABILITIES:
+- Answer questions about spending, income, budgets, and trends
+- Change vendor categories (e.g., "move Amazon to Shopping")
+- Set or update budgets (e.g., "set food budget to $1000")
+- Create new categories
+- Look up vendor transaction history
+
+RULES:
+- When the user asks you to make a change, USE THE APPROPRIATE TOOL. Don't just describe what to do.
+- Be concise — under 150 words unless detail is needed
+- Reference specific numbers from their data
+- Use $ formatting for amounts
+- Be conversational and helpful`;
 
     const messages = [...history.slice(-10), { role: 'user', content: message }];
 
@@ -1237,9 +1276,42 @@ When answering:
       max_tokens: 1024,
       system: systemPrompt,
       messages,
+      tools: agentTools,
     });
 
-    res.json({ reply: response.content[0].text });
+    // Check if Claude wants to use a tool
+    const toolUse = response.content.find(c => c.type === 'tool_use');
+    if (toolUse) {
+      // Return the proposed action for user confirmation
+      const toolDescriptions = {
+        change_vendor_category: `Change all "${toolUse.input.vendor}" transactions to category "${toolUse.input.category}"`,
+        set_budget: `Set ${toolUse.input.category} budget to $${toolUse.input.amount}`,
+        create_category: `Create new category "${toolUse.input.name}"`,
+        get_vendor_transactions: `Look up transactions for "${toolUse.input.vendor}"`,
+      };
+
+      // For read-only tools, execute immediately
+      if (toolUse.name === 'get_vendor_transactions') {
+        const result = await executeAgentTool(toolUse.name, toolUse.input, hh, userId);
+        // Send result back to Claude for a human-friendly response
+        const followUp = await anthropic.messages.create({
+          model: 'claude-sonnet-4-6', max_tokens: 1024, system: systemPrompt,
+          messages: [...messages, { role: 'assistant', content: response.content }, { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUse.id, content: result }] }],
+        });
+        return res.json({ reply: followUp.content.find(c=>c.type==='text')?.text || result });
+      }
+
+      // For write tools, ask for confirmation
+      const textContent = response.content.find(c => c.type === 'text');
+      return res.json({
+        reply: (textContent?.text || '') + `\n\n⚡ **Proposed action:** ${toolDescriptions[toolUse.name] || toolUse.name}`,
+        pendingAction: { tool: toolUse.name, input: toolUse.input, description: toolDescriptions[toolUse.name] }
+      });
+    }
+
+    // No tool use — just a text response
+    const textContent = response.content.find(c => c.type === 'text');
+    res.json({ reply: textContent?.text || 'I couldn\'t generate a response.' });
   } catch (e) {
     console.error('Chat error:', e.message);
     res.status(500).json({ error: e.message });
