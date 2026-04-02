@@ -2,22 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0a0a0a">
-<title>Ledger</title>
+<meta name="theme-color" content="#050508">
+<title>Obsidian</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 <style>
 :root {
-  --bg:#0C0C0E; --surface:#141416; --surface2:#1C1C1F; --surface3:#242428;
-  --surface-elevated:#28282D;
-  --border:#2A2A2F; --border2:#3A3A42; --border-accent:rgba(245,197,24,.10);
-  --text:#EDEDEF; --text-secondary:#A0A0A8; --text-muted:#6B6B74; --text-dim:#A0A0A8;
-  --gold:#F5C518; --gold-dim:rgba(245,197,24,.08); --gold-border:rgba(245,197,24,.15);
+  --bg:#050508; --surface:#0B0B14; --surface2:#111120; --surface3:#1A1A2E;
+  --surface-elevated:#1A1A2E;
+  --border:#1C1C36; --border2:#2A2A4A; --border-accent:rgba(232,168,40,.10);
+  --text:#EEEDF7; --text-secondary:#A5A3C4; --text-muted:#7A78A0; --text-dim:#6E6C8E;
+  --gold:#E8A828; --gold-dim:rgba(232,168,40,.08); --gold-border:rgba(232,168,40,.15);
   --green:#34D399; --red:#F87171; --blue:#60A5FA;
   --purple:#A78BFA; --teal:#2DD4BF; --orange:#FB923C; --pink:#F472B6;
   --pending:#FB923C; --success:#34D399; --danger:#F87171; --info:#60A5FA; --unsure:#FBBF24;
@@ -94,6 +94,7 @@ body::after{display:none;}
 .page-overlay.open{transform:translateX(0);}
 #page-catdrill,#page-income,#page-recurring,#page-review,#page-wizard,#page-catmanage{z-index:210;}
 #page-txdetail{z-index:250;}
+#page-wizard{z-index:260;}
 .page-header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);}
 .page-back{display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;padding:8px;margin:-8px;letter-spacing:.5px;}
 .page-back:active{opacity:.6;}
@@ -131,7 +132,7 @@ body::after{display:none;}
 .txd-tag-x:hover{opacity:1;}
 .txd-tag-add{padding:5px 10px;border-radius:20px;border:1px dashed var(--border2);background:transparent;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;}
 .txd-tag-add:hover{border-color:var(--gold);color:var(--gold);}
-.txd-notes{width:100%;min-height:60px;padding:12px;border-radius:12px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical;outline:none;transition:border-color .15s;}
+.txd-notes{width:100%;min-height:60px;padding:12px;border-radius:12px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:16px;resize:vertical;outline:none;transition:border-color .15s;}
 .txd-notes:focus{border-color:var(--gold);}
 .txd-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:12px;background:var(--surface2);border:1px solid var(--border2);margin-bottom:8px;}
 .txd-toggle-label{font-size:13px;}
@@ -852,7 +853,7 @@ body::after{display:none;}
   <!-- TOPBAR -->
   <div class="topbar">
     <div class="topbar-left">
-      <div class="logo-mark">Ledger</div>
+      <div class="logo-mark">Obsidian</div>
       <div class="net-pill" id="net-pill">+$0.00</div>
       <div class="streak-pill" id="streak-pill" style="display:none"><span style="font-size:13px">🔥</span><span id="streak-count">0</span></div>
     </div>
@@ -1024,9 +1025,9 @@ body::after{display:none;}
 
   <!-- BOTTOM TABS / SIDEBAR -->
   <nav class="tabs">
-    <div class="sidebar-brand">Ledger</div>
+    <div class="sidebar-brand">Obsidian</div>
     <div class="tab on" id="tab-home" onclick="go('home')"><div class="tab-pip"></div><div class="tab-icon">&#x25C8;</div><div class="tab-lbl">Home</div></div>
-    <div class="tab" id="tab-ledger" onclick="go('ledger')"><div class="tab-pip"></div><div class="tab-icon">&#x21C4;</div><div class="tab-lbl">Ledger</div></div>
+    <div class="tab" id="tab-ledger" onclick="go('ledger')"><div class="tab-pip"></div><div class="tab-icon">&#x21C4;</div><div class="tab-lbl">Obsidian</div></div>
     <div class="tab" id="tab-budget" onclick="go('budget')"><div class="tab-pip"></div><div class="tab-icon">&#x25A6;</div><div class="tab-lbl">Budget</div></div>
     <div class="tab" id="tab-reports" onclick="go('reports')"><div class="tab-pip"></div><div class="tab-icon">&#x223F;</div><div class="tab-lbl">Reports</div></div>
     <div class="tab" id="tab-accounts" onclick="go('accounts')"><div class="tab-pip"></div><div class="tab-icon">&#x25C9;</div><div class="tab-lbl">Accounts</div></div>
@@ -1039,7 +1040,7 @@ body::after{display:none;}
   <div class="install-icon">&#x1F4F2;</div>
   <div class="install-text">
     <div class="install-title">Add to Home Screen</div>
-    <div class="install-sub">Install Ledger as an app</div>
+    <div class="install-sub">Install Obsidian as an app</div>
   </div>
   <div class="install-actions">
     <button class="sbtn ghost" onclick="dismissInstall()">Later</button>
@@ -1319,7 +1320,7 @@ function mapCategoryFrontend(plaidCat){
 const USER_INITIALS={christian:'C',wife:'M'};
 
 // ─── STATE ────────────────────────────────────────────────────────
-let currentUser = localStorage.getItem('ledger_user') || 'christian';
+let currentUser = localStorage.getItem('obsidian_user') || 'christian';
 let users = [{id:'christian',name:'Christian'},{id:'wife',name:'Marisol'}];
 let transactions = [];
 let accounts = [];
@@ -1383,19 +1384,19 @@ async function loadData(){
       });
     }
     // Cache in localStorage for offline
-    localStorage.setItem('ledger_cache_tx',JSON.stringify(transactions));
-    localStorage.setItem('ledger_cache_ac',JSON.stringify(accounts));
-    localStorage.setItem('ledger_cache_budgets',JSON.stringify(budgets));
-    localStorage.setItem('ledger_cache_icons',JSON.stringify(CAT_ICONS));
+    localStorage.setItem('obsidian_cache_tx',JSON.stringify(transactions));
+    localStorage.setItem('obsidian_cache_ac',JSON.stringify(accounts));
+    localStorage.setItem('obsidian_cache_budgets',JSON.stringify(budgets));
+    localStorage.setItem('obsidian_cache_icons',JSON.stringify(CAT_ICONS));
   }catch(e){
     // Offline — use cache
-    const ct=localStorage.getItem('ledger_cache_tx');
-    const ca=localStorage.getItem('ledger_cache_ac');
-    const cb=localStorage.getItem('ledger_cache_budgets');
+    const ct=localStorage.getItem('obsidian_cache_tx');
+    const ca=localStorage.getItem('obsidian_cache_ac');
+    const cb=localStorage.getItem('obsidian_cache_budgets');
     if(ct)transactions=JSON.parse(ct);
     if(ca)accounts=JSON.parse(ca);
     if(cb)budgets=JSON.parse(cb);
-    const ci=localStorage.getItem('ledger_cache_icons');
+    const ci=localStorage.getItem('obsidian_cache_icons');
     if(ci)Object.assign(CAT_ICONS,JSON.parse(ci));
   }
   renderAll();
@@ -1435,7 +1436,7 @@ async function checkWizardTrigger(){
 function renderAll(){
   renderTopbar();
   renderHome();
-  renderLedger();
+  renderObsidian();
   renderBudget();
   renderReports();
   renderAccounts();
@@ -1580,7 +1581,7 @@ function openVendorList(){
   });
 }
 
-function renderLedger(){
+function renderObsidian(){
   const mtxs=currentMonth();
   const sorted=[...mtxs].sort((a,b)=>new Date(b.date)-new Date(a.date));
   const s=stats(mtxs);
@@ -2335,7 +2336,7 @@ function closeEmojiPicker(){
 async function pickEmoji(emoji){
   if(emojiPickerCat){
     CAT_ICONS[emojiPickerCat]=emoji;
-    localStorage.setItem('ledger_cache_icons',JSON.stringify(CAT_ICONS));
+    localStorage.setItem('obsidian_cache_icons',JSON.stringify(CAT_ICONS));
     renderAll();
     try{
       await fetch(`${API}/api/categories/${encodeURIComponent(emojiPickerCat)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,icon:emoji})});
@@ -3197,9 +3198,9 @@ async function submitTx(){
     await loadData();
   }catch(e){
     // Offline fallback — queue locally
-    const local=JSON.parse(localStorage.getItem('ledger_queue')||'[]');
+    const local=JSON.parse(localStorage.getItem('obsidian_queue')||'[]');
     local.push({userId:currentUser,desc,amount:amt,type,cat,date});
-    localStorage.setItem('ledger_queue',JSON.stringify(local));
+    localStorage.setItem('obsidian_queue',JSON.stringify(local));
     closeSheet('sheet');
     transactions.push({id:'local_'+Date.now(),user_id:currentUser,user_name:userName(currentUser),desc,amount:amt,type,cat,date,source:'manual'});
     renderAll();
@@ -3214,11 +3215,11 @@ async function deleteTx(id){
 
 // Flush queued offline transactions when back online
 window.addEventListener('online',async()=>{
-  const queue=JSON.parse(localStorage.getItem('ledger_queue')||'[]');
+  const queue=JSON.parse(localStorage.getItem('obsidian_queue')||'[]');
   for(const tx of queue){
     try{await fetch(`${API}/api/transactions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(tx)});}catch{}
   }
-  localStorage.removeItem('ledger_queue');
+  localStorage.removeItem('obsidian_queue');
 });
 
 // ─── MONTH SELECTOR ──────────────────────────────────────────────
@@ -3345,7 +3346,7 @@ function openUserPicker(){
 }
 function switchUser(id){
   currentUser=id;
-  localStorage.setItem('ledger_user',id);
+  localStorage.setItem('obsidian_user',id);
   closeSheet('upicker');
   loadData();
 }
