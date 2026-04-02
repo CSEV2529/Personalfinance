@@ -246,9 +246,10 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
       let cat, type, reviewed;
 
       if (rule) {
-        // TIER 1: Vendor rule — highest priority
+        // TIER 1: Vendor rule — category only, type from Plaid
         cat = rule.cat;
-        type = rule.type;
+        // Type is ALWAYS determined by Plaid amount sign — NEVER from vendor rule
+        type = cat === 'Transfer' ? 'transfer' : (t.amount > 0 ? 'expense' : 'income');
         reviewed = true;
       } else {
         // TIER 2: Check if this transaction was manually reviewed
@@ -1042,8 +1043,9 @@ app.post('/api/review-queue/resolve', async (req, res) => {
        ON CONFLICT (household, vendor) DO UPDATE SET category = EXCLUDED.category, type = EXCLUDED.type`,
       [hh, vendor, category, type]
     );
-    const result = await run('UPDATE transactions SET cat=?, type=?, reviewed=TRUE WHERE household=? AND "desc"=?',
-      [category, type, hh, vendor]);
+    // Only update category — NEVER override Plaid-determined type
+    const result = await run('UPDATE transactions SET cat=?, reviewed=TRUE WHERE household=? AND "desc"=?',
+      [category, hh, vendor]);
     res.json({ success: true, updated: result.changes });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1076,8 +1078,8 @@ app.post('/api/wizard/bulk-assign', async (req, res) => {
           [hh, vendor, category, type]
         );
         const r = await client.query(
-          'UPDATE transactions SET cat=$1, type=$2, reviewed=TRUE WHERE household=$3 AND "desc"=$4',
-          [category, type, hh, vendor]
+          'UPDATE transactions SET cat=$1, reviewed=TRUE WHERE household=$2 AND "desc"=$3',
+          [category, hh, vendor]
         );
         totalUpdated += r.rowCount || 0;
       }
@@ -1299,8 +1301,8 @@ app.post('/api/vendor-rules/bulk', async (req, res) => {
           [hh, a.vendor, a.category, a.type || 'expense']
         );
         const result = await client.query(
-          'UPDATE transactions SET cat = $1, type = $2, reviewed = TRUE WHERE household = $3 AND "desc" = $4',
-          [a.category, a.type || 'expense', hh, a.vendor]
+          'UPDATE transactions SET cat = $1, reviewed = TRUE WHERE household = $2 AND "desc" = $3',
+          [a.category, hh, a.vendor]
         );
         totalUpdated += result.rowCount;
         await client.query(
