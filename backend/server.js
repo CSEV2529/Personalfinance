@@ -639,42 +639,38 @@ app.post('/api/categories', async (req, res) => {
 });
 
 app.put('/api/categories/:id', async (req, res) => {
-  const { userId = 'christian', name, icon, color, sort_order, type } = req.body;
+  const { userId = 'christian', name, icon, color, sort_order, type, budget_amount } = req.body;
   try {
     const hh = await getHousehold(userId);
-    const cat = await get('SELECT * FROM categories WHERE household=? AND id=?', [hh, req.params.id]);
-    if (!cat) return res.status(404).json({ error: 'Category not found' });
-    const updates = [];
-    const params = [];
-    let paramIdx = 0;
-    if (icon !== undefined) { paramIdx++; updates.push(`icon=$${paramIdx}`); params.push(icon); }
-    if (color !== undefined) { paramIdx++; updates.push(`color=$${paramIdx}`); params.push(color); }
-    if (sort_order !== undefined) { paramIdx++; updates.push(`sort_order=$${paramIdx}`); params.push(sort_order); }
-    if (type !== undefined) { paramIdx++; updates.push(`type=$${paramIdx}`); params.push(type); }
-    if (name && name !== req.params.id) {
+    const catId = req.params.id;
+
+    if (name && name !== catId) {
       // Rename: update all references
-      await run('UPDATE transactions SET cat=? WHERE household=? AND cat=?', [name, hh, req.params.id]);
-      await run('UPDATE budgets SET category=? WHERE household=? AND category=?', [name, hh, req.params.id]);
-      await run('UPDATE vendor_rules SET category=? WHERE household=? AND category=?', [name, hh, req.params.id]);
-      await run('DELETE FROM categories WHERE household=? AND id=?', [hh, req.params.id]);
+      await pool.query('UPDATE transactions SET cat=$1 WHERE household=$2 AND cat=$3', [name, hh, catId]);
+      await pool.query('UPDATE vendor_rules SET category=$1 WHERE household=$2 AND category=$3', [name, hh, catId]);
+      await pool.query('DELETE FROM categories WHERE household=$1 AND id=$2', [hh, catId]);
+      const oldCat = await pool.query('SELECT * FROM categories WHERE household=$1 AND id=$2', [hh, catId]);
+      const old = oldCat.rows[0] || {};
       await pool.query(
-        `INSERT INTO categories (id,household,icon,color,type,sort_order,is_active) VALUES ($1,$2,$3,$4,$5,$6,TRUE)
-         ON CONFLICT (id, household) DO UPDATE SET icon=EXCLUDED.icon, color=EXCLUDED.color, type=EXCLUDED.type, sort_order=EXCLUDED.sort_order, is_active=TRUE`,
-        [name, hh, icon||cat.icon, color||cat.color, type||cat.type, sort_order!==undefined?sort_order:cat.sort_order]
+        `INSERT INTO categories (id,household,icon,color,type,sort_order,is_active,budget_amount) VALUES ($1,$2,$3,$4,$5,$6,TRUE,$7)
+         ON CONFLICT (id, household) DO UPDATE SET icon=EXCLUDED.icon, color=EXCLUDED.color, type=EXCLUDED.type, sort_order=EXCLUDED.sort_order, is_active=TRUE, budget_amount=EXCLUDED.budget_amount`,
+        [name, hh, icon||old.icon||'📌', color||old.color||'#7a78a0', type||old.type||'expense', sort_order!==undefined?sort_order:(old.sort_order||0), budget_amount!==undefined?budget_amount:(old.budget_amount||0)]
       );
-    } else if (updates.length) {
-      paramIdx++; params.push(hh);
-      paramIdx++; params.push(req.params.id);
-      await pool.query(`UPDATE categories SET ${updates.join(',')} WHERE household=$${paramIdx-1} AND id=$${paramIdx}`, params);
-    }
-    // Sync icon to category_icons
-    const finalIcon = icon || cat.icon;
-    if (finalIcon) {
-      await pool.query(
-        `INSERT INTO category_icons (household,category,icon) VALUES ($1,$2,$3)
-         ON CONFLICT (household, category) DO UPDATE SET icon = EXCLUDED.icon`,
-        [hh, name || req.params.id, finalIcon]
-      );
+    } else {
+      // Simple update — build SET clause
+      const sets = [];
+      const vals = [];
+      let i = 0;
+      if (icon !== undefined) { i++; sets.push(`icon=$${i}`); vals.push(icon); }
+      if (color !== undefined) { i++; sets.push(`color=$${i}`); vals.push(color); }
+      if (sort_order !== undefined) { i++; sets.push(`sort_order=$${i}`); vals.push(sort_order); }
+      if (type !== undefined) { i++; sets.push(`type=$${i}`); vals.push(type); }
+      if (budget_amount !== undefined) { i++; sets.push(`budget_amount=$${i}`); vals.push(budget_amount); }
+      if (sets.length) {
+        i++; vals.push(hh);
+        i++; vals.push(catId);
+        await pool.query(`UPDATE categories SET ${sets.join(',')} WHERE household=$${i-1} AND id=$${i}`, vals);
+      }
     }
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
