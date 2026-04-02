@@ -313,6 +313,16 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
     for (const d of dupes) await client.query('DELETE FROM transactions WHERE id = $1', [d.pending_id]);
     if (dupes.length) console.log(`  Removed ${dupes.length} duplicate pending transactions`);
 
+    // Also remove cross-account duplicates (same desc, amount, date, household but different account_ids)
+    const crossDupes = await client.query(`
+      DELETE FROM transactions WHERE id IN (
+        SELECT id FROM (
+          SELECT id, ROW_NUMBER() OVER (PARTITION BY household, "desc", amount, date ORDER BY created_at ASC) as rn
+          FROM transactions WHERE household = $1
+        ) ranked WHERE rn > 1
+      ) RETURNING id`, [household]);
+    if (crossDupes.rowCount) console.log(`  Removed ${crossDupes.rowCount} cross-account duplicate transactions`);
+
     await client.query('COMMIT');
   } catch (e) {
     await client.query('ROLLBACK');
@@ -352,6 +362,17 @@ app.post('/api/create_link_token', async (req, res) => {
 app.post('/api/exchange_public_token', async (req, res) => {
   const { public_token, userId = 'christian', institution } = req.body;
   try {
+    // Guard: check if user already has a connected Plaid item
+    const hh = await getHousehold(userId);
+    const existingItems = await all('SELECT item_id FROM plaid_items WHERE user_id IN (SELECT id FROM users WHERE household = $1)', [hh]);
+    if (existingItems.length > 0) {
+      console.log(`  User ${userId} already has ${existingItems.length} Plaid item(s) — replacing oldest`);
+      // Remove all existing items for this household to prevent duplicates
+      for (const item of existingItems) {
+        await run('DELETE FROM plaid_items WHERE item_id = $1', [item.item_id]);
+      }
+    }
+
     const resp = await plaid.itemPublicTokenExchange({ public_token });
     const { access_token, item_id } = resp.data;
     await pool.query(
