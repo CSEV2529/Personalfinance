@@ -21,6 +21,11 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL?.includes('supabase') ? { rejectUnauthorized: false } : false,
 });
 
+// Force NUMERIC/DECIMAL types to return as JavaScript numbers, not strings
+const pg = require('pg');
+pg.types.setTypeParser(1700, val => parseFloat(val)); // NUMERIC
+pg.types.setTypeParser(20, val => parseInt(val)); // INT8/BIGINT
+
 console.log('  DB: PostgreSQL pool created');
 
 // ─── HELPER: convert SQLite ?-style params to $1,$2,... ─────────
