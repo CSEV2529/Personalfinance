@@ -4,7 +4,7 @@
  * Transactions always try network first, fall back to cache.
  */
 
-const CACHE = 'obsidian-v7';
+const CACHE = 'obsidian-v71';
 const SHELL = [
   '/',
   '/manifest.json',

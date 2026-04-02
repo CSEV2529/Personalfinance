@@ -1339,7 +1339,7 @@ function stats(txs){
   return{income:inc,expenses:exp,net:inc-exp};
 }
 function truncate(str,len){return str&&str.length>len?str.substring(0,len)+'\u2026':str||'';}
-function monthTxs(txs,y,m){return txs.filter(t=>{const d=new Date(t.date);return d.getMonth()===m&&d.getFullYear()===y;});}
+function monthTxs(txs,y,m){return txs.filter(t=>{const p=t.date.split('-');return parseInt(p[0])===y&&parseInt(p[1])===(m+1);});}
 function currentMonth(){return monthTxs(transactions,selectedMonth.getFullYear(),selectedMonth.getMonth());}
 function catBreak(txs){
   const m={};
@@ -1499,7 +1499,7 @@ function renderHome(){
   $('quick-actions').innerHTML=qaCards;
 
   // Recent
-  const recent=[...mtxs].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
+  const recent=[...mtxs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
   $('recent-list').innerHTML=txRows(recent,false);
 
   // Donut (top 7 + Other)
@@ -1583,7 +1583,7 @@ function openVendorList(){
 
 function renderObsidian(){
   const mtxs=currentMonth();
-  const sorted=[...mtxs].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const sorted=[...mtxs].sort((a,b)=>b.date.localeCompare(a.date));
   const s=stats(mtxs);
   $('ledger-month-label').textContent=selectedMonth.toLocaleString('default',{month:'long',year:'numeric'});
   $('ledger-count').textContent=`Transactions (${sorted.length})`;
@@ -2422,7 +2422,7 @@ function openVendorSheet(vendor){
   $('catdrill-title').textContent=vendor;
   openPage('page-catdrill',()=>{
     const body=$('catdrill-body');
-    const txs=currentMonth().filter(t=>t.desc===vendor).sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const txs=currentMonth().filter(t=>t.desc===vendor).sort((a,b)=>b.date.localeCompare(a.date));
     const debits=txs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
     const credits=txs.filter(t=>t.type==='income').reduce((a,t)=>a+t.amount,0);
     const net=debits-credits;
@@ -2613,7 +2613,7 @@ async function openCatDrill(cat){
 
 function renderCatDrillTxs(cat,mode,btn){
   if(btn){btn.parentElement.querySelectorAll('.catd-toggle-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
-  const mtxs=currentMonth().filter(t=>t.cat===cat).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const mtxs=currentMonth().filter(t=>t.cat===cat).sort((a,b)=>b.date.localeCompare(a.date));
   const el=$('catdrill-txs');
   if(mode==='vendor'){
     const groups={};
