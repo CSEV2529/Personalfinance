@@ -114,8 +114,11 @@ async function initDB() {
     id TEXT NOT NULL, household TEXT NOT NULL,
     icon TEXT DEFAULT '📌', color TEXT DEFAULT '#7a78a0',
     type TEXT DEFAULT 'expense', sort_order INTEGER DEFAULT 0, is_active BOOLEAN DEFAULT TRUE,
+    budget_amount NUMERIC(12,2) DEFAULT 0,
     PRIMARY KEY (id, household)
   )`);
+  // Ensure budget_amount column exists (for existing DBs)
+  try { await pool.query('ALTER TABLE categories ADD COLUMN budget_amount NUMERIC(12,2) DEFAULT 0'); } catch(e) {}
   await pool.query(`CREATE TABLE IF NOT EXISTS recurring_rules (
     id TEXT PRIMARY KEY, household TEXT NOT NULL, vendor TEXT NOT NULL,
     category TEXT, expected_amount NUMERIC(12,2), frequency TEXT,
@@ -1117,10 +1120,11 @@ app.post('/api/webhook', async (req, res) => {
 });
 
 // ─── BUDGETS ──────────────────────────────────────────────────────
+// Budgets now live in the categories table as budget_amount
 app.get('/api/budgets', async (req, res) => {
   try {
     const hh = await getHousehold(req.query.userId || 'christian');
-    const rows = await all('SELECT category, amount FROM budgets WHERE household = ? ORDER BY category', [hh]);
+    const rows = await all('SELECT id as category, budget_amount as amount FROM categories WHERE household = ? AND budget_amount > 0 AND is_active = TRUE ORDER BY sort_order', [hh]);
     res.json({ budgets: rows });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1130,10 +1134,11 @@ app.put('/api/budgets', async (req, res) => {
   if (!category || amount == null) return res.status(400).json({ error: 'Missing category or amount' });
   try {
     const hh = await getHousehold(userId);
+    // Upsert category with budget amount
     await pool.query(
-      `INSERT INTO budgets (household, category, amount, updated_at) VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (household, category) DO UPDATE SET amount = EXCLUDED.amount, updated_at = NOW()`,
-      [hh, category, parseFloat(amount)]
+      `INSERT INTO categories (id, household, budget_amount) VALUES ($1, $2, $3)
+       ON CONFLICT (id, household) DO UPDATE SET budget_amount = EXCLUDED.budget_amount`,
+      [category, hh, parseFloat(amount)]
     );
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1144,7 +1149,7 @@ app.delete('/api/budgets', async (req, res) => {
   if (!category) return res.status(400).json({ error: 'Missing category' });
   try {
     const hh = await getHousehold(userId);
-    await run('DELETE FROM budgets WHERE household = ? AND category = ?', [hh, category]);
+    await run('UPDATE categories SET budget_amount = 0 WHERE id = ? AND household = ?', [category, hh]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
