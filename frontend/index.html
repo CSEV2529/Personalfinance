@@ -979,8 +979,10 @@ body::after{display:none;}
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px" id="budget-kpis"></div>
         </div>
-        <div class="sec-head"><div class="sec-title">Categories</div><div class="sec-link" onclick="openCatManage()">Manage</div></div>
-        <div class="budget-cats-grid" id="budget-cats"></div>
+        <div id="budget-cats"></div>
+        <div style="padding:0 14px 14px">
+          <button class="catm-add" onclick="addNewCategoryFull()">+ Add Category</button>
+        </div>
         <div class="spacer"></div>
       </div>
     </div>
@@ -1598,6 +1600,9 @@ function renderBudget(){
   $('budget-month-label').textContent=selectedMonth.toLocaleString('default',{month:'long',year:'numeric'});
   const mtxs=currentMonth();
   const bd=catBreak(mtxs);
+  // Income per category
+  const incByCat={};
+  mtxs.filter(t=>t.type==='income').forEach(t=>{incByCat[t.cat]=(incByCat[t.cat]||0)+t.amount;});
   const totalB=Object.values(budgets).reduce((a,b)=>a+b,0);
   const totalS=Object.keys(budgets).reduce((a,c)=>a+(bd[c]||0),0);
   const _now=new Date();
@@ -1609,30 +1614,48 @@ function renderBudget(){
     <div class="kcard" style="--kc:var(--gold);width:auto"><div class="kcard-lbl">Budget</div><div class="kcard-val" style="font-size:16px">${money(totalB)}</div></div>
     <div class="kcard" style="--kc:var(--red);width:auto"><div class="kcard-lbl">Spent</div><div class="kcard-val" style="font-size:16px">${money(totalS)}</div></div>
     <div class="kcard" style="--kc:${rem>=0?'var(--green)':'var(--red)'};width:auto"><div class="kcard-lbl">Left</div><div class="kcard-val" style="font-size:16px">${money(rem)}</div></div>`;
-  $('budget-cats').innerHTML=Object.keys(budgets).map(cat=>{
-    const spent=bd[cat]||0,limit=budgets[cat];
-    const pct=Math.min((spent/limit)*100,100);
-    const over=spent>limit,color=over?'var(--red)':pct>75?'var(--gold)':'var(--green)';
+
+  // Build unified category list — ALL categories, with budget info where it exists
+  const allCats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets),...Object.keys(bd),...Object.keys(incByCat)])].filter(c=>c!=='Transfer').sort();
+
+  $('budget-cats').innerHTML=allCats.map(cat=>{
+    const spent=bd[cat]||0;
+    const income=incByCat[cat]||0;
+    const limit=budgets[cat]||0;
+    const hasBudget=limit>0;
+    const pct=hasBudget?Math.min((spent/limit)*100,100):0;
+    const over=hasBudget&&spent>limit;
+    const color=over?'var(--red)':pct>75?'var(--gold)':'var(--green)';
     const esc=cat.replace(/'/g,"\\'");
+    const txCount=mtxs.filter(t=>t.cat===cat).length;
+
     return`<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;margin:0 14px 8px;">
       <div onclick="event.stopPropagation();openEmojiForCategory('${esc}')" style="font-size:24px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:${CAT_COLORS[cat]||'#888'}15;cursor:pointer;flex-shrink:0;position:relative;">
         ${CAT_ICONS[cat]||'\u{1F4CC}'}
-        <div style="position:absolute;bottom:-2px;right:-2px;width:16px;height:16px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:7px;color:var(--text-dim);">✎</div>
+        <div style="position:absolute;bottom:-2px;right:-2px;width:16px;height:16px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:7px;color:var(--text-dim);">\u270E</div>
       </div>
       <div style="flex:1;min-width:0;cursor:pointer;" onclick="openCatDrill('${esc}')">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
           <span style="font-size:14px;font-weight:500;">${cat}</span>
-          <span style="font-family:'DM Mono',monospace;font-size:12px;">${money(spent)}<span style="color:var(--text-dim);font-size:10px;"> / ${money(limit)}</span></span>
+          <span style="font-family:'DM Mono',monospace;font-size:11px;">
+            ${spent>0?`<span style="color:var(--red)">-${money(spent)}</span>`:''}
+            ${income>0?`<span style="color:var(--green)">+${money(income)}</span>`:''}
+            ${!spent&&!income?'<span style="color:var(--text-muted)">$0</span>':''}
+          </span>
         </div>
-        <div class="bar-track" style="position:relative"><div class="bar-fill" style="width:${pct}%;background:${color}"></div>${_isCurr?`<div class="pace-marker" style="left:${_pacePct}%"></div>`:''}</div>
-        ${over?`<div style="color:var(--red);font-family:'DM Mono',monospace;font-size:10px;margin-top:3px;">\u25B2 ${money(spent-limit)} over budget</div>`:''}
+        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);margin-bottom:4px;">${txCount} txns${hasBudget?' \u00B7 Budget: '+money(limit):''}</div>
+        ${hasBudget?`<div class="bar-track" style="position:relative"><div class="bar-fill" style="width:${pct}%;background:${color}"></div>${_isCurr?`<div class="pace-marker" style="left:${_pacePct}%"></div>`:''}</div>`:''}
+        ${over?`<div style="color:var(--red);font-family:'DM Mono',monospace;font-size:10px;margin-top:3px;">\u25B2 ${money(spent-limit)} over</div>`:''}
       </div>
-      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
-        <button onclick="event.stopPropagation();openBudgetEdit('${esc}',${limit})" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text-dim);padding:4px;">&#x270E;</button>
-        <button onclick="event.stopPropagation();deleteBudget('${esc}')" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text-muted);padding:4px;">&#x2715;</button>
+      <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:flex-end;">
+        <button onclick="event.stopPropagation();editCategoryBudget('${esc}',${limit})" style="background:none;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:9px;color:var(--gold);padding:4px;">${hasBudget?'\u270E Budget':'+ Budget'}</button>
+        <div style="display:flex;gap:4px;">
+          <button onclick="event.stopPropagation();renameCategory('${esc}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--text-dim);padding:2px;">\u270E</button>
+          <button onclick="event.stopPropagation();deleteCategory('${esc}')" style="background:none;border:none;cursor:pointer;font-size:10px;color:var(--text-muted);padding:2px;">\u2715</button>
+        </div>
       </div>
     </div>`;
-  }).join('')+`<button class="add-budget-btn" onclick="openAddBudget()">+ Add Budget</button>`;
+  }).join('');
 }
 
 function renderReports(){
