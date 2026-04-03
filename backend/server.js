@@ -200,7 +200,7 @@ function mapCategory(plaidCat) {
   if (c.includes('ENTERTAINMENT') || c.includes('RECREATION'))                    return 'Entertainment';
   if (c.includes('SHOPS') || c.includes('SHOPPING') || c.includes('MERCHANDISE')) return 'Shopping';
   if (c.includes('UTILITIES') || c.includes('TELECOM') || c.includes('INTERNET')) return 'Utilities';
-  if (c.includes('TRANSFER') || c.includes('WIRE') || c.includes('ACH'))          return 'Transfer';
+  if (c.includes('TRANSFER_OUT') || c.includes('TRANSFER_IN'))                    return 'Transfer';
   if (c.includes('PAYROLL') || c.includes('INCOME') || c.includes('DEPOSIT'))     return 'Income';
   return 'Other';
 }
@@ -265,13 +265,9 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
         } else {
           // TIER 3: Plaid categorization
           cat = mapCategory(t.personal_finance_category?.primary || t.category?.[0]);
-          const desc = (t.name || '').toUpperCase();
-          if (cat !== 'Transfer' && (
-            desc.includes('TRANSFER') || (desc.includes('CREDIT CARD') && desc.includes('PAYMENT')) ||
-            desc.includes('CD DEPOSIT') || (desc.includes('SAVINGS') && desc.includes('WITHDRAWAL')) ||
-            desc.includes('AUTOMATIC PAYMENT') || desc.includes('AUTOPAY') ||
-            desc.includes('PAYMENT - THANK')
-          )) cat = 'Transfer';
+          // Trust Plaid's categorization — no keyword overrides
+          // Plaid already tags inter-account transfers correctly
+          // Things like Venmo, PayPal, mortgage payments are real expenses, not transfers
           // NO REFUND TYPE — only income, expense, transfer
           type = cat === 'Transfer' ? 'transfer' : (t.amount > 0 ? 'expense' : 'income');
           reviewed = false;
