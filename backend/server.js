@@ -366,15 +366,16 @@ app.post('/api/create_link_token', async (req, res) => {
 app.post('/api/exchange_public_token', async (req, res) => {
   const { public_token, userId = 'christian', institution } = req.body;
   try {
-    // Guard: check if user already has a connected Plaid item
+    // BULLETPROOF: On reconnect, wipe ALL old data for this household
+    // Plaid generates new account IDs on every connection, so old IDs become orphans
     const hh = await getHousehold(userId);
     const existingItems = await all('SELECT item_id FROM plaid_items WHERE user_id IN (SELECT id FROM users WHERE household = $1)', [hh]);
     if (existingItems.length > 0) {
-      console.log(`  User ${userId} already has ${existingItems.length} Plaid item(s) — replacing oldest`);
-      // Remove all existing items for this household to prevent duplicates
-      for (const item of existingItems) {
-        await run('DELETE FROM plaid_items WHERE item_id = $1', [item.item_id]);
-      }
+      console.log(`  Reconnecting — clearing old data for household ${hh}`);
+      await pool.query('DELETE FROM plaid_items WHERE user_id IN (SELECT id FROM users WHERE household = $1)', [hh]);
+      await pool.query('DELETE FROM transactions WHERE household = $1 AND source = $2', [hh, 'plaid']);
+      await pool.query('DELETE FROM accounts WHERE household = $1', [hh]);
+      console.log(`  Cleared old plaid items, plaid transactions, and accounts`);
     }
 
     const resp = await plaid.itemPublicTokenExchange({ public_token });
@@ -1323,12 +1324,39 @@ app.post('/api/maintenance/dedup', async (req, res) => {
   const { userId = 'christian' } = req.body;
   try {
     const hh = await getHousehold(userId);
-    const dupes = await all(`SELECT p.id as pending_id FROM transactions p
-      INNER JOIN transactions posted ON p."desc" = posted."desc" AND p.amount = posted.amount
-        AND p.date = posted.date AND p.account_id = posted.account_id AND p.household = posted.household
-      WHERE p.household = ? AND p.pending = TRUE AND posted.pending = FALSE AND p.id != posted.id`, [hh]);
-    for (const d of dupes) await run('DELETE FROM transactions WHERE id = ?', [d.pending_id]);
-    res.json({ success: true, removed: dupes.length });
+    let removed = 0;
+
+    // 1. Dedup accounts by name+mask (keep newest)
+    const acctDupes = await pool.query(`
+      DELETE FROM accounts WHERE account_id IN (
+        SELECT account_id FROM (
+          SELECT account_id, ROW_NUMBER() OVER (PARTITION BY name, mask, household ORDER BY updated_at DESC) as rn
+          FROM accounts WHERE household = $1
+        ) ranked WHERE rn > 1
+      ) RETURNING account_id`, [hh]);
+    removed += acctDupes.rowCount;
+
+    // 2. Dedup pending/posted transactions
+    const pendDupes = await pool.query(`
+      DELETE FROM transactions WHERE id IN (
+        SELECT p.id FROM transactions p
+        INNER JOIN transactions posted ON p."desc" = posted."desc" AND p.amount = posted.amount
+          AND p.date = posted.date AND p.household = posted.household
+        WHERE p.household = $1 AND p.pending = TRUE AND posted.pending = FALSE AND p.id != posted.id
+      ) RETURNING id`, [hh]);
+    removed += pendDupes.rowCount;
+
+    // 3. Dedup cross-account duplicates (same desc+amount+date, keep oldest)
+    const crossDupes = await pool.query(`
+      DELETE FROM transactions WHERE id IN (
+        SELECT id FROM (
+          SELECT id, ROW_NUMBER() OVER (PARTITION BY household, "desc", amount, date ORDER BY created_at ASC) as rn
+          FROM transactions WHERE household = $1
+        ) ranked WHERE rn > 1
+      ) RETURNING id`, [hh]);
+    removed += crossDupes.rowCount;
+
+    res.json({ success: true, removed, accounts_deduped: acctDupes.rowCount, pending_deduped: pendDupes.rowCount, cross_deduped: crossDupes.rowCount });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
