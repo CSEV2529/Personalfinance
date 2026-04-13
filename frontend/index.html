@@ -2858,7 +2858,7 @@ async function openVendorWizard(){
       const{vendors,stats}=await res.json();
       window._wizardAssignments={};
       window._wizardVendors=vendors;
-      const cats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].filter(c=>c!=='Transfer'&&c!=='Other').sort();
+      const cats=[...new Set([...Object.keys(CAT_ICONS),...Object.keys(CAT_COLORS),...Object.keys(budgets),...transactions.map(t=>t.cat)])].filter(c=>c&&c!=='Transfer'&&c!=='Other').sort();
       const withRules=vendors.filter(v=>v.has_rule);
       const noRule=vendors.filter(v=>!v.has_rule);
       const preAccepted=noRule.filter(v=>v.plaid_category&&v.plaid_category!=='Other'&&v.tx_count>=2);
