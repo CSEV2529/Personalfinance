@@ -190,7 +190,9 @@ async function initDB() {
   await pool.query(`INSERT INTO users (id, name, household) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, ['wife', 'Marisol', 'spenziero']);
   const defaultBudgets = {Housing:2000,Food:800,Transport:400,Health:300,Entertainment:200,Shopping:400,Utilities:250};
   for (const [cat, amt] of Object.entries(defaultBudgets)) {
-    await pool.query('INSERT INTO budgets (household, category, amount) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', ['spenziero', cat, amt]);
+    await pool.query(`INSERT INTO categories (id, household, budget_amount) VALUES ($1, $2, $3)
+      ON CONFLICT (id, household) DO UPDATE SET budget_amount = COALESCE(NULLIF(categories.budget_amount, 0), EXCLUDED.budget_amount)`,
+      [cat, 'spenziero', amt]);
   }
   console.log('  DB: schema ready');
 }
@@ -1605,7 +1607,17 @@ app.post('/api/chat', async (req, res) => {
     // If confirming a pending action, execute it
     if (confirmAction) {
       const result = await executeAgentTool(confirmAction.tool, confirmAction.input, hh);
-      return res.json({ reply: `✅ Done! ${JSON.stringify(result)}`, actionExecuted: true });
+      // Format result as human-readable text
+      let replyText = '✅ Done!';
+      const t = confirmAction.tool;
+      const inp = confirmAction.input;
+      if (t === 'recategorize_vendor') replyText = `✅ Done — updated ${result.transactions_updated || 0} "${inp.vendor}" transactions to **${inp.category}**. Future ones will auto-categorize.`;
+      else if (t === 'set_budget') replyText = `✅ Done — set **${inp.category}** budget to $${inp.amount.toLocaleString()}/month.`;
+      else if (t === 'create_category') replyText = `✅ Done — created category **${inp.name}**${inp.icon ? ' ' + inp.icon : ''}.`;
+      else if (t === 'add_note') replyText = `✅ Done — note added.`;
+      else if (t === 'add_tags') replyText = `✅ Done — tagged ${result.tagged || 0} transaction${(result.tagged || 0) !== 1 ? 's' : ''} as **${inp.tag}**.`;
+      else if (t === 'merge_vendors') replyText = `✅ Done — merged ${result.merged || 0} vendor name${(result.merged || 0) !== 1 ? 's' : ''} into "${inp.primary_vendor}" (${result.transactions_updated || 0} transactions updated).`;
+      return res.json({ reply: replyText, actionExecuted: true });
     }
 
     const now = new Date();
@@ -1880,7 +1892,7 @@ app.get('/api/health-score', async (req, res) => {
     const expenses = mtxs.filter(t => t.type === 'expense').reduce((a,t) => a + parseFloat(t.amount), 0);
     const savingsRate = income > 0 ? (income - expenses) / income : 0;
     const savingsScore = Math.min(30, Math.max(0, Math.round(savingsRate * 150)));
-    const budgetRows = await all('SELECT category, amount FROM budgets WHERE household = ?', [hh]);
+    const budgetRows = await all('SELECT id as category, budget_amount as amount FROM categories WHERE household = ? AND budget_amount > 0 AND is_active = TRUE', [hh]);
     let budgetScore = 25;
     for (const b of budgetRows) {
       const spent = mtxs.filter(t => t.type === 'expense' && t.cat === b.category).reduce((a,t) => a + parseFloat(t.amount), 0);
