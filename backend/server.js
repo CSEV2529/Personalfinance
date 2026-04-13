@@ -174,6 +174,17 @@ async function initDB() {
       OR UPPER("desc") LIKE '%PAYMENT - THANK%'
     )`);
 
+  // ── CLEANUP: Remove stale pending txns that have a posted match within 3 days ──
+  const stalePending = await pool.query(`
+    DELETE FROM transactions WHERE id IN (
+      SELECT p.id FROM transactions p
+      INNER JOIN transactions posted ON p."desc" = posted."desc" AND p.amount = posted.amount
+        AND p.account_id = posted.account_id AND p.household = posted.household
+        AND ABS(posted.date::date - p.date::date) <= 3
+      WHERE p.pending = TRUE AND posted.pending = FALSE AND p.id != posted.id
+    ) RETURNING id`);
+  if (stalePending.rowCount) console.log(`  DB: Cleaned up ${stalePending.rowCount} stale pending duplicates`);
+
   await pool.query(`INSERT INTO users (id, name, household) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, ['christian', 'Christian', 'spenziero']);
   await pool.query(`INSERT INTO users (id, name, household) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, ['wife', 'Marisol', 'spenziero']);
   const defaultBudgets = {Housing:2000,Food:800,Transport:400,Health:300,Entertainment:200,Shopping:400,Utilities:250};
@@ -335,15 +346,26 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
       );
     }
 
-    // Remove duplicate pending transactions (posted version exists)
+    // Remove pending transactions that Plaid explicitly replaced (pending_transaction_id)
+    let pendingRemoved = 0;
+    for (const t of allTransactions) {
+      if (!t.pending && t.pending_transaction_id) {
+        const del = await client.query('DELETE FROM transactions WHERE id = $1 AND household = $2 AND pending = TRUE', [t.pending_transaction_id, household]);
+        pendingRemoved += del.rowCount;
+      }
+    }
+    if (pendingRemoved) console.log(`  Removed ${pendingRemoved} pending txns via Plaid pending_transaction_id`);
+
+    // Remove duplicate pending transactions (posted version exists within 3-day window)
     const dupesResult = await client.query(`
       SELECT p.id as pending_id FROM transactions p
       INNER JOIN transactions posted ON p."desc" = posted."desc" AND p.amount = posted.amount
-        AND p.date = posted.date AND p.account_id = posted.account_id AND p.household = posted.household
+        AND p.account_id = posted.account_id AND p.household = posted.household
+        AND ABS(posted.date::date - p.date::date) <= 3
       WHERE p.household = $1 AND p.pending = TRUE AND posted.pending = FALSE AND p.id != posted.id`, [household]);
     const dupes = dupesResult.rows;
     for (const d of dupes) await client.query('DELETE FROM transactions WHERE id = $1', [d.pending_id]);
-    if (dupes.length) console.log(`  Removed ${dupes.length} duplicate pending transactions`);
+    if (dupes.length) console.log(`  Removed ${dupes.length} duplicate pending transactions (date-window match)`);
 
     // Also remove cross-account duplicates (same desc, amount, date, household but different account_ids)
     const crossDupes = await client.query(`
