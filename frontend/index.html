@@ -298,6 +298,17 @@ body::after{display:none;}
 .wizard-pill{padding:6px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;white-space:nowrap;cursor:pointer;transition:all .15s;flex-shrink:0;}
 .wizard-pill:active{transform:scale(.95);}
 .wizard-pill.selected{background:rgba(245,197,24,.12);border-color:var(--gold);color:var(--gold);font-weight:500;}
+.wizard-type-btn{flex:1;padding:8px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;text-align:center;cursor:pointer;transition:all .15s;user-select:none;}
+.wizard-type-btn:active{transform:scale(.97);}
+.wizard-type-btn.selected{background:rgba(245,197,24,.12);border-color:var(--gold);color:var(--gold);font-weight:500;}
+.wizard-txn-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;}
+.wizard-txn-row:active{background:var(--surface2);}
+.wizard-txn-row:last-child{border-bottom:none;}
+.wizard-txn-row .txn-desc{flex:1;color:var(--text);margin-right:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.wizard-txn-row .txn-meta{color:var(--text-muted);font-size:9px;margin-right:8px;white-space:nowrap;}
+.wizard-txn-row .txn-amount{font-weight:500;white-space:nowrap;}
+.wizard-txn-row .txn-amount.income{color:var(--green);}
+.wizard-txn-row .txn-amount.transfer{color:var(--text-dim);}
 
 /* ─── SUB-HEADER ─────────────────────────────────────────── */
 .sub-header{display:flex;align-items:center;justify-content:center;gap:10px;padding:6px 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
@@ -2877,44 +2888,84 @@ async function openVendorWizard(){
 function wizardVendorRow(v,cats,preAccepted,hasRule){
   const existing=window._wizardAssignments[v.vendor];
   const currentCat=existing?.category||(hasRule?v.rule_category:null)||(preAccepted?mapCategoryFrontend(v.plaid_category):null);
+  const currentType=existing?.type||v.inferred_type||'expense';
   const esc=v.vendor.replace(/'/g,"\\'");
   const escHtml=v.vendor.replace(/"/g,'&quot;');
   const pillsHidden=hasRule&&!existing;
   return`<div class="wizard-vendor-row ${currentCat?'done':''}" data-vendor="${escHtml}">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;cursor:pointer" onclick="toggleWizardPills(this)">
       <div><div style="font-size:14px;font-weight:500">${v.vendor}</div>
-        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted)">${v.tx_count} txn${v.tx_count!==1?'s':''} ${currentCat?'\u00B7 '+currentCat:''}${v.plaid_category&&v.plaid_category!=='Other'&&!currentCat?' \u00B7 Plaid: '+v.plaid_category:''}</div></div>
+        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted)">${v.tx_count} txn${v.tx_count!==1?'s':''}${currentCat?' \u00B7 '+currentCat:''}${currentType!=='expense'?' \u00B7 '+currentType:''}${v.plaid_category&&v.plaid_category!=='Other'&&!currentCat?' \u00B7 Plaid: '+v.plaid_category:''}</div></div>
       <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--red)">${money(v.total_spend)}</div>
     </div>
-    <div class="wizard-pills-wrap" style="${pillsHidden?'display:none;':''}display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;flex-wrap:wrap">
-      ${cats.map(c=>`<div class="wizard-pill ${currentCat===c?'selected':''}" onclick="wizardAssignVendor('${esc}','${c}',this)">${CAT_ICONS[c]||'\u{1F4CC}'} ${c}</div>`).join('')}
-      <div class="wizard-pill" onclick="wizardNewCategory('${esc}',this)" style="border-style:dashed">+ New</div>
+    <div class="wizard-pills-wrap" style="${pillsHidden?'display:none':'display:flex'};flex-direction:column;gap:10px">
+      <div style="display:flex;gap:4px">
+        <div class="wizard-type-btn ${currentType==='expense'?'selected':''}" onclick="wizardSetType('${esc}','expense',this)">Expense</div>
+        <div class="wizard-type-btn ${currentType==='income'?'selected':''}" onclick="wizardSetType('${esc}','income',this)">Income</div>
+        <div class="wizard-type-btn ${currentType==='transfer'?'selected':''}" onclick="wizardSetType('${esc}','transfer',this)">Transfer</div>
+      </div>
+      <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;flex-wrap:wrap">
+        ${cats.map(c=>`<div class="wizard-pill ${currentCat===c?'selected':''}" onclick="wizardAssignVendor('${esc}','${c}',this)">${CAT_ICONS[c]||'\u{1F4CC}'} ${c}</div>`).join('')}
+        <div class="wizard-pill" onclick="wizardNewCategory('${esc}',this)" style="border-style:dashed">+ New</div>
+      </div>
     </div>
-    <div style="margin-top:4px"><span class="wizard-expand-btn" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);cursor:pointer;text-decoration:underline" onclick="expandWizardTxns('${esc}',this)">View ${v.tx_count} transactions</span></div>
+    <div style="margin-top:8px"><span class="wizard-expand-btn" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);cursor:pointer;text-decoration:underline" onclick="expandWizardTxns('${esc}',this)">View ${v.tx_count} transactions</span></div>
   </div>`;
 }
 
 function toggleWizardPills(header){
   const wrap=header.parentElement.querySelector('.wizard-pills-wrap');
-  if(wrap&&wrap.style.display==='none')wrap.style.display='flex';
+  if(!wrap)return;
+  wrap.style.display=(wrap.style.display==='none')?'flex':'none';
+}
+
+function wizardSetType(vendor,type,el){
+  const existing=window._wizardAssignments[vendor];
+  const v=window._wizardVendors?.find(x=>x.vendor===vendor);
+  if(!existing){
+    window._wizardAssignments[vendor]={category:v?.rule_category||mapCategoryFrontend(v?.plaid_category)||null,type};
+  }else{
+    existing.type=type;
+  }
+  const row=el.closest('.wizard-vendor-row');
+  if(row){
+    row.querySelectorAll('.wizard-type-btn').forEach(b=>b.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+  updateWizardProgress();
 }
 
 async function expandWizardTxns(vendor,btn){
-  const container=btn.parentElement;
-  if(container.querySelector('.wizard-txn-list')){container.querySelector('.wizard-txn-list').remove();btn.textContent=`View transactions`;return;}
+  const row=btn.closest('.wizard-vendor-row');
+  if(!row)return;
+  const existing=row.querySelector('.wizard-txn-list');
+  if(existing){existing.remove();btn.textContent='View transactions';return;}
   btn.textContent='Loading...';
   try{
-    const res=await fetch(`${API}/api/transactions?userId=${currentUser}&vendor=${encodeURIComponent(vendor)}&limit=10`);
+    const res=await fetch(`${API}/api/transactions?userId=${currentUser}&vendor=${encodeURIComponent(vendor)}&limit=50`);
     const data=await res.json();
     const txs=data.transactions||data||[];
     if(!txs.length){btn.textContent='No transactions found';return;}
     const list=document.createElement('div');
     list.className='wizard-txn-list';
-    list.style.cssText='margin-top:6px;padding:8px;background:var(--surface2);border-radius:8px;';
-    list.innerHTML=txs.map(t=>`<div style="display:flex;justify-content:space-between;padding:4px 0;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);border-bottom:1px solid var(--border)"><span>${t.date}</span><span style="color:var(--text)">${money(t.amount)}</span></div>`).join('');
-    container.appendChild(list);
+    list.style.cssText='margin-top:10px;padding:4px 0;background:var(--surface2);border-radius:10px;max-height:320px;overflow-y:auto';
+    list.innerHTML=txs.map(t=>{
+      const typeClass=t.type==='income'?'income':(t.type==='transfer'?'transfer':'');
+      const sign=t.type==='income'?'+':(t.type==='transfer'?'':'-');
+      const statusBadge=t.status==='unsure'?'<span style="color:var(--gold);margin-left:4px">?</span>':'';
+      return`<div class="wizard-txn-row" onclick="openTxDetailFromWizard('${t.id}')">
+        <div class="txn-desc">${escapeHtml(t.desc||'Untitled')}${statusBadge}</div>
+        <div class="txn-meta">${t.date} \u00B7 ${t.cat||'Other'}</div>
+        <div class="txn-amount ${typeClass}">${sign}${money(Math.abs(t.amount))}</div>
+      </div>`;
+    }).join('');
+    row.appendChild(list);
     btn.textContent='Hide transactions';
-  }catch(e){btn.textContent='Error loading';}
+  }catch(e){btn.textContent='Error loading';console.error('expandWizardTxns:',e);}
+}
+
+function openTxDetailFromWizard(txId){
+  openTxDetail(txId);
 }
 
 function wizardNewCategory(vendor,btn){
@@ -2926,8 +2977,13 @@ function wizardNewCategory(vendor,btn){
 }
 
 function wizardAssignVendor(vendor,category,el){
+  const existing=window._wizardAssignments[vendor];
   const v=window._wizardVendors?.find(x=>x.vendor===vendor);
-  window._wizardAssignments[vendor]={category,type:v?.inferred_type||'expense'};
+  if(existing){
+    existing.category=category;
+  }else{
+    window._wizardAssignments[vendor]={category,type:v?.inferred_type||'expense'};
+  }
   const row=el.closest('.wizard-vendor-row');
   if(row){
     row.classList.add('done');
@@ -2948,15 +3004,26 @@ function updateWizardProgress(){
 }
 
 async function submitVendorWizard(){
-  const assignments=Object.entries(window._wizardAssignments).filter(([,d])=>d.category).map(([vendor,d])=>({vendor,category:d.category,type:d.type||'expense'}));
-  if(!assignments.length){alert('No assignments to save');return;}
+  const assignments=Object.entries(window._wizardAssignments)
+    .filter(([,d])=>d.category)
+    .map(([vendor,d])=>{
+      const finalType=d.category==='Transfer'?'transfer':(d.type||'expense');
+      return{vendor,category:d.category,type:finalType};
+    });
+  if(!assignments.length){alert('No assignments to save. Pick a category for at least one vendor.');return;}
+  const btn=document.querySelector('#page-wizard .sht-btn.primary');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
   try{
     const res=await fetch(`${API}/api/vendor-rules/bulk`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,assignments})});
     const result=await res.json();
     if(!result.success)throw new Error(result.error||'Save failed');
     closePage('page-wizard');
+    showToast(`Saved ${assignments.length} vendor rule${assignments.length!==1?'s':''} \u00B7 ${result.transactions_updated||0} transactions updated`);
     await loadData();
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){
+    alert('Error: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Save All Assignments';}
+  }
 }
 
 // ─── INCOME BREAKDOWN ────────────────────────────────────────────

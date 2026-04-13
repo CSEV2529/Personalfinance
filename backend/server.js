@@ -1447,13 +1447,38 @@ async function executeAgentTool(toolName, toolInput, hh) {
     case 'recategorize_vendor': {
       const { vendor, category, type: txType } = toolInput;
       const resolvedType = txType || 'expense';
-      await run(`INSERT INTO vendor_rules (household, vendor, category, type, updated_at)
-        VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT (household, vendor) DO UPDATE SET category=$3, type=$4, updated_at=NOW()`,
-        [hh, vendor, category, resolvedType]);
-      const result = await run('UPDATE transactions SET cat=$1, type=$2, reviewed=TRUE WHERE household=$3 AND "desc"=$4',
-        [category, resolvedType, hh, vendor]);
+
+      // Find all matching transactions using partial case-insensitive match
+      const matchRows = await all(
+        'SELECT id, "desc" FROM transactions WHERE household = $1 AND "desc" ILIKE $2',
+        [hh, `%${vendor}%`]
+      );
+
+      if (matchRows.length === 0) {
+        return { success: false, vendor, category, type: resolvedType, transactions_updated: 0,
+          message: `No transactions found matching "${vendor}". Try a different search term.` };
+      }
+
+      // Ensure the target category exists
       await run('INSERT INTO categories (id, household) VALUES ($1, $2) ON CONFLICT DO NOTHING', [category, hh]);
-      return { success: true, vendor, category, type: resolvedType, transactions_updated: result.changes };
+
+      // Create vendor rules for each unique variant
+      const uniqueVendors = [...new Set(matchRows.map(r => r.desc))];
+      for (const v of uniqueVendors) {
+        await run(`INSERT INTO vendor_rules (household, vendor, category, type, updated_at)
+          VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT (household, vendor) DO UPDATE SET category=$3, type=$4, updated_at=NOW()`,
+          [hh, v, category, resolvedType]);
+      }
+
+      // Update all matching transactions
+      const result = await run(
+        'UPDATE transactions SET cat=$1, type=$2, reviewed=TRUE WHERE household=$3 AND "desc" ILIKE $4',
+        [category, resolvedType, hh, `%${vendor}%`]);
+
+      return { success: true, vendor, category, type: resolvedType,
+        transactions_updated: result.changes || matchRows.length,
+        unique_vendor_names_matched: uniqueVendors.length,
+        sample_vendors: uniqueVendors.slice(0, 5) };
     }
 
     case 'set_budget': {
@@ -1599,17 +1624,36 @@ app.post('/api/chat', async (req, res) => {
     // If confirming a pending action, execute it
     if (confirmAction) {
       const result = await executeAgentTool(confirmAction.tool, confirmAction.input, hh);
-      // Format result as human-readable text
-      let replyText = '✅ Done!';
       const t = confirmAction.tool;
       const inp = confirmAction.input;
-      if (t === 'recategorize_vendor') replyText = `✅ Done — updated ${result.transactions_updated || 0} "${inp.vendor}" transactions to **${inp.category}**. Future ones will auto-categorize.`;
-      else if (t === 'set_budget') replyText = `✅ Done — set **${inp.category}** budget to $${inp.amount.toLocaleString()}/month.`;
-      else if (t === 'create_category') replyText = `✅ Done — created category **${inp.name}**${inp.icon ? ' ' + inp.icon : ''}.`;
-      else if (t === 'add_note') replyText = `✅ Done — note added.`;
-      else if (t === 'add_tags') replyText = `✅ Done — tagged ${result.tagged || 0} transaction${(result.tagged || 0) !== 1 ? 's' : ''} as **${inp.tag}**.`;
-      else if (t === 'merge_vendors') replyText = `✅ Done — merged ${result.merged || 0} vendor name${(result.merged || 0) !== 1 ? 's' : ''} into "${inp.primary_vendor}" (${result.transactions_updated || 0} transactions updated).`;
-      return res.json({ reply: replyText, actionExecuted: true });
+      let reply;
+
+      if (result.error) {
+        reply = `⚠️ I couldn't complete that action: ${result.error}`;
+      } else if (t === 'recategorize_vendor') {
+        if (result.transactions_updated === 0) {
+          reply = `I couldn't find any transactions matching "${inp.vendor}". ${result.message || 'Try a different search term.'}`;
+        } else {
+          const variantNote = result.unique_vendor_names_matched > 1
+            ? ` across ${result.unique_vendor_names_matched} vendor name variants` : '';
+          const typeNote = inp.type && inp.type !== 'expense' ? ` as ${inp.type}` : '';
+          reply = `✅ Updated ${result.transactions_updated} "${inp.vendor}" transactions to **${inp.category}**${typeNote}${variantNote}. Future ones will auto-categorize.`;
+        }
+      } else if (t === 'set_budget') {
+        reply = `✅ Budget set — **${inp.category}**: $${parseFloat(inp.amount).toFixed(2)}/month`;
+      } else if (t === 'create_category') {
+        reply = `✅ Category "${inp.name}" created.`;
+      } else if (t === 'add_note') {
+        reply = `✅ Note added to transaction.`;
+      } else if (t === 'add_tags') {
+        reply = `✅ Tagged ${result.tagged || 0} transactions with "${inp.tag}".`;
+      } else if (t === 'merge_vendors') {
+        reply = `✅ Merged ${result.merged || 0} vendor variants into "${inp.primary_vendor}". ${result.transactions_updated || 0} transactions updated.`;
+      } else {
+        reply = '✅ Done.';
+      }
+
+      return res.json({ reply, actionExecuted: true });
     }
 
     const now = new Date();
@@ -1691,11 +1735,18 @@ RULES:
       // Check if any write tools need confirmation (only on first encounter)
       const writeToolUse = toolUseBlocks.find(t => WRITE_TOOLS.has(t.name));
       if (writeToolUse && iterations === 1) {
-        const textContent = response.content.find(c => c.type === 'text');
-        return res.json({
-          reply: textContent?.text || `I'd like to make a change. Should I go ahead?`,
-          pendingAction: { tool: writeToolUse.name, input: writeToolUse.input }
-        });
+        // Check if user already confirmed in natural language (e.g. "yes", "go ahead")
+        const lastUserMsg = (message || '').toLowerCase().trim();
+        const userAlreadyConfirmed = /^(yes|yeah|yep|yup|sure|ok|okay|k|confirmed|confirm|go ahead|do it|proceed|yes please|please do|fine|correct|right)\b/i.test(lastUserMsg);
+
+        if (!userAlreadyConfirmed) {
+          const textContent = response.content.find(c => c.type === 'text');
+          return res.json({
+            reply: textContent?.text || `I'd like to make a change. Should I go ahead?`,
+            pendingAction: { tool: writeToolUse.name, input: writeToolUse.input }
+          });
+        }
+        // User already confirmed — fall through to execute
       }
 
       // Add assistant message with tool calls
@@ -1835,14 +1886,17 @@ app.post('/api/vendor-rules/bulk', async (req, res) => {
       await client.query('BEGIN');
       let totalUpdated = 0;
       for (const a of assignments) {
+        // Transfer category always forces transfer type
+        const finalType = a.category === 'Transfer' ? 'transfer' : (a.type || 'expense');
         await client.query(
           `INSERT INTO vendor_rules (household, vendor, category, type, updated_at) VALUES ($1, $2, $3, $4, NOW())
            ON CONFLICT (household, vendor) DO UPDATE SET category = EXCLUDED.category, type = EXCLUDED.type, updated_at = NOW()`,
-          [hh, a.vendor, a.category, a.type || 'expense']
+          [hh, a.vendor, a.category, finalType]
         );
+        // Update BOTH cat and type on existing transactions
         const result = await client.query(
-          'UPDATE transactions SET cat = $1, reviewed = TRUE WHERE household = $2 AND "desc" = $3',
-          [a.category, hh, a.vendor]
+          'UPDATE transactions SET cat = $1, type = $2, reviewed = TRUE WHERE household = $3 AND "desc" = $4',
+          [a.category, finalType, hh, a.vendor]
         );
         totalUpdated += result.rowCount;
         await client.query(
