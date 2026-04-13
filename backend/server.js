@@ -294,30 +294,38 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
       const rule = vendorRules[t.name] || vendorRulesUpper[(t.name || '').toUpperCase().trim()];
       let cat, type, reviewed;
 
-      if (rule) {
-        // TIER 1: Vendor rule — category only, type from Plaid
+      // STEP 1: Check if this transaction was manually reviewed — ALWAYS wins
+      const existingResult = await client.query(
+        'SELECT cat, type, reviewed, notes, status, is_recurring FROM transactions WHERE id = $1',
+        [t.transaction_id]
+      );
+      const existing = existingResult.rows[0];
+
+      if (existing && existing.reviewed) {
+        // MANUAL REVIEW WINS — preserve both category AND type
+        cat = existing.cat;
+        type = existing.type;
+        reviewed = true;
+      } else if (rule) {
+        // VENDOR RULE — apply category from rule
         cat = rule.cat;
-        // Type is ALWAYS determined by Plaid amount sign — NEVER from vendor rule
-        type = cat === 'Transfer' ? 'transfer' : (t.amount > 0 ? 'expense' : 'income');
+        if (cat === 'Transfer') {
+          type = 'transfer';
+        } else if (rule.type && rule.type !== 'expense') {
+          // Rule has explicit non-default type — respect it
+          type = rule.type;
+        } else {
+          type = t.amount > 0 ? 'expense' : 'income';
+        }
         reviewed = true;
       } else {
-        // TIER 2: Check if this transaction was manually reviewed
-        const existingResult = await client.query('SELECT cat, type, reviewed FROM transactions WHERE id = $1', [t.transaction_id]);
-        const existing = existingResult.rows[0];
-        if (existing && existing.reviewed) {
-          cat = existing.cat;
-          type = existing.type;
-          reviewed = true;
-        } else {
-          // TIER 3: Plaid categorization + name-based transfer detection
-          cat = mapCategory(t.personal_finance_category?.primary || t.category?.[0]);
-          // Check transaction name for transfer patterns Plaid may miss
-          if (cat !== 'Transfer' && isTransferByName(t.name)) {
-            cat = 'Transfer';
-          }
-          type = cat === 'Transfer' ? 'transfer' : (t.amount > 0 ? 'expense' : 'income');
-          reviewed = false;
+        // TIER 3: Plaid categorization + name-based transfer detection
+        cat = mapCategory(t.personal_finance_category?.primary || t.category?.[0]);
+        if (cat !== 'Transfer' && isTransferByName(t.name)) {
+          cat = 'Transfer';
         }
+        type = cat === 'Transfer' ? 'transfer' : (t.amount > 0 ? 'expense' : 'income');
+        reviewed = false;
       }
 
       const originalCat = t.personal_finance_category?.primary || t.category?.[0] || null;
@@ -371,11 +379,20 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
     for (const d of dupes) await client.query('DELETE FROM transactions WHERE id = $1', [d.pending_id]);
     if (dupes.length) console.log(`  Removed ${dupes.length} pending duplicates (amount+account+date match)`);
 
-    // Also remove cross-account duplicates (same desc, amount, date, household but different account_ids)
+    // Also remove cross-account duplicates (same desc, amount, date, household)
+    // Prefer keeping records with user edits (notes, reviewed, unsure, tags, recurring)
     const crossDupes = await client.query(`
       DELETE FROM transactions WHERE id IN (
         SELECT id FROM (
-          SELECT id, ROW_NUMBER() OVER (PARTITION BY household, "desc", amount, date ORDER BY created_at ASC) as rn
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY household, "desc", amount, date
+            ORDER BY
+              (CASE WHEN notes IS NOT NULL AND notes != '' THEN 0 ELSE 1 END),
+              (CASE WHEN reviewed = TRUE THEN 0 ELSE 1 END),
+              (CASE WHEN status IS NOT NULL AND status != 'confirmed' THEN 0 ELSE 1 END),
+              (CASE WHEN is_recurring = TRUE THEN 0 ELSE 1 END),
+              created_at ASC
+          ) as rn
           FROM transactions WHERE household = $1
         ) ranked WHERE rn > 1
       ) RETURNING id`, [household]);
@@ -580,7 +597,7 @@ app.get('/api/transactions/:id', async (req, res) => {
 });
 
 app.put('/api/transactions/:id', async (req, res) => {
-  const { category, type, notes, is_recurring, applyToVendor, original_sign, status } = req.body;
+  const { category, type, notes, is_recurring, original_sign, status } = req.body;
   try {
     const tx = await get('SELECT * FROM transactions WHERE id = ?', [req.params.id]);
     if (!tx) return res.status(404).json({ error: 'Transaction not found' });
@@ -590,28 +607,16 @@ app.put('/api/transactions/:id', async (req, res) => {
     const newRecurring = is_recurring !== undefined ? (is_recurring ? true : false) : tx.is_recurring;
     const newSign = original_sign !== undefined ? original_sign : tx.original_sign;
     const newStatus = status || tx.status || 'confirmed';
+    // Single transaction update ONLY. Vendor-wide changes go through dedicated endpoints.
     await run('UPDATE transactions SET cat=?, type=?, notes=?, is_recurring=?, original_sign=?, status=?, reviewed=TRUE WHERE id=?',
       [newCat, newType, newNotes, newRecurring, newSign, newStatus, req.params.id]);
-    let updatedCount = 1;
-    if (applyToVendor) {
-      // Vendor rule stores ONLY category
-      await pool.query(
-        `INSERT INTO vendor_rules (household, vendor, category, type, updated_at) VALUES ($1,$2,$3,'expense',NOW())
-         ON CONFLICT (household, vendor) DO UPDATE SET category = EXCLUDED.category, type = EXCLUDED.type, updated_at = NOW()`,
-        [tx.household, tx.desc, newCat]
-      );
-      // Apply category only — preserve each tx's type and sign
-      const result = await run('UPDATE transactions SET cat=?, reviewed=TRUE WHERE household=? AND "desc"=?',
-        [newCat, tx.household, tx.desc]);
-      updatedCount = result.changes || 1;
-    }
-    res.json({ success: true, updated: updatedCount });
+    res.json({ success: true, updated: 1 });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Legacy endpoint (frontend compat)
 app.put('/api/transactions/:id/category', async (req, res) => {
-  const { category, type, applyToVendor, original_sign } = req.body;
+  const { category, type, original_sign } = req.body;
   if (!category && !type && original_sign === undefined) return res.status(400).json({ error: 'Missing category, type, or sign' });
   try {
     const tx = await get('SELECT * FROM transactions WHERE id = ?', [req.params.id]);
@@ -619,22 +624,9 @@ app.put('/api/transactions/:id/category', async (req, res) => {
     const newCat = category || tx.cat;
     const newType = type || tx.type;
     const newSign = original_sign !== undefined ? original_sign : tx.original_sign;
-    // Always update this specific transaction (type + sign + category)
+    // Single transaction update ONLY. Vendor-wide changes go through dedicated endpoints.
     await run('UPDATE transactions SET cat=?, type=?, original_sign=?, reviewed=TRUE WHERE id=?', [newCat, newType, newSign, req.params.id]);
-    let updatedCount = 1;
-    if (applyToVendor) {
-      // Vendor rule stores ONLY category — not type, not sign
-      await pool.query(
-        `INSERT INTO vendor_rules (household, vendor, category, type, updated_at) VALUES ($1,$2,$3,'expense',NOW())
-         ON CONFLICT (household, vendor) DO UPDATE SET category = EXCLUDED.category, type = EXCLUDED.type, updated_at = NOW()`,
-        [tx.household, tx.desc, newCat]
-      );
-      // Apply category to all matching, but PRESERVE their type and sign
-      const result = await run('UPDATE transactions SET cat=?, reviewed=TRUE WHERE household=? AND "desc"=?',
-        [newCat, tx.household, tx.desc]);
-      updatedCount = result.changes || 1;
-    }
-    res.json({ success: true, updated: updatedCount });
+    res.json({ success: true, updated: 1 });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1774,21 +1766,30 @@ app.post('/api/maintenance/dedup', async (req, res) => {
       ) RETURNING account_id`, [hh]);
     removed += acctDupes.rowCount;
 
-    // 2. Dedup pending/posted transactions
+    // 2. Dedup pending/posted transactions (amount+account within 3 days)
     const pendDupes = await pool.query(`
       DELETE FROM transactions WHERE id IN (
-        SELECT p.id FROM transactions p
-        INNER JOIN transactions posted ON p."desc" = posted."desc" AND p.amount = posted.amount
-          AND p.date = posted.date AND p.household = posted.household
+        SELECT DISTINCT p.id FROM transactions p
+        INNER JOIN transactions posted ON p.amount = posted.amount
+          AND p.account_id = posted.account_id AND p.household = posted.household
+          AND ABS(posted.date::date - p.date::date) <= 3
         WHERE p.household = $1 AND p.pending = TRUE AND posted.pending = FALSE AND p.id != posted.id
       ) RETURNING id`, [hh]);
     removed += pendDupes.rowCount;
 
-    // 3. Dedup cross-account duplicates (same desc+amount+date, keep oldest)
+    // 3. Dedup cross-account duplicates — prefer records with user edits
     const crossDupes = await pool.query(`
       DELETE FROM transactions WHERE id IN (
         SELECT id FROM (
-          SELECT id, ROW_NUMBER() OVER (PARTITION BY household, "desc", amount, date ORDER BY created_at ASC) as rn
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY household, "desc", amount, date
+            ORDER BY
+              (CASE WHEN notes IS NOT NULL AND notes != '' THEN 0 ELSE 1 END),
+              (CASE WHEN reviewed = TRUE THEN 0 ELSE 1 END),
+              (CASE WHEN status IS NOT NULL AND status != 'confirmed' THEN 0 ELSE 1 END),
+              (CASE WHEN is_recurring = TRUE THEN 0 ELSE 1 END),
+              created_at ASC
+          ) as rn
           FROM transactions WHERE household = $1
         ) ranked WHERE rn > 1
       ) RETURNING id`, [hh]);

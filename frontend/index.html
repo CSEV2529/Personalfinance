@@ -2055,8 +2055,7 @@ async function saveTxDetail(){
     await fetch(`${API}/api/transactions/${txDetailId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       category:t.cat,type:t.type,
       notes:document.querySelector('.txd-notes')?.value||'',
-      is_recurring:false,
-      applyToVendor:false
+      is_recurring:false
     })});
     t.notes=document.querySelector('.txd-notes')?.value||'';
     t.reviewed=1;
@@ -2298,14 +2297,10 @@ function selectCatFromPicker(cat){
 
 function openCatPickerForTxDetail(txId,currentCat){
   openCatPicker(async(newCat)=>{
-    const applyToVendor=false;
     try{
-      await fetch(`${API}/api/transactions/${txId}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:newCat,applyToVendor})});
+      await fetch(`${API}/api/transactions/${txId}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:newCat})});
       const t=transactions.find(tx=>tx.id===txId);
-      if(t){
-        if(applyToVendor){transactions.filter(tx=>tx.desc===t.desc).forEach(tx=>{tx.cat=newCat;});}
-        else{t.cat=newCat;}
-      }
+      if(t)t.cat=newCat;
       if(txDetailId)renderTxDetail(txDetailId);
       renderAll();
     }catch(e){alert('Failed: '+e.message);}
@@ -2344,18 +2339,12 @@ function renderRecatSheet(){
 async function applyType(newType){
   const ids=window._bulkIds||[recatTxId];
   if(!ids.length)return;
-  const applyToVendor=false;
   try{
     for(const id of ids){
-      const res=await fetch(`${API}/api/transactions/${id}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:newType,applyToVendor})});
+      const res=await fetch(`${API}/api/transactions/${id}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:newType})});
       if(!res.ok)throw new Error('Update failed');
     }
-    if(applyToVendor){
-      const descs=new Set(ids.map(id=>transactions.find(t=>t.id===id)?.desc).filter(Boolean));
-      transactions.filter(t=>descs.has(t.desc)).forEach(t=>{t.type=newType;});
-    }else{
-      ids.forEach(id=>{const tx=transactions.find(t=>t.id===id);if(tx)tx.type=newType;});
-    }
+    ids.forEach(id=>{const tx=transactions.find(t=>t.id===id);if(tx)tx.type=newType;});
     recatCurrentType=newType;
     renderRecatSheet();
     renderAll();
@@ -2424,18 +2413,12 @@ async function pickEmoji(emoji){
 async function applyRecat(newCat){
   const ids=window._bulkIds||[recatTxId];
   if(!ids.length)return;
-  const applyToVendor=false;
   try{
     for(const id of ids){
-      const res=await fetch(`${API}/api/transactions/${id}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:newCat,applyToVendor})});
+      const res=await fetch(`${API}/api/transactions/${id}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:newCat})});
       if(!res.ok)throw new Error('Update failed');
     }
-    if(applyToVendor){
-      const descs=new Set(ids.map(id=>transactions.find(t=>t.id===id)?.desc).filter(Boolean));
-      transactions.filter(t=>descs.has(t.desc)).forEach(t=>{t.cat=newCat;});
-    }else{
-      ids.forEach(id=>{const tx=transactions.find(t=>t.id===id);if(tx)tx.cat=newCat;});
-    }
+    ids.forEach(id=>{const tx=transactions.find(t=>t.id===id);if(tx)tx.cat=newCat;});
     if(!budgets[newCat]){
       const budRes=await fetch(`${API}/api/budgets`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:newCat,amount:200})});
       if(budRes.ok)budgets[newCat]=200;
