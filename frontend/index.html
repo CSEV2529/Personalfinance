@@ -944,8 +944,9 @@ body::after{display:none;}
           </div>
         </div>
 
-        <div class="sec-head"><div class="sec-title">Spending by Category</div></div>
         <div id="weekly-recap"></div>
+
+        <div class="sec-head"><div class="sec-title">Spending by Category</div></div>
         <div id="expense-bars-section" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin:0 14px 18px;max-height:500px;overflow-y:auto;"></div>
 
         <div class="sec-head"><div class="sec-title">Top Vendors</div></div>
@@ -1033,7 +1034,7 @@ body::after{display:none;}
   <nav class="tabs">
     <div class="sidebar-brand">Obsidian</div>
     <div class="tab on" id="tab-home" onclick="go('home')"><div class="tab-pip"></div><div class="tab-icon">&#x25C8;</div><div class="tab-lbl">Home</div></div>
-    <div class="tab" id="tab-ledger" onclick="go('ledger')"><div class="tab-pip"></div><div class="tab-icon">&#x21C4;</div><div class="tab-lbl">Obsidian</div></div>
+    <div class="tab" id="tab-ledger" onclick="go('ledger')"><div class="tab-pip"></div><div class="tab-icon">&#x21C4;</div><div class="tab-lbl">Ledger</div></div>
     <div class="tab" id="tab-budget" onclick="go('budget')"><div class="tab-pip"></div><div class="tab-icon">&#x25A6;</div><div class="tab-lbl">Budget</div></div>
     <div class="tab" id="tab-reports" onclick="go('reports')"><div class="tab-pip"></div><div class="tab-icon">&#x223F;</div><div class="tab-lbl">Reports</div></div>
     <div class="tab" id="tab-accounts" onclick="go('accounts')"><div class="tab-pip"></div><div class="tab-icon">&#x25C9;</div><div class="tab-lbl">Accounts</div></div>
@@ -1283,12 +1284,6 @@ body::after{display:none;}
       <div class="chat-bubble">Hey! I can help you understand your spending, compare budgets, find trends, or answer any questions about your finances. What would you like to know?</div>
     </div>
     <div class="chat-suggestions" id="chat-suggestions">
-      <button class="chat-chip" onclick="sendSuggestion('How am I doing this month?')">How am I doing?</button>
-      <button class="chat-chip" onclick="sendSuggestion('Am I on budget?')">On budget?</button>
-      <button class="chat-chip" onclick="sendSuggestion('Move all Amazon to Shopping')">Recategorize vendor</button>
-      <button class="chat-chip" onclick="sendSuggestion('Set my food budget to $800')">Set budget</button>
-      <button class="chat-chip" onclick="sendSuggestion('What are my biggest expenses?')">Biggest expenses?</button>
-      <button class="chat-chip" onclick="sendSuggestion('Look up transactions from Venmo')">Search vendor</button>
     </div>
   </div>
   <div class="chat-input-bar">
@@ -1387,7 +1382,7 @@ async function loadData(){
     if(iconRes.ok){
       const d=await iconRes.json();
       (d.categories||[]).forEach(c=>{
-        if(c.icon)CAT_ICONS[c.id]=c.icon;
+        if(c.icon&&c.icon!=='??'&&c.icon!=='?')CAT_ICONS[c.id]=c.icon;
         if(c.color)CAT_COLORS[c.id]=c.color;
       });
     }
@@ -1465,7 +1460,7 @@ function renderTopbar(){
 function renderHome(){
   const mtxs=currentMonth();
   const s=stats(mtxs);
-  const savings=s.income>0?((s.net/s.income)*100).toFixed(0):0;
+  const savings=s.income>0?Math.max(-100,Math.min(100,Math.round((s.net/s.income)*100))):(s.expenses>0?'N/A':'\u2014');
 
   $('hero-who').textContent='Household \u00B7 '+selectedMonth.toLocaleString('default',{month:'long',year:'numeric'});
   $('month-label').textContent=selectedMonth.toLocaleString('default',{month:'long',year:'numeric'});
@@ -1491,10 +1486,10 @@ function renderHome(){
   const dailyAvg=daysElapsed>0?s.expenses/daysElapsed:0;
   const totalBal=accounts.filter(a=>a.type==='depository').reduce((a,ac)=>a+(ac.balance||0),0);
   const cards=[
-    {lbl:'Income',val:money(s.income),color:'var(--green)',sub:'This month',action:"openIncomeBreakdown()"},
-    {lbl:'Expenses',val:money(s.expenses),color:'var(--red)',sub:'This month',action:"openTypeSheet('expense')"},
     {lbl:'Net Cash Flow',val:(s.net>=0?'+':'')+money(s.net),color:s.net>=0?'var(--green)':'var(--red)',sub:'Income - Expenses'},
     {lbl:'Avg/Day',val:money(dailyAvg),color:'var(--orange)',sub:`${daysElapsed} days`},
+    {lbl:'Balance',val:money(totalBal),color:'var(--teal)',sub:'All accounts'},
+    {lbl:'Transactions',val:mtxs.length,color:'var(--blue)',sub:'This month'},
   ];
   $('kpi-cards').innerHTML=cards.map(c=>`<div class="kcard" style="--kc:${c.color};cursor:pointer" onclick="${c.action||''}"><div class="kcard-lbl">${c.lbl}</div><div class="kcard-val">${c.val}</div><div class="kcard-sub">${c.sub}</div></div>`).join('');
 
@@ -2185,9 +2180,40 @@ async function openUnsurePage(){
       const{transactions:txs}=await res.json();
       if(!txs.length){body.innerHTML='<div class="empty-msg">No unsure charges</div>';return;}
       body.innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:16px">${txs.length} charge${txs.length!==1?'s':''} marked as unsure</div>
-        <div class="tx-list">${txRows(txs,false)}</div>`;
+        <div class="tx-list">${txs.map(t=>{
+          const isIncome=t.type==='income';
+          return`<div class="tx-row" data-txid="${t.id}" style="flex-wrap:wrap;">
+            <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}22">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
+            <div class="tx-body">
+              <div class="tx-desc">${t.desc}</div>
+              <div class="tx-meta"><span class="tx-cat">${t.cat}</span><span class="tx-date">\u00B7 ${t.date}</span></div>
+            </div>
+            <div class="tx-amt ${isIncome?'pos':'neg'}">${isIncome?'+':'-'}${money(t.amount)}</div>
+            <div style="display:flex;gap:8px;width:100%;padding:8px 0 4px 0;margin-left:44px;">
+              <button class="sht-btn primary" style="flex:1;padding:8px;font-size:9px;border-radius:8px;border:none;background:var(--gold);color:#000;font-family:'DM Mono',monospace;cursor:pointer;font-weight:600;"
+                onclick="event.stopPropagation();resolveUnsure('${t.id}',this);">\u2713 Confirm</button>
+              <button class="sht-btn ghost" style="flex:1;padding:8px;font-size:9px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text-dim);font-family:'DM Mono',monospace;cursor:pointer;"
+                onclick="event.stopPropagation();openTxDetail('${t.id}');">Edit Details</button>
+            </div>
+          </div>`;}).join('')}</div>`;
     }catch(e){body.innerHTML='<div class="empty-msg">Failed to load</div>';}
   });
+}
+
+async function resolveUnsure(txId,btn){
+  try{
+    await fetch(`${API}/api/transactions/${txId}/status`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({status:'confirmed'})
+    });
+    const row=btn.closest('.tx-row');
+    if(row){row.style.transition='opacity .3s';row.style.opacity='0';setTimeout(()=>row.remove(),300);}
+    const t=transactions.find(tx=>tx.id===txId);
+    if(t)t.status='confirmed';
+    renderAll();
+    showToast('Charge confirmed');
+  }catch(e){alert('Error: '+e.message);}
 }
 
 function toggleTop20(){
@@ -2826,48 +2852,93 @@ async function openVendorWizard(){
       const lowPriority=needsReview.filter(v=>v.total_spend<25&&v.tx_count<2);
       preAccepted.forEach(v=>{const m=mapCategoryFrontend(v.plaid_category);if(m&&m!=='Other')window._wizardAssignments[v.vendor]={category:m,type:v.inferred_type||'expense',auto:true};});
 
-      let html=`<div style="text-align:center;padding:16px 0;border-bottom:1px solid var(--border);margin-bottom:16px">
+      const initialDone=withRules.length+preAccepted.length;
+      const initialPct=Math.min(100,Math.round(initialDone/Math.max(1,vendors.length)*100));
+      let html=`<div style="text-align:center;padding:16px 0;border-bottom:1px solid var(--border);margin-bottom:16px;position:sticky;top:0;z-index:5;background:var(--bg);padding-bottom:12px">
         <div style="font-family:'Playfair Display',serif;font-size:22px;margin-bottom:4px">Organize Your Spending</div>
         <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted)">${stats.total_vendors} vendors \u00B7 ${money(stats.total_spend)} total</div>
-        <div class="bar-track" style="margin:12px 20px 0"><div class="bar-fill" id="wizard-progress" style="width:${stats.coverage_pct}%;background:var(--gold)"></div></div>
-        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--gold);margin-top:6px" id="wizard-progress-label">${stats.coverage_pct}% categorized</div>
+        <div class="bar-track" style="margin:12px 20px 0"><div class="bar-fill" id="wizard-progress" style="width:${initialPct}%;background:var(--gold)"></div></div>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--gold);margin-top:6px" id="wizard-progress-label">${initialPct}% categorized</div>
       </div>`;
       if(highPriority.length){html+=`<div class="txd-label">${highPriority.length} vendors need your input</div>`;html+=highPriority.map(v=>wizardVendorRow(v,cats)).join('');}
       if(preAccepted.length){html+=`<div class="txd-label" style="color:var(--green);margin-top:16px">\u2713 ${preAccepted.length} auto-categorized</div>`;html+=preAccepted.map(v=>wizardVendorRow(v,cats,true)).join('');}
       if(lowPriority.length){html+=`<div class="txd-label" style="margin-top:16px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">${lowPriority.length} small vendors \u25BE</div><div style="display:none">${lowPriority.map(v=>wizardVendorRow(v,cats)).join('')}</div>`;}
-      if(withRules.length){html+=`<div class="txd-label" style="margin-top:16px;cursor:pointer;color:var(--text-muted)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">\u2713 ${withRules.length} already categorized \u25BE</div><div style="display:none">${withRules.map(v=>`<div style="padding:10px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);margin-bottom:6px;opacity:.6;display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">${v.vendor}</div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted)">${v.tx_count} txns \u00B7 ${v.rule_category}</div></div><div style="color:var(--green)">\u2713</div></div>`).join('')}</div>`;}
+      if(withRules.length){html+=`<div class="txd-label" style="margin-top:16px;cursor:pointer;color:var(--text-muted)" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">\u2713 ${withRules.length} already categorized \u25BE</div><div style="display:none">${withRules.map(v=>wizardVendorRow(v,cats,false,true)).join('')}</div>`;}
       html+=`<div style="position:sticky;bottom:0;padding:16px 0;background:linear-gradient(0deg,var(--bg) 80%,transparent)"><button class="sht-btn primary" style="width:100%" onclick="submitVendorWizard()">Save All Assignments</button></div>`;
       body.innerHTML=html;
     }catch(e){body.innerHTML='<div class="empty-msg">Failed: '+e.message+'</div>';}
   });
 }
 
-function wizardVendorRow(v,cats,preAccepted){
+function wizardVendorRow(v,cats,preAccepted,hasRule){
   const existing=window._wizardAssignments[v.vendor];
-  const currentCat=existing?.category||(preAccepted?mapCategoryFrontend(v.plaid_category):null);
+  const currentCat=existing?.category||(hasRule?v.rule_category:null)||(preAccepted?mapCategoryFrontend(v.plaid_category):null);
   const esc=v.vendor.replace(/'/g,"\\'");
-  return`<div class="wizard-vendor-row ${currentCat?'done':''}" data-vendor="${v.vendor.replace(/"/g,'&quot;')}">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+  const escHtml=v.vendor.replace(/"/g,'&quot;');
+  const pillsHidden=hasRule&&!existing;
+  return`<div class="wizard-vendor-row ${currentCat?'done':''}" data-vendor="${escHtml}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;cursor:pointer" onclick="toggleWizardPills(this)">
       <div><div style="font-size:14px;font-weight:500">${v.vendor}</div>
-        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted)">${v.tx_count} txn${v.tx_count!==1?'s':''} ${v.plaid_category&&v.plaid_category!=='Other'?'\u00B7 Plaid: '+v.plaid_category:''}</div></div>
+        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted)">${v.tx_count} txn${v.tx_count!==1?'s':''} ${currentCat?'\u00B7 '+currentCat:''}${v.plaid_category&&v.plaid_category!=='Other'&&!currentCat?' \u00B7 Plaid: '+v.plaid_category:''}</div></div>
       <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--red)">${money(v.total_spend)}</div>
     </div>
-    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none">
+    <div class="wizard-pills-wrap" style="${pillsHidden?'display:none;':''}display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;flex-wrap:wrap">
       ${cats.map(c=>`<div class="wizard-pill ${currentCat===c?'selected':''}" onclick="wizardAssignVendor('${esc}','${c}',this)">${CAT_ICONS[c]||'\u{1F4CC}'} ${c}</div>`).join('')}
+      <div class="wizard-pill" onclick="wizardNewCategory('${esc}',this)" style="border-style:dashed">+ New</div>
     </div>
+    <div style="margin-top:4px"><span class="wizard-expand-btn" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);cursor:pointer;text-decoration:underline" onclick="expandWizardTxns('${esc}',this)">View ${v.tx_count} transactions</span></div>
   </div>`;
+}
+
+function toggleWizardPills(header){
+  const wrap=header.parentElement.querySelector('.wizard-pills-wrap');
+  if(wrap&&wrap.style.display==='none')wrap.style.display='flex';
+}
+
+async function expandWizardTxns(vendor,btn){
+  const container=btn.parentElement;
+  if(container.querySelector('.wizard-txn-list')){container.querySelector('.wizard-txn-list').remove();btn.textContent=`View transactions`;return;}
+  btn.textContent='Loading...';
+  try{
+    const res=await fetch(`${API}/api/transactions?userId=${currentUser}&vendor=${encodeURIComponent(vendor)}&limit=10`);
+    const data=await res.json();
+    const txs=data.transactions||data||[];
+    if(!txs.length){btn.textContent='No transactions found';return;}
+    const list=document.createElement('div');
+    list.className='wizard-txn-list';
+    list.style.cssText='margin-top:6px;padding:8px;background:var(--surface2);border-radius:8px;';
+    list.innerHTML=txs.map(t=>`<div style="display:flex;justify-content:space-between;padding:4px 0;font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);border-bottom:1px solid var(--border)"><span>${t.date}</span><span style="color:var(--text)">${money(t.amount)}</span></div>`).join('');
+    container.appendChild(list);
+    btn.textContent='Hide transactions';
+  }catch(e){btn.textContent='Error loading';}
+}
+
+function wizardNewCategory(vendor,btn){
+  const name=prompt('New category name:');
+  if(!name||!name.trim())return;
+  const cat=name.trim();
+  if(!CAT_ICONS[cat])CAT_ICONS[cat]='\u{1F4CC}';
+  wizardAssignVendor(vendor,cat,btn);
 }
 
 function wizardAssignVendor(vendor,category,el){
   const v=window._wizardVendors?.find(x=>x.vendor===vendor);
   window._wizardAssignments[vendor]={category,type:v?.inferred_type||'expense'};
   const row=el.closest('.wizard-vendor-row');
-  row.classList.add('done');
-  row.querySelectorAll('.wizard-pill').forEach(p=>p.classList.remove('selected'));
-  el.classList.add('selected');
+  if(row){
+    row.classList.add('done');
+    row.querySelectorAll('.wizard-pill').forEach(p=>p.classList.remove('selected'));
+    if(el.classList)el.classList.add('selected');
+  }
+  updateWizardProgress();
+}
+
+function updateWizardProgress(){
   const total=window._wizardVendors?.length||1;
-  const done=Object.keys(window._wizardAssignments).length;
-  const pct=Math.round(done/total*100);
+  const existingRules=window._wizardVendors?.filter(v=>v.has_rule).length||0;
+  const assigned=Object.keys(window._wizardAssignments).length;
+  const done=existingRules+assigned;
+  const pct=Math.min(100,Math.round(done/total*100));
   const fill=$('wizard-progress');if(fill)fill.style.width=pct+'%';
   const label=$('wizard-progress-label');if(label)label.textContent=pct+'% categorized';
 }
@@ -3452,7 +3523,31 @@ function toggleChat(){
   chatOpen=!chatOpen;
   $('chat-panel').classList.toggle('open',chatOpen);
   $('chat-fab').classList.toggle('hidden',chatOpen);
-  if(chatOpen)$('chat-input').focus();
+  if(chatOpen){
+    $('chat-input').focus();
+    if(!chatHistory.length)renderChatSuggestions();
+  }
+}
+
+function renderChatSuggestions(){
+  const el=$('chat-suggestions');
+  if(!el)return;
+  const chips=getContextualSuggestions();
+  el.innerHTML=chips.map(c=>`<button class="chat-chip" onclick="sendSuggestion('${c.text.replace(/'/g,"\\'")}');">${c.icon} ${c.text}</button>`).join('');
+}
+
+function getContextualSuggestions(){
+  const suggestions=[];
+  suggestions.push({text:'How am I doing this month?',icon:'📊'});
+  const uncatCount=transactions.filter(t=>t.cat==='Other'&&!t.reviewed).length;
+  if(uncatCount>0)suggestions.push({text:`Categorize my ${uncatCount} uncategorized transactions`,icon:'🏷️'});
+  suggestions.push({text:'Am I on budget?',icon:'💰'});
+  if(new Date().getDate()>15)suggestions.push({text:'Will I stay under budget this month?',icon:'🎯'});
+  suggestions.push({text:'What subscriptions am I paying for?',icon:'🔄'});
+  suggestions.push({text:'Compare this month to last month',icon:'📈'});
+  suggestions.push({text:'Where am I spending the most?',icon:'🔍'});
+  suggestions.push({text:'Suggest budgets based on my spending',icon:'💡'});
+  return suggestions.slice(0,6);
 }
 
 function sendSuggestion(text){
@@ -3506,10 +3601,23 @@ async function sendChat(){
       scrollChat();
     }
     if(data.actionExecuted)await loadData();
+    // If AI took write actions via tool loop, refresh app data
+    if(data.actions&&data.actions.length>0){
+      await loadData();
+      showToast(`Obsidian AI updated ${data.actions.length} item${data.actions.length>1?'s':''}`);
+    }
   }catch(e){
     $('chat-typing')?.remove();
     appendChatMsg('assistant','Sorry, I hit an error: '+e.message);
   }
+}
+
+function showToast(message){
+  const toast=document.createElement('div');
+  toast.style.cssText=`position:fixed;top:100px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--gold);border-radius:12px;padding:10px 20px;font-family:'DM Mono',monospace;font-size:11px;color:var(--gold);z-index:999;animation:fadeUp .3s ease;box-shadow:0 4px 20px rgba(0,0,0,.4)`;
+  toast.textContent=message;
+  document.body.appendChild(toast);
+  setTimeout(()=>toast.remove(),3000);
 }
 
 async function confirmChatAction(){

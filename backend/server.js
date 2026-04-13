@@ -164,6 +164,16 @@ async function initDB() {
   // Ensure all amounts are positive (Math.abs) — undo any negative amount migration
   await run("UPDATE transactions SET amount = ABS(amount) WHERE amount < 0");
 
+  // ── FIX MISCLASSIFIED TRANSFERS (v8) ──
+  await run(`UPDATE transactions SET cat='Transfer', type='transfer'
+    WHERE reviewed=FALSE AND cat != 'Transfer' AND (
+      UPPER("desc") LIKE 'XFER %' OR UPPER("desc") LIKE 'EXT XFER%'
+      OR UPPER("desc") LIKE '%OFFICIAL CHECK%'
+      OR (UPPER("desc") LIKE '%CREDIT CARD%' AND UPPER("desc") LIKE '%PAYMENT%')
+      OR UPPER("desc") LIKE '%AUTOMATIC PAYMENT%'
+      OR UPPER("desc") LIKE '%PAYMENT - THANK%'
+    )`);
+
   await pool.query(`INSERT INTO users (id, name, household) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, ['christian', 'Christian', 'spenziero']);
   await pool.query(`INSERT INTO users (id, name, household) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, ['wife', 'Marisol', 'spenziero']);
   const defaultBudgets = {Housing:2000,Food:800,Transport:400,Health:300,Entertainment:200,Shopping:400,Utilities:250};
@@ -193,6 +203,8 @@ async function getHousehold(userId) {
 function mapCategory(plaidCat) {
   if (!plaidCat) return 'Other';
   const c = plaidCat.toUpperCase();
+  // Transfer detection first — highest priority
+  if (c.includes('TRANSFER') || c.includes('WIRE') || c.includes('ACH'))          return 'Transfer';
   if (c.includes('RENT') || c.includes('MORTGAGE') || c.includes('HOME'))         return 'Housing';
   if (c.includes('FOOD') || c.includes('RESTAURANT') || c.includes('GROCERY'))    return 'Food';
   if (c.includes('TRANSPORT') || c.includes('TRAVEL') || c.includes('GAS') || c.includes('AUTO')) return 'Transport';
@@ -200,9 +212,24 @@ function mapCategory(plaidCat) {
   if (c.includes('ENTERTAINMENT') || c.includes('RECREATION'))                    return 'Entertainment';
   if (c.includes('SHOPS') || c.includes('SHOPPING') || c.includes('MERCHANDISE')) return 'Shopping';
   if (c.includes('UTILITIES') || c.includes('TELECOM') || c.includes('INTERNET')) return 'Utilities';
-  if (c.includes('TRANSFER_OUT') || c.includes('TRANSFER_IN'))                    return 'Transfer';
   if (c.includes('PAYROLL') || c.includes('INCOME') || c.includes('DEPOSIT'))     return 'Income';
   return 'Other';
+}
+
+// Detect transfers from transaction name (for cases Plaid doesn't catch)
+function isTransferByName(name) {
+  if (!name) return false;
+  const desc = name.toUpperCase();
+  return (
+    desc.startsWith('XFER ') || desc.startsWith('EXT XFER') ||
+    desc.includes('TRANSFER') || desc.includes('AUTOPAY') ||
+    (desc.includes('CREDIT CARD') && desc.includes('PAYMENT')) ||
+    desc.includes('CD DEPOSIT') ||
+    (desc.includes('SAVINGS') && desc.includes('WITHDRAWAL')) ||
+    desc.includes('AUTOMATIC PAYMENT') ||
+    desc.includes('PAYMENT - THANK') ||
+    desc.startsWith('OFFICIAL CHECK')
+  );
 }
 
 async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
@@ -234,10 +261,14 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
 
   console.log(`  Fetched ${allTransactions.length} of ${totalAvailable} transactions (${Math.ceil(totalAvailable / batchSize)} pages)`);
 
-  // ── LOAD VENDOR RULES ──
+  // ── LOAD VENDOR RULES (case-insensitive lookup) ──
   const vendorRules = {};
+  const vendorRulesUpper = {};
   (await all('SELECT vendor, category, type FROM vendor_rules WHERE household = ?', [household]))
-    .forEach(r => { vendorRules[r.vendor] = { cat: r.category, type: r.type }; });
+    .forEach(r => {
+      vendorRules[r.vendor] = { cat: r.category, type: r.type };
+      vendorRulesUpper[r.vendor.toUpperCase().trim()] = { cat: r.category, type: r.type };
+    });
 
   // ── UPSERT WITH THREE-TIER CATEGORIZATION (inside a transaction) ──
   const client = await pool.connect();
@@ -245,7 +276,8 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
     await client.query('BEGIN');
 
     for (const t of allTransactions) {
-      const rule = vendorRules[t.name];
+      // Case-insensitive vendor rule lookup
+      const rule = vendorRules[t.name] || vendorRulesUpper[(t.name || '').toUpperCase().trim()];
       let cat, type, reviewed;
 
       if (rule) {
@@ -263,12 +295,12 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
           type = existing.type;
           reviewed = true;
         } else {
-          // TIER 3: Plaid categorization
+          // TIER 3: Plaid categorization + name-based transfer detection
           cat = mapCategory(t.personal_finance_category?.primary || t.category?.[0]);
-          // Trust Plaid's categorization — no keyword overrides
-          // Plaid already tags inter-account transfers correctly
-          // Things like Venmo, PayPal, mortgage payments are real expenses, not transfers
-          // NO REFUND TYPE — only income, expense, transfer
+          // Check transaction name for transfer patterns Plaid may miss
+          if (cat !== 'Transfer' && isTransferByName(t.name)) {
+            cat = 'Transfer';
+          }
           type = cat === 'Transfer' ? 'transfer' : (t.amount > 0 ? 'expense' : 'income');
           reviewed = false;
         }
@@ -404,8 +436,18 @@ app.post('/api/exchange_public_token', async (req, res) => {
 });
 
 app.get('/api/transactions', async (req, res) => {
-  const { userId = 'christian', days = 60, household: hhParam = 'true', startDate, endDate } = req.query;
+  const { userId = 'christian', days = 60, household: hhParam = 'true', startDate, endDate, vendor, limit } = req.query;
   try {
+    // Quick vendor lookup
+    if (vendor) {
+      const hh = await getHousehold(userId);
+      const lim = parseInt(limit) || 20;
+      const txs = await all(`SELECT t.*, u.name as user_name FROM transactions t
+        LEFT JOIN users u ON t.user_id = u.id
+        WHERE t.household = $1 AND t."desc" ILIKE $2
+        ORDER BY t.date DESC LIMIT ${lim}`, [hh, `%${vendor}%`]);
+      return res.json({ transactions: txs, total: txs.length });
+    }
     let txs;
     if (startDate && endDate) {
       if (hhParam === 'true') {
@@ -1165,38 +1207,366 @@ const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
 
 // ─── AI AGENT TOOLS ─────────────────────────────────────────────
 const agentTools = [
-  { name: 'change_vendor_category', description: 'Change the category for ALL transactions from a specific vendor. This creates a vendor rule so future transactions are also categorized.', input_schema: { type: 'object', properties: { vendor: { type: 'string', description: 'Exact vendor name as it appears in transactions' }, category: { type: 'string', description: 'Target category name (e.g., Food, Shopping, Housing)' } }, required: ['vendor', 'category'] } },
-  { name: 'set_budget', description: 'Set or update the monthly budget amount for a category', input_schema: { type: 'object', properties: { category: { type: 'string', description: 'Category name' }, amount: { type: 'number', description: 'Monthly budget amount in dollars' } }, required: ['category', 'amount'] } },
-  { name: 'create_category', description: 'Create a new spending category', input_schema: { type: 'object', properties: { name: { type: 'string', description: 'New category name' }, icon: { type: 'string', description: 'Emoji icon for the category' }, budget: { type: 'number', description: 'Optional monthly budget amount' } }, required: ['name'] } },
-  { name: 'get_vendor_transactions', description: 'Look up all transactions from a specific vendor', input_schema: { type: 'object', properties: { vendor: { type: 'string', description: 'Vendor name to search for (partial match supported)' } }, required: ['vendor'] } },
+  {
+    name: 'search_transactions',
+    description: 'Search for transactions matching criteria. Use when user asks about specific charges, vendors, amounts, or date ranges.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        vendor: { type: 'string', description: 'Vendor/merchant name to search (partial match)' },
+        category: { type: 'string', description: 'Category to filter by' },
+        min_amount: { type: 'number', description: 'Minimum transaction amount' },
+        max_amount: { type: 'number', description: 'Maximum transaction amount' },
+        start_date: { type: 'string', description: 'Start date (YYYY-MM-DD)' },
+        end_date: { type: 'string', description: 'End date (YYYY-MM-DD)' },
+        type: { type: 'string', enum: ['expense', 'income', 'transfer'], description: 'Transaction type filter' },
+        limit: { type: 'integer', description: 'Max results to return (default 20)' }
+      }
+    }
+  },
+  {
+    name: 'get_spending_summary',
+    description: 'Get spending breakdown by category or vendor for a date range. Use for questions like "how much did I spend on food" or "what are my biggest categories".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        start_date: { type: 'string', description: 'Start date (YYYY-MM-DD)' },
+        end_date: { type: 'string', description: 'End date (YYYY-MM-DD)' },
+        group_by: { type: 'string', enum: ['category', 'vendor'], description: 'How to group the results' }
+      },
+      required: ['start_date', 'end_date', 'group_by']
+    }
+  },
+  {
+    name: 'get_vendor_history',
+    description: 'Get all transactions from a specific vendor. Use when user asks about a specific merchant or store.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        vendor: { type: 'string', description: 'Vendor name (partial match)' },
+        months: { type: 'integer', description: 'How many months back to look (default 6)' }
+      },
+      required: ['vendor']
+    }
+  },
+  {
+    name: 'recategorize_vendor',
+    description: 'Change the category for ALL transactions from a vendor. Creates a vendor rule for future transactions too. ALWAYS confirm with user before executing.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        vendor: { type: 'string', description: 'Exact vendor name' },
+        category: { type: 'string', description: 'New category to assign' },
+        type: { type: 'string', enum: ['expense', 'income', 'transfer'], description: 'Transaction type' }
+      },
+      required: ['vendor', 'category']
+    }
+  },
+  {
+    name: 'set_budget',
+    description: 'Create or update a monthly budget for a category.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', description: 'Category name' },
+        amount: { type: 'number', description: 'Monthly budget amount in dollars' }
+      },
+      required: ['category', 'amount']
+    }
+  },
+  {
+    name: 'create_category',
+    description: 'Create a new spending category.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Category name' },
+        icon: { type: 'string', description: 'Emoji icon for the category' }
+      },
+      required: ['name']
+    }
+  },
+  {
+    name: 'add_note',
+    description: 'Add a note to a specific transaction.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        transaction_id: { type: 'string', description: 'Transaction ID' },
+        note: { type: 'string', description: 'Note text to add' }
+      },
+      required: ['transaction_id', 'note']
+    }
+  },
+  {
+    name: 'add_tags',
+    description: 'Add a tag to one or more transactions. Use for bulk tagging like "tag all Costco as tax-deductible".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        vendor: { type: 'string', description: 'If tagging by vendor, the vendor name' },
+        transaction_ids: { type: 'array', items: { type: 'string' }, description: 'Specific transaction IDs to tag' },
+        tag: { type: 'string', description: 'Tag name' }
+      },
+      required: ['tag']
+    }
+  },
+  {
+    name: 'get_recurring',
+    description: 'List all confirmed recurring charges and subscriptions with amounts and frequency.',
+    input_schema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'get_budget_status',
+    description: 'Get current budget vs actual spending for all categories.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        month: { type: 'string', description: 'Month in YYYY-MM format (default current month)' }
+      }
+    }
+  },
+  {
+    name: 'forecast_balance',
+    description: 'Project what the user\'s balance will be at a future date based on income/expense patterns.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        target_date: { type: 'string', description: 'Future date to project to (YYYY-MM-DD)' }
+      },
+      required: ['target_date']
+    }
+  },
+  {
+    name: 'compare_periods',
+    description: 'Compare spending between two time periods. Use for "how does this month compare to last month" questions.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        period1_start: { type: 'string', description: 'First period start date' },
+        period1_end: { type: 'string', description: 'First period end date' },
+        period2_start: { type: 'string', description: 'Second period start date' },
+        period2_end: { type: 'string', description: 'Second period end date' },
+        group_by: { type: 'string', enum: ['category', 'vendor', 'total'], description: 'Comparison grouping' }
+      },
+      required: ['period1_start', 'period1_end', 'period2_start', 'period2_end']
+    }
+  },
+  {
+    name: 'suggest_budgets',
+    description: 'Analyze spending history and suggest budget amounts for each category. Optionally apply a savings target percentage.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        savings_target_pct: { type: 'number', description: 'Desired savings percentage (e.g. 15 for 15%)' },
+        months_to_analyze: { type: 'integer', description: 'How many months of history to analyze (default 3)' }
+      }
+    }
+  },
+  {
+    name: 'merge_vendors',
+    description: 'Merge duplicate vendor names that refer to the same merchant. Keeps the primary vendor name and recategorizes all transactions from the merged names.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        primary_vendor: { type: 'string', description: 'The vendor name to keep' },
+        merge_vendors: { type: 'array', items: { type: 'string' }, description: 'Vendor names to merge into the primary' }
+      },
+      required: ['primary_vendor', 'merge_vendors']
+    }
+  }
 ];
 
-async function executeAgentTool(toolName, toolInput, hh, userId) {
+const WRITE_TOOLS = new Set(['recategorize_vendor', 'set_budget', 'create_category', 'add_note', 'add_tags', 'merge_vendors']);
+
+async function executeAgentTool(toolName, toolInput, hh) {
+  const now = new Date();
+  const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  const currentMonthEnd = new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().split('T')[0];
+
   switch (toolName) {
-    case 'change_vendor_category': {
-      const { vendor, category } = toolInput;
-      await pool.query(`INSERT INTO vendor_rules (household, vendor, category, type, updated_at) VALUES ($1,$2,$3,'expense',NOW()) ON CONFLICT (household, vendor) DO UPDATE SET category=EXCLUDED.category, updated_at=NOW()`, [hh, vendor, category]);
-      const r = await pool.query('UPDATE transactions SET cat=$1, reviewed=TRUE WHERE household=$2 AND "desc"=$3', [category, hh, vendor]);
-      await pool.query('INSERT INTO categories (id, household) VALUES ($1,$2) ON CONFLICT DO NOTHING', [category, hh]);
-      return `Changed ${r.rowCount} transactions from "${vendor}" to category "${category}". Future transactions will also be categorized automatically.`;
+
+    case 'search_transactions': {
+      let conditions = ['t.household = $1'];
+      let params = [hh];
+      let idx = 2;
+      if (toolInput.vendor) { conditions.push(`t."desc" ILIKE $${idx}`); params.push(`%${toolInput.vendor}%`); idx++; }
+      if (toolInput.category) { conditions.push(`t.cat = $${idx}`); params.push(toolInput.category); idx++; }
+      if (toolInput.min_amount) { conditions.push(`t.amount >= $${idx}`); params.push(toolInput.min_amount); idx++; }
+      if (toolInput.max_amount) { conditions.push(`t.amount <= $${idx}`); params.push(toolInput.max_amount); idx++; }
+      if (toolInput.start_date) { conditions.push(`t.date >= $${idx}`); params.push(toolInput.start_date); idx++; }
+      if (toolInput.end_date) { conditions.push(`t.date <= $${idx}`); params.push(toolInput.end_date); idx++; }
+      if (toolInput.type) { conditions.push(`t.type = $${idx}`); params.push(toolInput.type); idx++; }
+      const limit = toolInput.limit || 20;
+      const rows = await all(`SELECT t.id, t."desc", t.amount, t.type, t.cat, t.date, t.pending
+        FROM transactions t WHERE ${conditions.join(' AND ')}
+        ORDER BY t.date DESC LIMIT ${limit}`, params);
+      return { transactions: rows, count: rows.length };
     }
+
+    case 'get_spending_summary': {
+      const { start_date, end_date, group_by } = toolInput;
+      const groupCol = group_by === 'vendor' ? '"desc"' : 'cat';
+      const rows = await all(`SELECT ${groupCol} as name, SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) as debits,
+        SUM(CASE WHEN type='income' THEN amount ELSE 0 END) as credits, COUNT(*) as tx_count
+        FROM transactions WHERE household = $1 AND date >= $2 AND date <= $3
+        GROUP BY ${groupCol} ORDER BY SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) DESC`,
+        [hh, start_date, end_date]);
+      const total = rows.reduce((a, r) => a + parseFloat(r.debits) - parseFloat(r.credits), 0);
+      return { breakdown: rows.map(r => ({ ...r, net: parseFloat(r.debits) - parseFloat(r.credits) })), total };
+    }
+
+    case 'get_vendor_history': {
+      const months = toolInput.months || 6;
+      const cutoff = new Date(); cutoff.setMonth(cutoff.getMonth() - months);
+      const rows = await all(`SELECT id, "desc", amount, type, cat, date
+        FROM transactions WHERE household = $1 AND "desc" ILIKE $2 AND date >= $3
+        ORDER BY date DESC`, [hh, `%${toolInput.vendor}%`, cutoff.toISOString().split('T')[0]]);
+      const total = rows.reduce((a, r) => a + (r.type === 'expense' ? parseFloat(r.amount) : -parseFloat(r.amount)), 0);
+      return { vendor: toolInput.vendor, transactions: rows, total, count: rows.length };
+    }
+
+    case 'recategorize_vendor': {
+      const { vendor, category, type: txType } = toolInput;
+      const resolvedType = txType || 'expense';
+      await run(`INSERT INTO vendor_rules (household, vendor, category, type, updated_at)
+        VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT (household, vendor) DO UPDATE SET category=$3, type=$4, updated_at=NOW()`,
+        [hh, vendor, category, resolvedType]);
+      const result = await run('UPDATE transactions SET cat=$1, type=$2, reviewed=TRUE WHERE household=$3 AND "desc"=$4',
+        [category, resolvedType, hh, vendor]);
+      await run('INSERT INTO categories (id, household) VALUES ($1, $2) ON CONFLICT DO NOTHING', [category, hh]);
+      return { success: true, vendor, category, type: resolvedType, transactions_updated: result.changes };
+    }
+
     case 'set_budget': {
-      const { category, amount } = toolInput;
-      await pool.query(`INSERT INTO categories (id, household, budget_amount) VALUES ($1,$2,$3) ON CONFLICT (id, household) DO UPDATE SET budget_amount=EXCLUDED.budget_amount`, [category, hh, amount]);
-      return `Set monthly budget for "${category}" to $${amount.toFixed(2)}.`;
+      await pool.query(`INSERT INTO categories (id, household, budget_amount) VALUES ($1,$2,$3)
+        ON CONFLICT (id, household) DO UPDATE SET budget_amount=EXCLUDED.budget_amount`,
+        [toolInput.category, hh, toolInput.amount]);
+      return { success: true, category: toolInput.category, amount: toolInput.amount };
     }
+
     case 'create_category': {
-      const { name, icon, budget } = toolInput;
-      await pool.query(`INSERT INTO categories (id, household, icon, budget_amount) VALUES ($1,$2,$3,$4) ON CONFLICT (id, household) DO UPDATE SET icon=COALESCE(EXCLUDED.icon, categories.icon), budget_amount=COALESCE(EXCLUDED.budget_amount, categories.budget_amount)`, [name, hh, icon || '📌', budget || 0]);
-      return `Created category "${name}"${icon ? ' with icon ' + icon : ''}${budget ? ' and $' + budget + '/month budget' : ''}.`;
+      await pool.query('INSERT INTO categories (id, household, icon) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [toolInput.name, hh, toolInput.icon || '📌']);
+      return { success: true, category: toolInput.name };
     }
-    case 'get_vendor_transactions': {
-      const { vendor } = toolInput;
-      const txs = await all(`SELECT "desc", amount, type, cat, date FROM transactions WHERE household=$1 AND "desc" ILIKE $2 ORDER BY date DESC LIMIT 20`, [hh, `%${vendor}%`]);
-      if (!txs.length) return `No transactions found matching "${vendor}".`;
-      return txs.map(t => `${t.date} | ${t.type} | ${t.cat} | ${t.desc} | $${parseFloat(t.amount).toFixed(2)}`).join('\n');
+
+    case 'add_note': {
+      await run('UPDATE transactions SET notes=$1 WHERE id=$2 AND household=$3',
+        [toolInput.note, toolInput.transaction_id, hh]);
+      return { success: true };
     }
-    default: return 'Unknown tool';
+
+    case 'add_tags': {
+      let txIds = toolInput.transaction_ids || [];
+      if (toolInput.vendor && !txIds.length) {
+        const rows = await all('SELECT id FROM transactions WHERE household=$1 AND "desc" ILIKE $2',
+          [hh, `%${toolInput.vendor}%`]);
+        txIds = rows.map(r => r.id);
+      }
+      for (const id of txIds) {
+        await run('INSERT INTO transaction_tags (transaction_id, tag, household) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+          [id, toolInput.tag, hh]);
+      }
+      return { success: true, tagged: txIds.length, tag: toolInput.tag };
+    }
+
+    case 'get_recurring': {
+      const recurring = await all('SELECT vendor, category, expected_amount, frequency, is_subscription, last_seen FROM recurring_rules WHERE household=$1 AND is_active=TRUE ORDER BY expected_amount DESC', [hh]);
+      const total = recurring.reduce((a, r) => a + parseFloat(r.expected_amount || 0), 0);
+      return { recurring, monthly_total: total };
+    }
+
+    case 'get_budget_status': {
+      const month = toolInput.month || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      const [y, m] = month.split('-').map(Number);
+      const mStart = `${y}-${String(m).padStart(2,'0')}-01`;
+      const mEnd = new Date(y, m, 0).toISOString().split('T')[0];
+      const budgets = await all('SELECT id as category, budget_amount as amount FROM categories WHERE household=$1 AND budget_amount > 0', [hh]);
+      const spending = await all(`SELECT cat, SUM(amount) as spent FROM transactions WHERE household=$1 AND type='expense' AND date>=$2 AND date<=$3 GROUP BY cat`, [hh, mStart, mEnd]);
+      const spendMap = {};
+      spending.forEach(s => { spendMap[s.cat] = parseFloat(s.spent); });
+      return {
+        month,
+        budgets: budgets.map(b => ({
+          category: b.category,
+          budget: parseFloat(b.amount),
+          spent: spendMap[b.category] || 0,
+          remaining: parseFloat(b.amount) - (spendMap[b.category] || 0),
+          pct_used: b.amount > 0 ? Math.round((spendMap[b.category] || 0) / parseFloat(b.amount) * 100) : 0
+        }))
+      };
+    }
+
+    case 'forecast_balance': {
+      const accounts = await all('SELECT SUM(balance) as total FROM accounts WHERE household=$1', [hh]);
+      const currentBalance = parseFloat(accounts[0]?.total) || 0;
+      const targetDate = new Date(toolInput.target_date);
+      const daysAhead = Math.ceil((targetDate - now) / (1000*60*60*24));
+      const thirtyAgo = new Date(); thirtyAgo.setDate(thirtyAgo.getDate() - 30);
+      const recentTxs = await all(`SELECT type, SUM(amount) as total FROM transactions WHERE household=$1 AND date>=$2 GROUP BY type`, [hh, thirtyAgo.toISOString().split('T')[0]]);
+      const income30 = parseFloat(recentTxs.find(t => t.type === 'income')?.total || 0);
+      const expenses30 = parseFloat(recentTxs.find(t => t.type === 'expense')?.total || 0);
+      const dailyNet = (income30 - expenses30) / 30;
+      const projected = currentBalance + (dailyNet * daysAhead);
+      return { current_balance: currentBalance, target_date: toolInput.target_date, days_ahead: daysAhead, daily_net_avg: dailyNet, projected_balance: projected };
+    }
+
+    case 'compare_periods': {
+      const getData = async (start, end) => {
+        const groupCol = toolInput.group_by === 'vendor' ? '"desc"' : (toolInput.group_by === 'category' ? 'cat' : null);
+        if (groupCol) {
+          return await all(`SELECT ${groupCol} as name, SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) as expenses,
+            SUM(CASE WHEN type='income' THEN amount ELSE 0 END) as income, COUNT(*) as tx_count
+            FROM transactions WHERE household=$1 AND date>=$2 AND date<=$3 GROUP BY ${groupCol} ORDER BY SUM(amount) DESC`,
+            [hh, start, end]);
+        } else {
+          return await all(`SELECT type, SUM(amount) as total, COUNT(*) as cnt FROM transactions WHERE household=$1 AND date>=$2 AND date<=$3 GROUP BY type`, [hh, start, end]);
+        }
+      };
+      const p1 = await getData(toolInput.period1_start, toolInput.period1_end);
+      const p2 = await getData(toolInput.period2_start, toolInput.period2_end);
+      return { period1: { start: toolInput.period1_start, end: toolInput.period1_end, data: p1 }, period2: { start: toolInput.period2_start, end: toolInput.period2_end, data: p2 } };
+    }
+
+    case 'suggest_budgets': {
+      const months = toolInput.months_to_analyze || 3;
+      const cutoff = new Date(); cutoff.setMonth(cutoff.getMonth() - months);
+      const rows = await all(`SELECT cat, AVG(monthly_total) as avg_spend FROM (
+        SELECT cat, TO_CHAR(date::date, 'YYYY-MM') as month, SUM(amount) as monthly_total
+        FROM transactions WHERE household=$1 AND type='expense' AND date>=$2
+        GROUP BY cat, TO_CHAR(date::date, 'YYYY-MM')
+      ) sub GROUP BY cat ORDER BY avg_spend DESC`, [hh, cutoff.toISOString().split('T')[0]]);
+      const totalAvg = rows.reduce((a, r) => a + parseFloat(r.avg_spend), 0);
+      const savingsTarget = toolInput.savings_target_pct || 0;
+      const multiplier = savingsTarget > 0 ? (100 - savingsTarget) / 100 : 1.1;
+      return {
+        suggestions: rows.map(r => ({
+          category: r.cat,
+          avg_monthly_spend: Math.round(parseFloat(r.avg_spend) * 100) / 100,
+          suggested_budget: Math.round(parseFloat(r.avg_spend) * multiplier * 100) / 100
+        })),
+        total_avg_spend: totalAvg,
+        savings_target_pct: savingsTarget
+      };
+    }
+
+    case 'merge_vendors': {
+      const { primary_vendor, merge_vendors } = toolInput;
+      const primaryRule = await get('SELECT category, type FROM vendor_rules WHERE household=$1 AND vendor=$2', [hh, primary_vendor]);
+      if (!primaryRule) return { error: `No vendor rule found for "${primary_vendor}". Categorize the primary vendor first.` };
+      let totalUpdated = 0;
+      for (const v of merge_vendors) {
+        const r = await run('UPDATE transactions SET cat=$1, type=$2 WHERE household=$3 AND "desc"=$4',
+          [primaryRule.category, primaryRule.type, hh, v]);
+        totalUpdated += r.changes;
+        await run('DELETE FROM vendor_rules WHERE household=$1 AND vendor=$2', [hh, v]);
+      }
+      return { success: true, primary_vendor, merged: merge_vendors.length, transactions_updated: totalUpdated };
+    }
+
+    default:
+      return { error: `Unknown tool: ${toolName}` };
   }
 }
 
@@ -1210,8 +1580,8 @@ app.post('/api/chat', async (req, res) => {
 
     // If confirming a pending action, execute it
     if (confirmAction) {
-      const result = await executeAgentTool(confirmAction.tool, confirmAction.input, hh, userId);
-      return res.json({ reply: `✅ Done! ${result}`, actionExecuted: true });
+      const result = await executeAgentTool(confirmAction.tool, confirmAction.input, hh);
+      return res.json({ reply: `✅ Done! ${JSON.stringify(result)}`, actionExecuted: true });
     }
 
     const now = new Date();
@@ -1219,7 +1589,7 @@ app.post('/api/chat', async (req, res) => {
     const lastDay = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
     const monthEnd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
 
-    const monthTxs = await all(`SELECT "desc", amount, type, cat, date FROM transactions WHERE household = ? AND date >= ? AND date <= ? ORDER BY date DESC`, [hh, monthStart, monthEnd]);
+    const monthTxs = await all(`SELECT "desc", amount, type, cat, date FROM transactions WHERE household = $1 AND date >= $2 AND date <= $3 ORDER BY date DESC`, [hh, monthStart, monthEnd]);
     const income = monthTxs.filter(t=>t.type==='income').reduce((a,t)=>a+parseFloat(t.amount),0);
     const expenses = monthTxs.filter(t=>t.type==='expense').reduce((a,t)=>a+parseFloat(t.amount),0);
     const catSpend = {};
@@ -1227,9 +1597,9 @@ app.post('/api/chat', async (req, res) => {
     const vendorSpend = {};
     monthTxs.filter(t=>t.type==='expense').forEach(t=>{ vendorSpend[t.desc]=(vendorSpend[t.desc]||0)+parseFloat(t.amount); });
     const topVendors = Object.entries(vendorSpend).sort((a,b)=>b[1]-a[1]).slice(0,15);
-    const budgetRows = await all('SELECT id as category, budget_amount as amount FROM categories WHERE household = ? AND budget_amount > 0', [hh]);
-    const categories = await all('SELECT id, icon, budget_amount FROM categories WHERE household = ? AND is_active = TRUE', [hh]);
-    const accts = await all(`SELECT a.name, a.type, a.subtype, a.balance FROM accounts a JOIN users u ON a.user_id = u.id WHERE u.household = ?`, [hh]);
+    const budgetRows = await all('SELECT id as category, budget_amount as amount FROM categories WHERE household = $1 AND budget_amount > 0', [hh]);
+    const categories = await all('SELECT id, icon, budget_amount FROM categories WHERE household = $1 AND is_active = TRUE', [hh]);
+    const accts = await all(`SELECT a.name, a.type, a.subtype, a.balance FROM accounts a JOIN users u ON a.user_id = u.id WHERE u.household = $1`, [hh]);
 
     const context = `## Financial Data for ${now.toLocaleString('default',{month:'long',year:'numeric'})}
 ### Summary
@@ -1248,67 +1618,103 @@ ${accts.length?accts.map(a=>`- ${a.name} (${a.type}): $${(parseFloat(a.balance)|
 ### Recent Transactions (last 20)
 ${monthTxs.slice(0,20).map(t=>`- ${t.date} | ${t.type} | ${t.cat} | ${t.desc} | $${parseFloat(t.amount).toFixed(2)}`).join('\n')}`;
 
-    const systemPrompt = `You are Obsidian, an AI finance assistant for the Spenziero household. You have real financial data and can take actions on their behalf.
+    const systemPrompt = `You are Obsidian AI, a personal finance assistant for the ${hh} household. You have access to their real financial data and can take actions on their behalf.
 
 ${context}
 
 CAPABILITIES:
-- Answer questions about spending, income, budgets, and trends
-- Change vendor categories (e.g., "move Amazon to Shopping")
-- Set or update budgets (e.g., "set food budget to $1000")
-- Create new categories
-- Look up vendor transaction history
+- You can search transactions, analyze spending, compare periods, and forecast balances
+- You can recategorize vendors, set budgets, create categories, add notes and tags
+- You can suggest budgets based on spending history
+- You can review recurring charges and subscriptions
 
 RULES:
-- When the user asks you to make a change, USE THE APPROPRIATE TOOL. Don't just describe what to do.
-- Be concise — under 150 words unless detail is needed
-- Reference specific numbers from their data
-- Use $ formatting for amounts
-- Be conversational and helpful`;
+1. Use your tools to get precise data — don't guess from the summary above when exact data is available
+2. ALWAYS use tools for questions about specific vendors, amounts, or date ranges
+3. For WRITE actions (recategorize, set budget, create category), CONFIRM with the user before executing. Say what you'll do and ask "Should I go ahead?"
+4. After executing a write action, tell the user what changed (e.g. "Done — updated 34 Amazon transactions to Shopping")
+5. Be conversational but concise. Use specific $ amounts. No fluff
+6. Format amounts as $X,XXX.XX
+7. When comparing periods, calculate the actual difference and percentage change
+8. If the user asks to recategorize, search for matching transactions first to show them what will be affected
+9. Today's date is ${now.toISOString().split('T')[0]}`;
 
     const messages = [...history.slice(-10), { role: 'user', content: message }];
 
-    const response = await anthropic.messages.create({
+    // Initial API call with tools
+    let response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
+      max_tokens: 2048,
       system: systemPrompt,
-      messages,
       tools: agentTools,
+      messages,
     });
 
-    // Check if Claude wants to use a tool
-    const toolUse = response.content.find(c => c.type === 'tool_use');
-    if (toolUse) {
-      // Return the proposed action for user confirmation
-      const toolDescriptions = {
-        change_vendor_category: `Change all "${toolUse.input.vendor}" transactions to category "${toolUse.input.category}"`,
-        set_budget: `Set ${toolUse.input.category} budget to $${toolUse.input.amount}`,
-        create_category: `Create new category "${toolUse.input.name}"`,
-        get_vendor_transactions: `Look up transactions for "${toolUse.input.vendor}"`,
-      };
+    // Tool use loop — keep processing until we get a final text response
+    let allActions = [];
+    let iterations = 0;
+    const MAX_ITERATIONS = 5;
+    let loopMessages = [...messages];
 
-      // For read-only tools, execute immediately
-      if (toolUse.name === 'get_vendor_transactions') {
-        const result = await executeAgentTool(toolUse.name, toolUse.input, hh, userId);
-        // Send result back to Claude for a human-friendly response
-        const followUp = await anthropic.messages.create({
-          model: 'claude-sonnet-4-6', max_tokens: 1024, system: systemPrompt,
-          messages: [...messages, { role: 'assistant', content: response.content }, { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUse.id, content: result }] }],
+    while (response.stop_reason === 'tool_use' && iterations < MAX_ITERATIONS) {
+      iterations++;
+      const toolUseBlocks = response.content.filter(c => c.type === 'tool_use');
+
+      // Check if any write tools need confirmation (only on first encounter)
+      const writeToolUse = toolUseBlocks.find(t => WRITE_TOOLS.has(t.name));
+      if (writeToolUse && iterations === 1) {
+        const textContent = response.content.find(c => c.type === 'text');
+        return res.json({
+          reply: textContent?.text || `I'd like to make a change. Should I go ahead?`,
+          pendingAction: { tool: writeToolUse.name, input: writeToolUse.input }
         });
-        return res.json({ reply: followUp.content.find(c=>c.type==='text')?.text || result });
       }
 
-      // For write tools, ask for confirmation
-      const textContent = response.content.find(c => c.type === 'text');
-      return res.json({
-        reply: (textContent?.text || '') + `\n\n⚡ **Proposed action:** ${toolDescriptions[toolUse.name] || toolUse.name}`,
-        pendingAction: { tool: toolUse.name, input: toolUse.input, description: toolDescriptions[toolUse.name] }
+      // Add assistant message with tool calls
+      loopMessages.push({ role: 'assistant', content: response.content });
+
+      // Execute each tool call and collect results
+      const toolResultContents = [];
+      for (const tool of toolUseBlocks) {
+        try {
+          const result = await executeAgentTool(tool.name, tool.input, hh);
+          toolResultContents.push({
+            type: 'tool_result',
+            tool_use_id: tool.id,
+            content: JSON.stringify(result)
+          });
+          if (WRITE_TOOLS.has(tool.name)) {
+            allActions.push({ tool: tool.name, input: tool.input, result });
+          }
+        } catch (e) {
+          toolResultContents.push({
+            type: 'tool_result',
+            tool_use_id: tool.id,
+            content: JSON.stringify({ error: e.message }),
+            is_error: true
+          });
+        }
+      }
+
+      loopMessages.push({ role: 'user', content: toolResultContents });
+
+      // Get next response
+      response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2048,
+        system: systemPrompt,
+        tools: agentTools,
+        messages: loopMessages,
       });
     }
 
-    // No tool use — just a text response
-    const textContent = response.content.find(c => c.type === 'text');
-    res.json({ reply: textContent?.text || 'I couldn\'t generate a response.' });
+    // Extract text response
+    const textContent = response.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+
+    res.json({
+      reply: textContent || 'I couldn\'t generate a response.',
+      actions: allActions.length > 0 ? allActions : undefined,
+    });
   } catch (e) {
     console.error('Chat error:', e.message);
     res.status(500).json({ error: e.message });
@@ -1415,6 +1821,25 @@ app.post('/api/vendor-rules/bulk', async (req, res) => {
     } finally {
       client.release();
     }
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── VENDOR MERGE ──────────────────────────────────────────────
+app.post('/api/vendors/merge', async (req, res) => {
+  const { userId = 'christian', primary_vendor, merge_vendors } = req.body;
+  if (!primary_vendor || !merge_vendors?.length) return res.status(400).json({ error: 'Missing primary_vendor or merge_vendors' });
+  try {
+    const hh = await getHousehold(userId);
+    const primaryRule = await get('SELECT category, type FROM vendor_rules WHERE household=$1 AND vendor=$2', [hh, primary_vendor]);
+    if (!primaryRule) return res.status(400).json({ error: `No vendor rule found for "${primary_vendor}". Categorize the primary vendor first.` });
+    let totalUpdated = 0;
+    for (const v of merge_vendors) {
+      const r = await run('UPDATE transactions SET cat=$1, type=$2 WHERE household=$3 AND "desc"=$4',
+        [primaryRule.category, primaryRule.type, hh, v]);
+      totalUpdated += r.changes;
+      await run('DELETE FROM vendor_rules WHERE household=$1 AND vendor=$2', [hh, v]);
+    }
+    res.json({ success: true, merged: merge_vendors.length, transactions_updated: totalUpdated });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

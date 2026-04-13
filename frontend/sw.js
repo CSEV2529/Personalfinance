@@ -1,5 +1,5 @@
 /**
- * Ledger Service Worker
+ * Obsidian Service Worker
  * Caches the app shell for offline use.
  * Transactions always try network first, fall back to cache.
  */
@@ -57,7 +57,7 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   if (!e.data) return;
   const data = e.data.json();
-  self.registration.showNotification(data.title || 'Ledger', {
+  self.registration.showNotification(data.title || 'Obsidian', {
     body: data.body || '',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
