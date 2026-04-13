@@ -1900,11 +1900,15 @@ async function openBulkRecat(){
   $('recat-sheet').classList.add('on');
 }
 
+let _returnSheet=null;
 function onTxRowClick(e,id){
   // Select mode only works on the ledger tab
   if(selectMode && currentTab==='ledger'){e.stopPropagation();toggleSelectTx(id);return;}
-  // Close any open bottom sheets first
-  ['cat-sheet','vendor-sheet','recat-sheet'].forEach(s=>$(s)?.classList.remove('on'));
+  // Remember any open bottom sheet so we can restore it on back
+  _returnSheet=null;
+  ['cat-sheet','vendor-sheet','recat-sheet'].forEach(s=>{
+    if($(s)?.classList.contains('on')){_returnSheet=s;$(s).classList.remove('on');}
+  });
   openTxDetail(id);
 }
 
@@ -1988,16 +1992,33 @@ function closeTxDetail(){
   // Re-render any open parent pages so changed transactions are reflected
   if($('page-review')?.classList.contains('open')) refreshReviewQueue();
   if($('page-catdrill')?.classList.contains('open')){
-    // Re-render the category/vendor drill-down with fresh data
+    // Refresh the drill-down content in place without closing/reopening
     const title=$('catdrill-title')?.textContent;
-    if(title){
-      closePage('page-catdrill');
-      // Detect if it was a category or vendor drill-down and re-open
-      const isCat=Object.keys(CAT_COLORS).includes(title)||Object.keys(budgets).includes(title);
-      if(isCat) openCatDrill(title);
-      else openVendorSheet(title);
+    const body=$('catdrill-body');
+    if(title&&body){
+      const typeMap={Income:'income',Expenses:'expense',Transfers:'transfer'};
+      const typeKey=typeMap[title];
+      if(typeKey){
+        // It was a type sheet — re-render with fresh data
+        const txs=currentMonth().filter(t=>t.type===typeKey).sort((a,b)=>b.amount-a.amount);
+        const total=txs.reduce((a,t)=>a+Math.abs(t.amount),0);
+        body.querySelector('.tx-list').innerHTML=txRows(txs,false);
+        const statVals=body.querySelectorAll('.catd-stat-val');
+        if(statVals[0])statVals[0].textContent=txs.length;
+        if(statVals[1])statVals[1].textContent=money(total);
+      } else {
+        // Category or vendor drill-down — refresh tx list in place
+        const isCat=Object.keys(CAT_COLORS).includes(title)||Object.keys(budgets).includes(title);
+        const txs=isCat
+          ? currentMonth().filter(t=>t.cat===title).sort((a,b)=>new Date(b.date)-new Date(a.date))
+          : currentMonth().filter(t=>t.desc===title).sort((a,b)=>b.date.localeCompare(a.date));
+        const txList=body.querySelector('.tx-list');
+        if(txList) txList.innerHTML=txRows(txs,false);
+      }
     }
   }
+  // Restore any bottom sheet that was open before we opened tx detail
+  if(_returnSheet){$(_returnSheet)?.classList.add('on');_returnSheet=null;}
   renderAll();
 }
 
