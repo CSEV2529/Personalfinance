@@ -235,6 +235,13 @@ const plaidConfig = new Configuration({
 const plaid = new PlaidApi(plaidConfig);
 
 // ─── SUPABASE AUTH ──────────────────────────────────────────────
+console.log('  Auth config:', {
+  supabase_url: !!process.env.SUPABASE_URL,
+  anon_key: !!process.env.SUPABASE_ANON_KEY,
+  service_role: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+  jwt_secret: !!process.env.SUPABASE_JWT_SECRET,
+  jwt_secret_length: process.env.SUPABASE_JWT_SECRET?.length || 0
+});
 const supabaseAdmin = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
   ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
   : null;
@@ -267,6 +274,7 @@ async function requireAuth(req, res, next) {
       req.needsOnboarding = !hh;
       return next();
     } catch (e) {
+      console.error('JWT verification failed:', e.message, '| JWT secret length:', process.env.SUPABASE_JWT_SECRET?.length);
       return res.status(401).json({ error: 'Authentication failed: ' + e.message });
     }
   }
