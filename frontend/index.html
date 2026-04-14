@@ -1358,8 +1358,8 @@ function mapCategoryFrontend(plaidCat){
 const USER_INITIALS={christian:'C',wife:'M'};
 
 // ─── SUPABASE AUTH ───────────────────────────────────────────────
-const SUPABASE_URL = window.__OBSIDIAN_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = window.__OBSIDIAN_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = 'https://qjiizbvzvrixgjxaswmy.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqaWl6YnZ6dnJpeGdqeGFzd215Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMzM2MDMsImV4cCI6MjA5MDcwOTYwM30.jBDeFJI6qZVGRHU-Rflmcj5fTHKgfqubOPrtXuDPbXI';
 const supabaseClient = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase)
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 let accessToken = null;
