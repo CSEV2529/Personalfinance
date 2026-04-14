@@ -10,6 +10,8 @@ const { Pool } = require('pg');
 const path = require('path');
 const { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } = require('plaid');
 const Anthropic = require('@anthropic-ai/sdk');
+const jwt = require('jsonwebtoken');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(express.json());
@@ -132,6 +134,29 @@ async function initDB() {
     is_completed BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW()
   )`);
 
+  // ── AUTH TABLES (v10) ──
+  await pool.query(`CREATE TABLE IF NOT EXISTS households (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS household_members (
+    household_id UUID NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'member',
+    joined_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (household_id, user_id)
+  )`);
+  try { await pool.query('CREATE INDEX IF NOT EXISTS idx_hh_members_user ON household_members(user_id)'); } catch(e) {}
+  await pool.query(`CREATE TABLE IF NOT EXISTS user_profiles (
+    id TEXT PRIMARY KEY,
+    display_name TEXT,
+    avatar_color TEXT DEFAULT '#E8A828',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+  )`);
+
   // ── SEED CATEGORIES ──
   const defaultCats = {
     Housing: { icon: '🏠', color: '#ffd700' }, Food: { icon: '🍽️', color: '#34d399' },
@@ -209,9 +234,48 @@ const plaidConfig = new Configuration({
 });
 const plaid = new PlaidApi(plaidConfig);
 
+// ─── SUPABASE AUTH ──────────────────────────────────────────────
+const supabaseAdmin = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : null;
+
+// Legacy fallback — used during migration period when no JWT is present
 async function getHousehold(userId) {
+  // First check new household_members table
+  const member = await get('SELECT household_id FROM household_members WHERE user_id = $1 LIMIT 1', [userId]);
+  if (member) return member.household_id;
+  // Fall back to legacy users table
   const user = await get('SELECT household FROM users WHERE id = ?', [userId]);
   return user?.household || 'default';
+}
+
+// Auth middleware — supports JWT auth with legacy userId fallback
+async function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  // Try JWT auth first
+  if (authHeader && authHeader.startsWith('Bearer ') && process.env.SUPABASE_JWT_SECRET) {
+    try {
+      const token = authHeader.slice(7);
+      const payload = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
+      if (!payload.sub) return res.status(401).json({ error: 'Invalid token' });
+
+      req.user = { id: payload.sub, email: payload.email };
+
+      const hh = await get('SELECT household_id FROM household_members WHERE user_id = $1 LIMIT 1', [payload.sub]);
+      req.household = hh?.household_id || null;
+      req.needsOnboarding = !hh;
+      return next();
+    } catch (e) {
+      return res.status(401).json({ error: 'Authentication failed: ' + e.message });
+    }
+  }
+
+  // Legacy fallback — accept userId from query/body
+  const userId = req.query.userId || req.body?.userId || 'christian';
+  req.user = { id: userId, email: null };
+  req.household = await getHousehold(userId);
+  next();
 }
 
 function mapCategory(plaidCat) {
@@ -415,10 +479,11 @@ app.get('/api/users', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/create_link_token', async (req, res) => {
+app.post('/api/create_link_token', requireAuth, async (req, res) => {
   try {
+    const hh = req.household;
     const linkConfig = {
-      user: { client_user_id: req.body.userId || 'christian' },
+      user: { client_user_id: req.user.id },
       client_name: 'Obsidian',
       products: [Products.Transactions],
       country_codes: [CountryCode.Us],
@@ -434,12 +499,12 @@ app.post('/api/create_link_token', async (req, res) => {
   }
 });
 
-app.post('/api/exchange_public_token', async (req, res) => {
-  const { public_token, userId = 'christian', institution } = req.body;
+app.post('/api/exchange_public_token', requireAuth, async (req, res) => {
+  const { public_token, institution } = req.body;
   try {
     // BULLETPROOF: On reconnect, wipe ALL old data for this household
     // Plaid generates new account IDs on every connection, so old IDs become orphans
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const existingItems = await all('SELECT item_id FROM plaid_items WHERE user_id IN (SELECT id FROM users WHERE household = $1)', [hh]);
     if (existingItems.length > 0) {
       console.log(`  Reconnecting — clearing old data for household ${hh}`);
@@ -456,13 +521,13 @@ app.post('/api/exchange_public_token', async (req, res) => {
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (item_id) DO UPDATE SET
          user_id = EXCLUDED.user_id, access_token = EXCLUDED.access_token, institution = EXCLUDED.institution`,
-      [item_id, userId, access_token, institution || 'Unknown']
+      [item_id, req.user.id, access_token, institution || 'Unknown']
     );
-    console.log(`Bank connected: user=${userId}, item=${item_id}`);
+    console.log(`Bank connected: user=${req.user.id}, item=${item_id}`);
     // Try to fetch transactions, but don't fail if not ready yet
     let result = { count: 0, accounts: 0 };
     try {
-      result = await fetchAndStorePlaidTransactions(access_token, userId, item_id);
+      result = await fetchAndStorePlaidTransactions(access_token, req.user.id, item_id);
     } catch (fetchErr) {
       const code = fetchErr.response?.data?.error_code;
       if (code === 'PRODUCT_NOT_READY') {
@@ -478,12 +543,12 @@ app.post('/api/exchange_public_token', async (req, res) => {
   }
 });
 
-app.get('/api/transactions', async (req, res) => {
-  const { userId = 'christian', days = 60, household: hhParam = 'true', startDate, endDate, vendor, limit } = req.query;
+app.get('/api/transactions', requireAuth, async (req, res) => {
+  const { days = 60, household: hhParam = 'true', startDate, endDate, vendor, limit } = req.query;
   try {
+    const hh = req.household;
     // Quick vendor lookup
     if (vendor) {
-      const hh = await getHousehold(userId);
       const lim = parseInt(limit) || 20;
       const txs = await all(`SELECT t.*, u.name as user_name FROM transactions t
         LEFT JOIN users u ON t.user_id = u.id
@@ -494,36 +559,34 @@ app.get('/api/transactions', async (req, res) => {
     let txs;
     if (startDate && endDate) {
       if (hhParam === 'true') {
-        const hh = await getHousehold(userId);
         txs = await all(`SELECT t.*, u.name as user_name FROM transactions t
           LEFT JOIN users u ON t.user_id = u.id
           WHERE t.household = ? AND t.date >= ? AND t.date <= ?
           ORDER BY t.date DESC, t.created_at DESC`, [hh, startDate, endDate]);
       } else {
         txs = await all(`SELECT * FROM transactions WHERE user_id = ? AND date >= ? AND date <= ?
-          ORDER BY date DESC, created_at DESC`, [userId, startDate, endDate]);
+          ORDER BY date DESC, created_at DESC`, [req.user.id, startDate, endDate]);
       }
     } else {
       const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - parseInt(days));
       const cutoffStr = cutoff.toISOString().split('T')[0];
       if (hhParam === 'true') {
-        const hh = await getHousehold(userId);
         txs = await all(`SELECT t.*, u.name as user_name FROM transactions t
           LEFT JOIN users u ON t.user_id = u.id
           WHERE t.household = ? AND t.date >= ?
           ORDER BY t.date DESC, t.created_at DESC`, [hh, cutoffStr]);
       } else {
         txs = await all(`SELECT * FROM transactions WHERE user_id = ? AND date >= ?
-          ORDER BY date DESC, created_at DESC`, [userId, cutoffStr]);
+          ORDER BY date DESC, created_at DESC`, [req.user.id, cutoffStr]);
       }
     }
     res.json({ transactions: txs, total: txs.length });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/accounts', async (req, res) => {
+app.get('/api/accounts', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(req.query.userId || 'christian');
+    const hh = req.household;
     const accounts = await all(`SELECT a.*, u.name as user_name FROM accounts a
       LEFT JOIN users u ON a.user_id = u.id
       WHERE a.household = ? ORDER BY a.type, a.name`, [hh]);
@@ -531,10 +594,9 @@ app.get('/api/accounts', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/sync', async (req, res) => {
-  const userId = req.body.userId || 'christian';
+app.post('/api/sync', requireAuth, async (req, res) => {
   try {
-    const household = await getHousehold(userId);
+    const household = req.household;
     const members = await all('SELECT id FROM users WHERE household = ?', [household]);
     let totalTx = 0;
     for (const member of members) {
@@ -550,25 +612,25 @@ app.post('/api/sync', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/transactions', async (req, res) => {
-  const { userId = 'christian', desc, amount, type, cat, date } = req.body;
+app.post('/api/transactions', requireAuth, async (req, res) => {
+  const { desc, amount, type, cat, date } = req.body;
   if (!desc || !amount || !type || !cat || !date)
     return res.status(400).json({ error: 'Missing required fields' });
   try {
-    const household = await getHousehold(userId);
+    const household = req.household;
     const id = 'manual_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     await run(`INSERT INTO transactions (id, household, user_id, "desc", amount, type, cat, date, source)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual')`,
-      [id, household, userId, desc, parseFloat(amount), type, cat, date]);
+      [id, household, req.user.id, desc, parseFloat(amount), type, cat, date]);
     res.json({ success: true, id });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ─── TRANSACTION DETAIL ─────────────────────────────────────────
 // Static routes MUST come before parameterized /:id routes
-app.get('/api/transactions/unsure', async (req, res) => {
+app.get('/api/transactions/unsure', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(req.query.userId || 'christian');
+    const hh = req.household;
     const txs = await all(`SELECT t.*, u.name as user_name FROM transactions t
       LEFT JOIN users u ON t.user_id=u.id
       WHERE t.household=? AND t.status='unsure' ORDER BY t.date DESC`, [hh]);
@@ -576,7 +638,7 @@ app.get('/api/transactions/unsure', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.put('/api/transactions/:id/status', async (req, res) => {
+app.put('/api/transactions/:id/status', requireAuth, async (req, res) => {
   const { status } = req.body;
   if (!status) return res.status(400).json({ error: 'Missing status' });
   try {
@@ -585,7 +647,7 @@ app.put('/api/transactions/:id/status', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/transactions/:id', async (req, res) => {
+app.get('/api/transactions/:id', requireAuth, async (req, res) => {
   try {
     const tx = await get(`SELECT t.*, u.name as user_name FROM transactions t
       LEFT JOIN users u ON t.user_id = u.id WHERE t.id = ?`, [req.params.id]);
@@ -596,7 +658,7 @@ app.get('/api/transactions/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.put('/api/transactions/:id', async (req, res) => {
+app.put('/api/transactions/:id', requireAuth, async (req, res) => {
   const { category, type, notes, is_recurring, original_sign, status } = req.body;
   try {
     const tx = await get('SELECT * FROM transactions WHERE id = ?', [req.params.id]);
@@ -615,7 +677,7 @@ app.put('/api/transactions/:id', async (req, res) => {
 });
 
 // Legacy endpoint (frontend compat)
-app.put('/api/transactions/:id/category', async (req, res) => {
+app.put('/api/transactions/:id/category', requireAuth, async (req, res) => {
   const { category, type, original_sign } = req.body;
   if (!category && !type && original_sign === undefined) return res.status(400).json({ error: 'Missing category, type, or sign' });
   try {
@@ -630,7 +692,7 @@ app.put('/api/transactions/:id/category', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/transactions/:id/tags', async (req, res) => {
+app.post('/api/transactions/:id/tags', requireAuth, async (req, res) => {
   const { tag } = req.body;
   if (!tag) return res.status(400).json({ error: 'Missing tag' });
   try {
@@ -644,14 +706,14 @@ app.post('/api/transactions/:id/tags', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/transactions/:id/tags/:tag', async (req, res) => {
+app.delete('/api/transactions/:id/tags/:tag', requireAuth, async (req, res) => {
   try {
     await run('DELETE FROM transaction_tags WHERE transaction_id=? AND tag=?', [req.params.id, req.params.tag]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/transactions/:id', async (req, res) => {
+app.delete('/api/transactions/:id', requireAuth, async (req, res) => {
   try {
     await run('DELETE FROM transaction_tags WHERE transaction_id = ?', [req.params.id]);
     await run('DELETE FROM transactions WHERE id = ?', [req.params.id]);
@@ -660,9 +722,9 @@ app.delete('/api/transactions/:id', async (req, res) => {
 });
 
 // ─── CATEGORY MANAGEMENT ────────────────────────────────────────
-app.get('/api/categories', async (req, res) => {
+app.get('/api/categories', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(req.query.userId || 'christian');
+    const hh = req.household;
     const cats = await all(`SELECT c.*, COALESCE(s.total,0) as spent, COALESCE(s.cnt,0) as tx_count
       FROM categories c LEFT JOIN (
         SELECT cat, SUM(amount) as total, COUNT(*) as cnt FROM transactions
@@ -673,11 +735,11 @@ app.get('/api/categories', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/categories', async (req, res) => {
-  const { userId = 'christian', name, icon, color, type = 'expense' } = req.body;
+app.post('/api/categories', requireAuth, async (req, res) => {
+  const { name, icon, color, type = 'expense' } = req.body;
   if (!name) return res.status(400).json({ error: 'Missing name' });
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const maxOrder = await get('SELECT MAX(sort_order) as m FROM categories WHERE household=?', [hh]);
     await pool.query(
       'INSERT INTO categories (id,household,icon,color,type,sort_order) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',
@@ -695,10 +757,10 @@ app.post('/api/categories', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.put('/api/categories/:id', async (req, res) => {
-  const { userId = 'christian', name, icon, color, sort_order, type, budget_amount } = req.body;
+app.put('/api/categories/:id', requireAuth, async (req, res) => {
+  const { name, icon, color, sort_order, type, budget_amount } = req.body;
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const catId = req.params.id;
 
     if (name && name !== catId) {
@@ -733,20 +795,19 @@ app.put('/api/categories/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/categories/:id', async (req, res) => {
-  const { userId = 'christian' } = req.query;
+app.delete('/api/categories/:id', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     await run('UPDATE transactions SET cat=? WHERE household=? AND cat=?', ['Other', hh, req.params.id]);
     await run('UPDATE categories SET is_active=FALSE WHERE household=? AND id=?', [hh, req.params.id]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/categories/:id/transactions', async (req, res) => {
-  const { userId = 'christian', group_by, startDate, endDate } = req.query;
+app.get('/api/categories/:id/transactions', requireAuth, async (req, res) => {
+  const { group_by, startDate, endDate } = req.query;
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     let txs;
     if (startDate && endDate) {
       txs = await all(`SELECT t.*, u.name as user_name FROM transactions t
@@ -775,29 +836,29 @@ app.get('/api/categories/:id/transactions', async (req, res) => {
 
 // ─── TRANSACTION STATUS (unsure/confirmed) ──────────────────────
 // ─── VENDOR RULES ───────────────────────────────────────────────
-app.get('/api/vendor-rules', async (req, res) => {
+app.get('/api/vendor-rules', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(req.query.userId || 'christian');
+    const hh = req.household;
     const rules = await all('SELECT vendor, category, type FROM vendor_rules WHERE household = ?', [hh]);
     res.json({ rules });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Legacy category-icons endpoints (kept for backward compat)
-app.get('/api/category-icons', async (req, res) => {
+app.get('/api/category-icons', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(req.query.userId || 'christian');
+    const hh = req.household;
     // Serve from categories table now
     const icons = await all('SELECT id as category, icon FROM categories WHERE household=? AND is_active=TRUE', [hh]);
     res.json({ icons });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.put('/api/category-icons', async (req, res) => {
-  const { userId = 'christian', category, icon } = req.body;
+app.put('/api/category-icons', requireAuth, async (req, res) => {
+  const { category, icon } = req.body;
   if (!category || !icon) return res.status(400).json({ error: 'Missing category or icon' });
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     await pool.query(
       `INSERT INTO category_icons (household, category, icon) VALUES ($1, $2, $3)
        ON CONFLICT (household, category) DO UPDATE SET icon = EXCLUDED.icon`,
@@ -810,19 +871,19 @@ app.put('/api/category-icons', async (req, res) => {
 });
 
 // ─── RECURRING & SUBSCRIPTIONS ──────────────────────────────────
-app.get('/api/recurring', async (req, res) => {
+app.get('/api/recurring', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(req.query.userId || 'christian');
+    const hh = req.household;
     const rules = await all('SELECT * FROM recurring_rules WHERE household=? AND is_active=TRUE ORDER BY last_seen DESC', [hh]);
     res.json({ recurring: rules });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/recurring', async (req, res) => {
-  const { userId = 'christian', vendor, category, expected_amount, frequency = 'monthly', is_subscription = 0 } = req.body;
+app.post('/api/recurring', requireAuth, async (req, res) => {
+  const { vendor, category, expected_amount, frequency = 'monthly', is_subscription = 0 } = req.body;
   if (!vendor) return res.status(400).json({ error: 'Missing vendor' });
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     // Check if rule already exists for this vendor
     const existing = await get('SELECT id FROM recurring_rules WHERE household=? AND vendor=? AND is_active=TRUE', [hh, vendor]);
     if (existing) return res.json({ success: true, id: existing.id, existing: true });
@@ -834,7 +895,7 @@ app.post('/api/recurring', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.put('/api/recurring/:id', async (req, res) => {
+app.put('/api/recurring/:id', requireAuth, async (req, res) => {
   const { frequency, expected_amount, is_active, is_subscription } = req.body;
   try {
     const updates = [], params = [];
@@ -850,10 +911,9 @@ app.put('/api/recurring/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/recurring/detect', async (req, res) => {
-  const { userId = 'christian' } = req.body;
+app.post('/api/recurring/detect', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     // Group transactions by vendor, analyze date patterns
     const vendors = await all(`SELECT "desc" as vendor, STRING_AGG(date, ',' ORDER BY date) as dates, STRING_AGG(amount::text, ',') as amounts,
       COUNT(*) as cnt, AVG(amount) as avg_amt, cat
@@ -899,9 +959,9 @@ app.post('/api/recurring/detect', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/subscriptions', async (req, res) => {
+app.get('/api/subscriptions', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(req.query.userId || 'christian');
+    const hh = req.household;
     const subs = await all('SELECT * FROM recurring_rules WHERE household=? AND is_subscription=TRUE AND is_active=TRUE', [hh]);
     const monthlyTotal = subs.reduce((a, s) => {
       const mult = s.frequency === 'weekly' ? 4.33 : s.frequency === 'quarterly' ? 1/3 : s.frequency === 'annual' ? 1/12 : 1;
@@ -911,10 +971,9 @@ app.get('/api/subscriptions', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/recurring/dedup', async (req, res) => {
-  const { userId = 'christian' } = req.body;
+app.post('/api/recurring/dedup', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     // Keep the earliest rule per vendor, delete the rest
     const dupes = await all(`SELECT id FROM recurring_rules WHERE household=? AND id NOT IN (
       SELECT MIN(id) FROM recurring_rules WHERE household=? GROUP BY vendor
@@ -924,11 +983,11 @@ app.post('/api/recurring/dedup', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/recurring/dismiss', async (req, res) => {
-  const { userId = 'christian', vendor } = req.body;
+app.post('/api/recurring/dismiss', requireAuth, async (req, res) => {
+  const { vendor } = req.body;
   if (!vendor) return res.status(400).json({ error: 'Missing vendor' });
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const id = 'rec_dismissed_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     await pool.query(
       `INSERT INTO recurring_rules (id,household,vendor,is_active,frequency) VALUES ($1,$2,$3,FALSE,'dismissed')
@@ -940,10 +999,10 @@ app.post('/api/recurring/dismiss', async (req, res) => {
 });
 
 // ─── ANALYTICS & TRENDS ─────────────────────────────────────────
-app.get('/api/trends/categories', async (req, res) => {
-  const { userId = 'christian', months = 6 } = req.query;
+app.get('/api/trends/categories', requireAuth, async (req, res) => {
+  const { months = 6 } = req.query;
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const cutoffDate = new Date();
     cutoffDate.setMonth(cutoffDate.getMonth() - parseInt(months));
     const cutoffStr = cutoffDate.toISOString().split('T')[0];
@@ -969,10 +1028,10 @@ app.get('/api/trends/categories', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/trends/vendors', async (req, res) => {
-  const { userId = 'christian', vendor, months = 6 } = req.query;
+app.get('/api/trends/vendors', requireAuth, async (req, res) => {
+  const { vendor, months = 6 } = req.query;
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const cutoffDate = new Date();
     cutoffDate.setMonth(cutoffDate.getMonth() - parseInt(months));
     const cutoffStr = cutoffDate.toISOString().split('T')[0];
@@ -992,10 +1051,10 @@ app.get('/api/trends/vendors', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/trends/cashflow', async (req, res) => {
-  const { userId = 'christian', months = '6' } = req.query;
+app.get('/api/trends/cashflow', requireAuth, async (req, res) => {
+  const { months = '6' } = req.query;
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const numMonths = parseInt(months) || 6;
     const now = new Date();
     const data = [];
@@ -1013,10 +1072,10 @@ app.get('/api/trends/cashflow', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/trends/daily-average', async (req, res) => {
-  const { userId = 'christian', month } = req.query;
+app.get('/api/trends/daily-average', requireAuth, async (req, res) => {
+  const { month } = req.query;
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const now = new Date();
     const targetMonth = month || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     const [y, m] = targetMonth.split('-').map(Number);
@@ -1042,10 +1101,10 @@ app.get('/api/trends/daily-average', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/income/breakdown', async (req, res) => {
-  const { userId = 'christian', startDate, endDate } = req.query;
+app.get('/api/income/breakdown', requireAuth, async (req, res) => {
+  const { startDate, endDate } = req.query;
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     if (startDate && endDate) {
       const byCategory = await all(`SELECT cat as category, SUM(amount) as total, COUNT(*) as cnt
         FROM transactions WHERE household=? AND type='income' AND date>=? AND date<=?
@@ -1070,9 +1129,9 @@ app.get('/api/income/breakdown', async (req, res) => {
 });
 
 // ─── REVIEW QUEUE & WIZARD ──────────────────────────────────────
-app.get('/api/review-queue', async (req, res) => {
+app.get('/api/review-queue', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(req.query.userId || 'christian');
+    const hh = req.household;
     const vendorRows = await all(`SELECT "desc" as vendor, COUNT(*) as cnt, SUM(amount) as total,
       STRING_AGG(DISTINCT cat, ',') as current_cats, MIN(date) as first_seen, MAX(date) as last_seen
       FROM transactions WHERE household=? AND cat='Other' AND reviewed=FALSE
@@ -1089,11 +1148,11 @@ app.get('/api/review-queue', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/review-queue/resolve', async (req, res) => {
-  const { userId = 'christian', vendor, category, type = 'expense' } = req.body;
+app.post('/api/review-queue/resolve', requireAuth, async (req, res) => {
+  const { vendor, category, type = 'expense' } = req.body;
   if (!vendor || !category) return res.status(400).json({ error: 'Missing vendor or category' });
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     await pool.query(
       `INSERT INTO vendor_rules (household, vendor, category, type) VALUES ($1,$2,$3,$4)
        ON CONFLICT (household, vendor) DO UPDATE SET category = EXCLUDED.category, type = EXCLUDED.type`,
@@ -1106,9 +1165,9 @@ app.post('/api/review-queue/resolve', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/wizard/uncategorized-vendors', async (req, res) => {
+app.get('/api/wizard/uncategorized-vendors', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(req.query.userId || 'christian');
+    const hh = req.household;
     const vendors = await all(`SELECT t."desc" as vendor, COUNT(*) as cnt, SUM(t.amount) as total, t.cat as current_cat
       FROM transactions t
       LEFT JOIN vendor_rules vr ON vr.household=t.household AND vr.vendor=t."desc"
@@ -1118,11 +1177,11 @@ app.get('/api/wizard/uncategorized-vendors', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/wizard/bulk-assign', async (req, res) => {
-  const { userId = 'christian', assignments } = req.body;
+app.post('/api/wizard/bulk-assign', requireAuth, async (req, res) => {
+  const { assignments } = req.body;
   if (!assignments || !assignments.length) return res.status(400).json({ error: 'Missing assignments' });
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     let totalUpdated = 0;
     const client = await pool.connect();
     try {
@@ -1150,9 +1209,9 @@ app.post('/api/wizard/bulk-assign', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/status', async (req, res) => {
+app.get('/api/status', requireAuth, async (req, res) => {
   try {
-    const household = await getHousehold(req.query.userId || 'christian');
+    const household = req.household;
     const items = await all(`SELECT pi.item_id, pi.user_id, pi.institution
       FROM plaid_items pi JOIN users u ON pi.user_id = u.id
       WHERE u.household = ?`, [household]);
@@ -1174,19 +1233,19 @@ app.post('/api/webhook', async (req, res) => {
 
 // ─── BUDGETS ──────────────────────────────────────────────────────
 // Budgets now live in the categories table as budget_amount
-app.get('/api/budgets', async (req, res) => {
+app.get('/api/budgets', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(req.query.userId || 'christian');
+    const hh = req.household;
     const rows = await all('SELECT id as category, budget_amount as amount FROM categories WHERE household = ? AND budget_amount > 0 AND is_active = TRUE ORDER BY sort_order', [hh]);
     res.json({ budgets: rows });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.put('/api/budgets', async (req, res) => {
-  const { userId = 'christian', category, amount } = req.body;
+app.put('/api/budgets', requireAuth, async (req, res) => {
+  const { category, amount } = req.body;
   if (!category || amount == null) return res.status(400).json({ error: 'Missing category or amount' });
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     // Upsert category with budget amount
     await pool.query(
       `INSERT INTO categories (id, household, budget_amount) VALUES ($1, $2, $3)
@@ -1197,21 +1256,21 @@ app.put('/api/budgets', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete('/api/budgets', async (req, res) => {
-  const { userId = 'christian', category } = req.body;
+app.delete('/api/budgets', requireAuth, async (req, res) => {
+  const { category } = req.body;
   if (!category) return res.status(400).json({ error: 'Missing category' });
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     await run('UPDATE categories SET budget_amount = 0 WHERE id = ? AND household = ?', [category, hh]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ─── VENDOR SPENDING ─────────────────────────────────────────────
-app.get('/api/spending/by-vendor', async (req, res) => {
-  const { userId = 'christian', startDate, endDate } = req.query;
+app.get('/api/spending/by-vendor', requireAuth, async (req, res) => {
+  const { startDate, endDate } = req.query;
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const rows = await all(`SELECT "desc" as vendor, SUM(amount) as total, COUNT(*) as count
       FROM transactions
       WHERE household = ? AND type = 'expense' AND date >= ? AND date <= ?
@@ -1613,13 +1672,13 @@ async function executeAgentTool(toolName, toolInput, hh) {
   }
 }
 
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', requireAuth, async (req, res) => {
   if (!anthropic) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
-  const { userId = 'christian', message, history = [], confirmAction } = req.body;
+  const { message, history = [], confirmAction } = req.body;
   if (!message && !confirmAction) return res.status(400).json({ error: 'Missing message' });
 
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
 
     // If confirming a pending action, execute it
     if (confirmAction) {
@@ -1800,11 +1859,97 @@ RULES:
   }
 });
 
-// ─── MAINTENANCE ────────────────────────────────────────────────
-app.post('/api/maintenance/dedup', async (req, res) => {
-  const { userId = 'christian' } = req.body;
+// ─── AUTH & ONBOARDING ENDPOINTS ────────────────────────────────
+app.get('/api/me', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(userId);
+    const profile = await get('SELECT * FROM user_profiles WHERE id = $1', [req.user.id]);
+    const household = req.household
+      ? await get('SELECT * FROM households WHERE id = $1', [req.household])
+      : null;
+    const members = req.household
+      ? await all(`SELECT hm.user_id, hm.role, up.display_name, up.avatar_color FROM household_members hm
+          LEFT JOIN user_profiles up ON up.id = hm.user_id WHERE hm.household_id = $1`, [req.household])
+      : [];
+    res.json({ user: req.user, profile, household, members, needsOnboarding: req.needsOnboarding || !profile });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/me/profile', requireAuth, async (req, res) => {
+  const { display_name, avatar_color } = req.body;
+  try {
+    await run(`INSERT INTO user_profiles (id, display_name, avatar_color, updated_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (id) DO UPDATE SET display_name=$2, avatar_color=$3, updated_at=NOW()`,
+      [req.user.id, display_name, avatar_color || '#E8A828']);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/households', requireAuth, async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'Missing name' });
+  try {
+    const result = await pool.query(
+      'INSERT INTO households (name, created_by) VALUES ($1, $2) RETURNING id',
+      [name, req.user.id]
+    );
+    const householdId = result.rows[0].id;
+    await run('INSERT INTO household_members (household_id, user_id, role) VALUES ($1, $2, $3)',
+      [householdId, req.user.id, 'owner']);
+    const defaultCats = {Housing:'🏠',Food:'🍽️',Transport:'🚗',Health:'💊',Entertainment:'🎬',
+      Shopping:'🛍️',Utilities:'⚡',Income:'💰',Transfer:'🔁',Other:'📌',Subscriptions:'🔄',Personal:'💆'};
+    for (const [cat, icon] of Object.entries(defaultCats)) {
+      await pool.query('INSERT INTO categories (id, household, icon) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [cat, householdId, icon]);
+    }
+    res.json({ success: true, household_id: householdId });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/households/invite', requireAuth, async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Missing email' });
+  if (!req.household) return res.status(400).json({ error: 'No household' });
+  const member = await get('SELECT role FROM household_members WHERE household_id = $1 AND user_id = $2',
+    [req.household, req.user.id]);
+  if (member?.role !== 'owner') return res.status(403).json({ error: 'Only household owners can invite' });
+  try {
+    if (!supabaseAdmin) return res.status(500).json({ error: 'Supabase admin not configured' });
+    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: { household_id: req.household, invited_by: req.user.id }
+    });
+    if (error) throw error;
+    await run('INSERT INTO household_members (household_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+      [req.household, data.user.id, 'member']);
+    res.json({ success: true, invited: email });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/me', requireAuth, async (req, res) => {
+  try {
+    const household = req.household;
+    if (household) {
+      const otherMembers = await all('SELECT user_id FROM household_members WHERE household_id = $1 AND user_id != $2',
+        [household, req.user.id]);
+      if (otherMembers.length === 0) {
+        for (const tbl of ['transactions','vendor_rules','accounts','categories','recurring_rules','transaction_tags','challenges']) {
+          await run(`DELETE FROM ${tbl} WHERE household = $1`, [household]);
+        }
+        await run('DELETE FROM plaid_items WHERE user_id = $1', [req.user.id]);
+        await run('DELETE FROM households WHERE id = $1', [household]);
+      }
+      await run('DELETE FROM household_members WHERE user_id = $1', [req.user.id]);
+    }
+    await run('DELETE FROM user_profiles WHERE id = $1', [req.user.id]);
+    if (supabaseAdmin) await supabaseAdmin.auth.admin.deleteUser(req.user.id);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── MAINTENANCE ────────────────────────────────────────────────
+app.post('/api/maintenance/dedup', requireAuth, async (req, res) => {
+  try {
+    const hh = req.household;
     let removed = 0;
 
     // 1. Dedup accounts by name+mask (keep newest)
@@ -1851,10 +1996,9 @@ app.post('/api/maintenance/dedup', async (req, res) => {
 });
 
 // ─── VENDOR SUMMARY + BULK RULES ────────────────────────────────
-app.get('/api/vendor-summary', async (req, res) => {
-  const { userId = 'christian' } = req.query;
+app.get('/api/vendor-summary', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const vendors = await all(`
       SELECT t."desc" as vendor, COUNT(*) as tx_count, SUM(t.amount) as total_spend,
         MIN(t.date) as first_seen, MAX(t.date) as last_seen, t.cat as plaid_category,
@@ -1876,11 +2020,11 @@ app.get('/api/vendor-summary', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/vendor-rules/bulk', async (req, res) => {
-  const { userId = 'christian', assignments } = req.body;
+app.post('/api/vendor-rules/bulk', requireAuth, async (req, res) => {
+  const { assignments } = req.body;
   if (!assignments || !assignments.length) return res.status(400).json({ error: 'No assignments' });
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -1916,11 +2060,11 @@ app.post('/api/vendor-rules/bulk', async (req, res) => {
 });
 
 // ─── VENDOR MERGE ──────────────────────────────────────────────
-app.post('/api/vendors/merge', async (req, res) => {
-  const { userId = 'christian', primary_vendor, merge_vendors } = req.body;
+app.post('/api/vendors/merge', requireAuth, async (req, res) => {
+  const { primary_vendor, merge_vendors } = req.body;
   if (!primary_vendor || !merge_vendors?.length) return res.status(400).json({ error: 'Missing primary_vendor or merge_vendors' });
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const primaryRule = await get('SELECT category, type FROM vendor_rules WHERE household=$1 AND vendor=$2', [hh, primary_vendor]);
     if (!primaryRule) return res.status(400).json({ error: `No vendor rule found for "${primary_vendor}". Categorize the primary vendor first.` });
     let totalUpdated = 0;
@@ -1935,10 +2079,9 @@ app.post('/api/vendors/merge', async (req, res) => {
 });
 
 // ─── HEALTH SCORE ───────────────────────────────────────────────
-app.get('/api/health-score', async (req, res) => {
-  const { userId = 'christian' } = req.query;
+app.get('/api/health-score', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const now = new Date();
     const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
     const monthEnd = new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().split('T')[0];
@@ -1974,10 +2117,9 @@ app.get('/api/health-score', async (req, res) => {
 });
 
 // ─── STREAK ─────────────────────────────────────────────────────
-app.post('/api/streak/check-in', async (req, res) => {
-  const { userId = 'christian' } = req.query;
+app.post('/api/streak/check-in', requireAuth, async (req, res) => {
   try {
-    const user = await get('SELECT * FROM users WHERE id = ?', [userId]);
+    const user = await get('SELECT * FROM users WHERE id = ?', [req.user.id]);
     if (!user) return res.status(404).json({ error: 'User not found' });
     const today = new Date().toISOString().split('T')[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
@@ -1988,16 +2130,15 @@ app.post('/api/streak/check-in', async (req, res) => {
     else if (!user.last_active_date) { streak = 1; }
     else { streak = 1; }
     if (streak > best) best = streak;
-    await run('UPDATE users SET streak_count = ?, streak_best = ?, last_active_date = ? WHERE id = ?', [streak, best, today, userId]);
+    await run('UPDATE users SET streak_count = ?, streak_best = ?, last_active_date = ? WHERE id = ?', [streak, best, today, req.user.id]);
     res.json({ streak, best, is_new_day: user.last_active_date !== today, milestone: [7,30,100,365].includes(streak) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // ─── CHALLENGES ─────────────────────────────────────────────────
-app.get('/api/challenges', async (req, res) => {
-  const { userId = 'christian' } = req.query;
+app.get('/api/challenges', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     let challenges = await all('SELECT * FROM challenges WHERE household = ? AND month = ?', [hh, currentMonth]);
@@ -2052,10 +2193,9 @@ app.get('/api/challenges', async (req, res) => {
 });
 
 // ─── WEEKLY RECAP ───────────────────────────────────────────────
-app.get('/api/weekly-recap', async (req, res) => {
-  const { userId = 'christian' } = req.query;
+app.get('/api/weekly-recap', requireAuth, async (req, res) => {
   try {
-    const hh = await getHousehold(userId);
+    const hh = req.household;
     const now = new Date();
     const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
     const prevWeekStart = new Date(weekAgo); prevWeekStart.setDate(prevWeekStart.getDate() - 7);

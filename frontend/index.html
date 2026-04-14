@@ -860,9 +860,33 @@ body::after{display:none;}
   .reports-grid .chart-card{margin:0;}
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<div class="app">
+
+<!-- AUTH OVERLAY -->
+<div id="auth-overlay" style="position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;">
+  <div style="max-width:360px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px 24px;text-align:center;">
+    <div style="font-family:'Playfair Display',serif;font-size:32px;color:var(--gold);margin-bottom:8px">Obsidian</div>
+    <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:28px;letter-spacing:1px">Deep insight into your household finances</div>
+    <div id="auth-form">
+      <input type="email" id="auth-email" placeholder="Email" style="width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:16px;margin-bottom:12px;font-family:system-ui,sans-serif;box-sizing:border-box;">
+      <input type="password" id="auth-password" placeholder="Password" style="width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:16px;margin-bottom:12px;font-family:system-ui,sans-serif;box-sizing:border-box;">
+      <button id="auth-primary-btn" onclick="handleLogin()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--gold);color:#000;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;margin-bottom:8px;font-weight:600;">Sign In</button>
+      <button id="auth-secondary-btn" onclick="switchAuthMode()" style="width:100%;padding:14px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;margin-bottom:8px;">Create Account</button>
+      <button onclick="handleForgotPassword()" style="width:100%;padding:8px;border-radius:12px;border:none;background:transparent;color:var(--text-muted);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;">Forgot password?</button>
+    </div>
+    <div id="auth-error" style="color:var(--red);font-family:'DM Mono',monospace;font-size:10px;margin-top:12px"></div>
+    <div id="auth-message" style="color:var(--green);font-family:'DM Mono',monospace;font-size:10px;margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- ONBOARDING OVERLAY -->
+<div id="onboarding-overlay" style="position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px;overflow-y:auto;">
+  <div style="max-width:400px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px 24px;text-align:center;" id="onboarding-body"></div>
+</div>
+
+<div class="app" id="app-container" style="display:none">
 
   <!-- TOPBAR -->
   <div class="topbar">
@@ -1333,6 +1357,14 @@ function mapCategoryFrontend(plaidCat){
 }
 const USER_INITIALS={christian:'C',wife:'M'};
 
+// ─── SUPABASE AUTH ───────────────────────────────────────────────
+const SUPABASE_URL = window.__OBSIDIAN_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = window.__OBSIDIAN_SUPABASE_ANON_KEY || '';
+const supabaseClient = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+let accessToken = null;
+let authMode = 'login'; // 'login' or 'signup'
+
 // ─── STATE ────────────────────────────────────────────────────────
 let currentUser = localStorage.getItem('obsidian_user') || 'christian';
 let users = [{id:'christian',name:'Christian'},{id:'wife',name:'Marisol'}];
@@ -1362,6 +1394,195 @@ function catBreak(txs){
 }
 function userName(id){return users.find(u=>u.id===id)?.name||id;}
 
+// ─── API WRAPPER (adds auth header when available) ───────────────
+function apiHeaders(){
+  const h={'Content-Type':'application/json'};
+  if(accessToken)h['Authorization']=`Bearer ${accessToken}`;
+  return h;
+}
+async function apiCall(method,path,body){
+  const opts={method,headers:apiHeaders()};
+  if(body)opts.body=JSON.stringify(body);
+  const res=await fetch(`${API}${path}`,opts);
+  if(res.status===401&&supabaseClient){
+    await supabaseClient.auth.signOut();
+    showLogin();
+    throw new Error('Session expired');
+  }
+  return res;
+}
+async function apiGet(path){return apiCall('GET',path);}
+async function apiPost(path,body){return apiCall('POST',path,body);}
+async function apiPut(path,body){return apiCall('PUT',path,body);}
+async function apiDel(path){return apiCall('DELETE',path);}
+
+// ─── AUTH FUNCTIONS ──────────────────────────────────────────────
+async function initAuth(){
+  if(!supabaseClient){
+    // No Supabase configured — use legacy mode
+    showApp();
+    return;
+  }
+  const{data:{session}}=await supabaseClient.auth.getSession();
+  if(session){
+    accessToken=session.access_token;
+    currentUser=session.user.id;
+    const meRes=await apiGet('/api/me');
+    if(meRes.ok){
+      const me=await meRes.json();
+      if(me.needsOnboarding){showOnboarding();return;}
+      if(me.profile)currentUser=me.profile.id;
+      if(me.members?.length){
+        users=me.members.map(m=>({id:m.user_id,name:m.display_name||'User'}));
+        me.members.forEach(m=>{if(m.display_name)USER_INITIALS[m.user_id]=m.display_name[0].toUpperCase();});
+      }
+    }
+    showApp();
+  }else{
+    showLogin();
+  }
+  supabaseClient.auth.onAuthStateChange((event,session)=>{
+    if(event==='SIGNED_IN'){accessToken=session.access_token;currentUser=session.user.id;initAuth();}
+    else if(event==='SIGNED_OUT'){accessToken=null;currentUser=null;showLogin();}
+    else if(event==='TOKEN_REFRESHED'){accessToken=session.access_token;}
+  });
+}
+
+function showLogin(){
+  $('auth-overlay').style.display='flex';
+  $('onboarding-overlay').style.display='none';
+  $('app-container').style.display='none';
+}
+function showApp(){
+  $('auth-overlay').style.display='none';
+  $('onboarding-overlay').style.display='none';
+  $('app-container').style.display='';
+  loadData();
+}
+
+function switchAuthMode(){
+  authMode=authMode==='login'?'signup':'login';
+  $('auth-primary-btn').textContent=authMode==='login'?'Sign In':'Create Account';
+  $('auth-secondary-btn').textContent=authMode==='login'?'Create Account':'Back to Sign In';
+  $('auth-primary-btn').onclick=authMode==='login'?handleLogin:handleSignup;
+  $('auth-error').textContent='';
+  $('auth-message').textContent='';
+}
+
+async function handleLogin(){
+  const email=$('auth-email').value.trim();
+  const password=$('auth-password').value;
+  $('auth-error').textContent='';$('auth-message').textContent='';
+  if(!email||!password){$('auth-error').textContent='Email and password required';return;}
+  const{error}=await supabaseClient.auth.signInWithPassword({email,password});
+  if(error)$('auth-error').textContent=error.message;
+}
+
+async function handleSignup(){
+  const email=$('auth-email').value.trim();
+  const password=$('auth-password').value;
+  $('auth-error').textContent='';$('auth-message').textContent='';
+  if(!email||!password){$('auth-error').textContent='Email and password required';return;}
+  if(password.length<8){$('auth-error').textContent='Password must be at least 8 characters';return;}
+  const{error}=await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:window.location.origin}});
+  if(error){$('auth-error').textContent=error.message;return;}
+  $('auth-message').textContent='Check your email to confirm your account';
+}
+
+async function handleForgotPassword(){
+  const email=$('auth-email').value.trim();
+  if(!email){$('auth-error').textContent='Enter your email first';return;}
+  const{error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin});
+  if(error){$('auth-error').textContent=error.message;return;}
+  $('auth-message').textContent='Password reset email sent';
+}
+
+async function handleLogout(){
+  if(!confirm('Sign out?'))return;
+  if(supabaseClient)await supabaseClient.auth.signOut();
+  else{localStorage.removeItem('obsidian_user');location.reload();}
+}
+
+async function handleDeleteAccount(){
+  const c=prompt('This will permanently delete ALL your data. Type DELETE to confirm.');
+  if(c!=='DELETE')return;
+  try{
+    await apiDel('/api/me');
+    if(supabaseClient)await supabaseClient.auth.signOut();
+    alert('Your account has been deleted.');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ─── ONBOARDING ─────────────────────────────────────────────────
+let onboardingData={display_name:'',household_name:'',avatar_color:'#E8A828'};
+
+function showOnboarding(){
+  $('auth-overlay').style.display='none';
+  $('onboarding-overlay').style.display='flex';
+  $('app-container').style.display='none';
+  renderOnboardingStep(1);
+}
+
+function renderOnboardingStep(step){
+  const body=$('onboarding-body');
+  if(step===1){
+    body.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:28px;color:var(--gold);margin-bottom:8px">Welcome to Obsidian</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:24px">Let's get you set up in 3 quick steps.</div>
+      <div style="text-align:left;margin:0 auto 24px;max-width:260px">
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text);padding:8px 0;border-bottom:1px solid var(--border)">\u{1F512} Bank-level security via Plaid</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text);padding:8px 0;border-bottom:1px solid var(--border)">\u{1F3F7}\uFE0F Automatic transaction categorization</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text);padding:8px 0">\u{1F916} AI-powered spending insights</div>
+      </div>
+      <button onclick="renderOnboardingStep(2)" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--gold);color:#000;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-weight:600;">Get Started</button>`;
+  }else if(step===2){
+    const colors=['#E8A828','#34D399','#60A5FA','#F472B6','#A78BFA','#FB923C','#2DD4BF'];
+    body.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:24px;margin-bottom:16px">Tell us about you</div>
+      <input type="text" id="onb-name" placeholder="Your name" value="${onboardingData.display_name}" style="width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:16px;margin-bottom:16px;font-family:system-ui,sans-serif;box-sizing:border-box;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:2px;margin-bottom:8px;text-transform:uppercase">Avatar color</div>
+      <div style="display:flex;gap:10px;justify-content:center;margin-bottom:24px">${colors.map(c=>
+        `<div onclick="onboardingData.avatar_color='${c}';renderOnboardingStep(2)" style="width:36px;height:36px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${onboardingData.avatar_color===c?'var(--text)':'transparent'};transition:border .15s"></div>`
+      ).join('')}</div>
+      <button onclick="saveOnboardingStep2()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--gold);color:#000;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-weight:600;">Continue</button>`;
+  }else if(step===3){
+    body.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:24px;margin-bottom:8px">Create your household</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:20px">A household is a shared space for you and your partner. You can invite them later.</div>
+      <input type="text" id="onb-household" placeholder="Household name (e.g. Smith Family)" value="${onboardingData.household_name}" style="width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:16px;margin-bottom:16px;font-family:system-ui,sans-serif;box-sizing:border-box;">
+      <button onclick="saveOnboardingStep3()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--gold);color:#000;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-weight:600;">Create Household</button>`;
+  }else if(step===4){
+    body.innerHTML=`<div style="font-family:'Playfair Display',serif;font-size:24px;margin-bottom:8px">Connect your bank</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:20px">Obsidian uses Plaid \u2014 the same technology trusted by Venmo, Coinbase, and thousands of other apps. We never see your bank password.</div>
+      <div style="text-align:left;margin:0 auto 24px;max-width:260px">
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text);padding:8px 0;border-bottom:1px solid var(--border)">\u{1F512} 256-bit encryption</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text);padding:8px 0;border-bottom:1px solid var(--border)">\u{1F4D6} Read-only access</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text);padding:8px 0">\u274C Disconnect anytime</div>
+      </div>
+      <button onclick="openPlaidLink()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--gold);color:#000;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-weight:600;margin-bottom:8px;">Connect Bank</button>
+      <button onclick="finishOnboarding()" style="width:100%;padding:8px;border-radius:12px;border:none;background:transparent;color:var(--text-muted);font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;">Skip for now</button>`;
+  }
+}
+
+async function saveOnboardingStep2(){
+  onboardingData.display_name=$('onb-name').value.trim();
+  if(!onboardingData.display_name){alert('Please enter your name');return;}
+  await apiPost('/api/me/profile',{display_name:onboardingData.display_name,avatar_color:onboardingData.avatar_color});
+  renderOnboardingStep(3);
+}
+
+async function saveOnboardingStep3(){
+  onboardingData.household_name=$('onb-household').value.trim();
+  if(!onboardingData.household_name){alert('Please enter a household name');return;}
+  try{
+    const res=await apiPost('/api/households',{name:onboardingData.household_name});
+    if(!res.ok)throw new Error((await res.json()).error);
+    renderOnboardingStep(4);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function finishOnboarding(){
+  $('onboarding-overlay').style.display='none';
+  showApp();
+}
+
 // ─── ONLINE/OFFLINE ───────────────────────────────────────────────
 window.addEventListener('online',()=>{isOnline=true;$('offline-banner').classList.remove('on');loadData();});
 window.addEventListener('offline',()=>{isOnline=false;$('offline-banner').classList.add('on');});
@@ -1376,11 +1597,11 @@ async function loadData(){
     const startDate = startD.toISOString().split('T')[0];
     const endDate = endD.toISOString().split('T')[0];
     const [txRes, acRes, stRes, budRes, iconRes] = await Promise.all([
-      fetch(`${API}/api/transactions?userId=${currentUser}&startDate=${startDate}&endDate=${endDate}&household=true`),
-      fetch(`${API}/api/accounts?userId=${currentUser}`),
-      fetch(`${API}/api/status?userId=${currentUser}`),
-      fetch(`${API}/api/budgets?userId=${currentUser}`),
-      fetch(`${API}/api/categories?userId=${currentUser}`),
+      apiGet(`/api/transactions?startDate=${startDate}&endDate=${endDate}&household=true`),
+      apiGet('/api/accounts'),
+      apiGet('/api/status'),
+      apiGet('/api/budgets'),
+      apiGet('/api/categories'),
     ]);
     if(txRes.ok){const d=await txRes.json();transactions=d.transactions||[];}
     if(acRes.ok){const d=await acRes.json();accounts=d.accounts||[];}
@@ -1421,7 +1642,7 @@ async function syncAll(){
   if(!isConnected)return;
   showSync('Syncing household\u2026');
   try{
-    const res=await fetch(`${API}/api/sync`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser})});
+    const res=await apiPost('/api/sync',{});
     if(!res.ok)throw new Error('Sync failed');
     const d=await res.json();
     await loadData();
@@ -1432,7 +1653,7 @@ async function syncAll(){
 
 async function checkWizardTrigger(){
   try{
-    const res=await fetch(`${API}/api/wizard/uncategorized-vendors?userId=${currentUser}`);
+    const res=await apiGet('/api/wizard/uncategorized-vendors');
     const{vendors}=await res.json();
     if(vendors.length>=10&&!localStorage.getItem('wizard_shown_'+currentUser)){
       const banner=document.createElement('div');
@@ -1842,6 +2063,21 @@ function renderAccounts(){
         <button class="sbtn gold">Open</button>
       </div>
     </div>
+    <div class="sec-head" style="margin-top:14px"><div class="sec-title">Account</div></div>
+    <div class="scard">
+      <div class="srow" onclick="handleLogout()" style="cursor:pointer">
+        <div class="srow-left">
+          <div class="sico" style="background:rgba(248,113,113,.1)">\u{1F44B}</div>
+          <div><div class="sname">Sign Out</div><div class="ssub">End your session</div></div>
+        </div>
+      </div>
+      <div class="srow" onclick="handleDeleteAccount()" style="cursor:pointer">
+        <div class="srow-left">
+          <div class="sico" style="background:rgba(248,113,113,.15)">\u26A0\uFE0F</div>
+          <div><div class="sname" style="color:var(--red)">Delete Account</div><div class="ssub">Permanently delete all your data</div></div>
+        </div>
+      </div>
+    </div>
     <div class="spacer"></div>
   `;
 }
@@ -2063,11 +2299,11 @@ async function saveTxDetail(){
   const btn=$('txd-save-btn');
   btn.textContent='Saving...';
   try{
-    await fetch(`${API}/api/transactions/${txDetailId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    await apiPut(`/api/transactions/${txDetailId}`,{
       category:t.cat,type:t.type,
       notes:document.querySelector('.txd-notes')?.value||'',
       is_recurring:false
-    })});
+    });
     t.notes=document.querySelector('.txd-notes')?.value||'';
     t.reviewed=1;
     btn.textContent='\u2713 Saved';btn.classList.add('saved');
@@ -2082,7 +2318,7 @@ async function renderTxDetail(id){
   if(!t){$('txdetail-body').innerHTML='<div class="empty-msg">Transaction not found</div>';return;}
   let tags=[],notes=t.notes||'';
   try{
-    const res=await fetch(`${API}/api/transactions/${id}`);
+    const res=await apiGet(`/api/transactions/${id}`);
     if(res.ok){const d=await res.json();tags=d.tags||[];notes=d.notes||'';if(d.original_sign!==undefined)t.original_sign=d.original_sign;if(d.status)t.status=d.status;}
   }catch(e){}
 
@@ -2154,7 +2390,7 @@ async function renderTxDetail(id){
 async function changeTxType(id,newType){
   // Type is ALWAYS per-transaction only — never bulk-applied
   try{
-    await fetch(`${API}/api/transactions/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:newType})});
+    await apiPut(`/api/transactions/${id}`,{type:newType});
     const t=transactions.find(tx=>tx.id===id);if(t)t.type=newType;
     renderTxDetail(id);
     renderAll();
@@ -2162,21 +2398,21 @@ async function changeTxType(id,newType){
 }
 
 async function saveTxNotes(id,notes){
-  try{await fetch(`${API}/api/transactions/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes})});}catch(e){}
+  try{await apiPut(`/api/transactions/${id}`,{notes});}catch(e){}
 }
 
 async function addTxTag(id){
   const tag=prompt('Tag name:');
   if(!tag||!tag.trim())return;
   try{
-    await fetch(`${API}/api/transactions/${id}/tags`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag:tag.trim()})});
+    await apiPost(`/api/transactions/${id}/tags`,{tag:tag.trim()});
     renderTxDetail(id);
   }catch(e){}
 }
 
 async function removeTxTag(id,tag){
   try{
-    await fetch(`${API}/api/transactions/${id}/tags/${encodeURIComponent(tag)}`,{method:'DELETE'});
+    await apiDel(`/api/transactions/${id}/tags/${encodeURIComponent(tag)}`);
     renderTxDetail(id);
   }catch(e){}
 }
@@ -2184,7 +2420,7 @@ async function removeTxTag(id,tag){
 
 async function changeTxSign(id,newSign){
   try{
-    await fetch(`${API}/api/transactions/${id}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({original_sign:newSign})});
+    await apiPut(`/api/transactions/${id}/category`,{original_sign:newSign});
     const t=transactions.find(tx=>tx.id===id);
     if(t)t.original_sign=newSign;
     renderTxDetail(id);
@@ -2194,7 +2430,7 @@ async function changeTxSign(id,newSign){
 
 async function setTxStatus(id,status){
   try{
-    await fetch(`${API}/api/transactions/${id}/status`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+    await apiPut(`/api/transactions/${id}/status`,{status});
     const t=transactions.find(tx=>tx.id===id);
     if(t)t.status=status;
     renderTxDetail(id);
@@ -2207,7 +2443,7 @@ async function openUnsurePage(){
     const body=$('unsure-body');
     body.innerHTML='<div class="empty-msg">Loading...</div>';
     try{
-      const res=await fetch(`${API}/api/transactions/unsure?userId=${currentUser}`);
+      const res=await apiGet('/api/transactions/unsure');
       const{transactions:txs}=await res.json();
       if(!txs.length){body.innerHTML='<div class="empty-msg">No unsure charges</div>';return;}
       body.innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-dim);margin-bottom:16px">${txs.length} charge${txs.length!==1?'s':''} marked as unsure</div>
@@ -2233,11 +2469,7 @@ async function openUnsurePage(){
 
 async function resolveUnsure(txId,btn){
   try{
-    await fetch(`${API}/api/transactions/${txId}/status`,{
-      method:'PUT',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({status:'confirmed'})
-    });
+    await apiPut(`/api/transactions/${txId}/status`,{status:'confirmed'});
     const row=btn.closest('.tx-row');
     if(row){row.style.transition='opacity .3s';row.style.opacity='0';setTimeout(()=>row.remove(),300);}
     const t=transactions.find(tx=>tx.id===txId);
@@ -2309,7 +2541,7 @@ function selectCatFromPicker(cat){
 function openCatPickerForTxDetail(txId,currentCat){
   openCatPicker(async(newCat)=>{
     try{
-      await fetch(`${API}/api/transactions/${txId}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:newCat})});
+      await apiPut(`/api/transactions/${txId}/category`,{category:newCat});
       const t=transactions.find(tx=>tx.id===txId);
       if(t)t.cat=newCat;
       if(txDetailId)renderTxDetail(txDetailId);
@@ -2352,7 +2584,7 @@ async function applyType(newType){
   if(!ids.length)return;
   try{
     for(const id of ids){
-      const res=await fetch(`${API}/api/transactions/${id}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:newType})});
+      const res=await apiPut(`/api/transactions/${id}/category`,{type:newType});
       if(!res.ok)throw new Error('Update failed');
     }
     ids.forEach(id=>{const tx=transactions.find(t=>t.id===id);if(tx)tx.type=newType;});
@@ -2415,7 +2647,7 @@ async function pickEmoji(emoji){
     localStorage.setItem('obsidian_cache_icons',JSON.stringify(CAT_ICONS));
     renderAll();
     try{
-      await fetch(`${API}/api/categories/${encodeURIComponent(emojiPickerCat)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,icon:emoji})});
+      await apiPut(`/api/categories/${encodeURIComponent(emojiPickerCat)}`,{icon:emoji});
     }catch(e){console.error('Failed to save emoji:',e);}
   }
   closeEmojiPicker();
@@ -2426,12 +2658,12 @@ async function applyRecat(newCat){
   if(!ids.length)return;
   try{
     for(const id of ids){
-      const res=await fetch(`${API}/api/transactions/${id}/category`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:newCat})});
+      const res=await apiPut(`/api/transactions/${id}/category`,{category:newCat});
       if(!res.ok)throw new Error('Update failed');
     }
     ids.forEach(id=>{const tx=transactions.find(t=>t.id===id);if(tx)tx.cat=newCat;});
     if(!budgets[newCat]){
-      const budRes=await fetch(`${API}/api/budgets`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:newCat,amount:200})});
+      const budRes=await apiPut('/api/budgets',{category:newCat,amount:200});
       if(budRes.ok)budgets[newCat]=200;
     }
     recatCurrentCat=newCat;
@@ -2566,7 +2798,7 @@ async function openCatManage(){
     const body=$('catmanage-body');
     body.innerHTML='<div class="empty-msg">Loading...</div>';
     try{
-      const res=await fetch(`${API}/api/categories?userId=${currentUser}`);
+      const res=await apiGet('/api/categories');
       const{categories}=await res.json();
       body.innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:16px">${categories.length} categories \u00B7 Tap emoji to change, tap name to view transactions</div>`+
         categories.map(c=>{
@@ -2601,7 +2833,7 @@ function editCategoryBudget(cat,currentAmt){
   if(amt===null)return;
   const val=parseFloat(amt);
   if(isNaN(val)||val<0){alert('Enter a valid amount');return;}
-  fetch(`${API}/api/budgets`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:cat,amount:val})})
+  apiPut('/api/budgets',{category:cat,amount:val})
     .then(()=>{budgets[cat]=val;openCatManage();renderAll();})
     .catch(e=>alert('Error: '+e.message));
 }
@@ -2612,8 +2844,8 @@ async function addNewCategoryFull(){
   const budgetAmt=prompt('Monthly budget (or 0 for none):','0');
   const amt=parseFloat(budgetAmt)||0;
   try{
-    await fetch(`${API}/api/categories`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,name:name.trim()})});
-    if(amt>0)await fetch(`${API}/api/budgets`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:name.trim(),amount:amt})});
+    await apiPost('/api/categories',{name:name.trim()});
+    if(amt>0)await apiPut('/api/budgets',{category:name.trim(),amount:amt});
     CAT_COLORS[name.trim()]=CAT_COLORS[name.trim()]||'#6E6C8E';
     CAT_ICONS[name.trim()]=CAT_ICONS[name.trim()]||'\u{1F4CC}';
     if(amt>0)budgets[name.trim()]=amt;
@@ -2639,7 +2871,7 @@ async function addNewCategory(){
   const name=prompt('Category name:');
   if(!name||!name.trim())return;
   try{
-    await fetch(`${API}/api/categories`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,name:name.trim()})});
+    await apiPost('/api/categories',{name:name.trim()});
     CAT_COLORS[name.trim()]=CAT_COLORS[name.trim()]||'#7a78a0';
     CAT_ICONS[name.trim()]=CAT_ICONS[name.trim()]||'📌';
     openCatManage();
@@ -2650,7 +2882,7 @@ async function renameCategory(oldName){
   const newName=prompt('Rename category:',oldName);
   if(!newName||newName.trim()===oldName)return;
   try{
-    await fetch(`${API}/api/categories/${encodeURIComponent(oldName)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,name:newName.trim()})});
+    await apiPut(`/api/categories/${encodeURIComponent(oldName)}`,{name:newName.trim()});
     // Update local state
     transactions.filter(t=>t.cat===oldName).forEach(t=>{t.cat=newName.trim();});
     if(budgets[oldName]){budgets[newName.trim()]=budgets[oldName];delete budgets[oldName];}
@@ -2664,7 +2896,7 @@ async function deleteCategory(name){
   const count=transactions.filter(t=>t.cat===name).length;
   if(!confirm(`Delete "${name}"? ${count} transactions will be moved to "Other".`))return;
   try{
-    await fetch(`${API}/api/categories/${encodeURIComponent(name)}?userId=${currentUser}`,{method:'DELETE'});
+    await apiDel(`/api/categories/${encodeURIComponent(name)}`);
     transactions.filter(t=>t.cat===name).forEach(t=>{t.cat='Other';});
     delete budgets[name];
     openCatManage();renderAll();
@@ -2750,7 +2982,7 @@ async function openReviewQueue(){
     const body=$('review-body');
     body.innerHTML='<div class="empty-msg">Loading...</div>';
     try{
-      const res=await fetch(`${API}/api/review-queue?userId=${currentUser}`);
+      const res=await apiGet('/api/review-queue');
       const{queue,total_unreviewed}=await res.json();
       if(!queue.length){body.innerHTML='<div class="empty-msg">All transactions reviewed!</div>';return;}
       const cats=[...new Set([...Object.keys(CAT_COLORS),...Object.keys(budgets)])].filter(c=>c!=='Transfer').sort();
@@ -2826,7 +3058,7 @@ async function resolveReview(vendor,category,el){
   const cnt=transactions.filter(t=>t.desc===vendor&&t.cat==='Other'&&!t.reviewed).length;
   if(!confirm(`Classify ${cnt} "${vendor}" transaction${cnt!==1?'s':''} as:\n\nType: ${type.toUpperCase()}\nCategory: ${category}\n\nApply to all?`))return;
   try{
-    await fetch(`${API}/api/review-queue/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,vendor,category,type})});
+    await apiPost('/api/review-queue/resolve',{vendor,category,type});
     transactions.filter(t=>t.desc===vendor).forEach(t=>{t.cat=category;t.type=type;t.reviewed=1;});
     const vendorEl=el.closest('.review-vendor');
     if(vendorEl){vendorEl.classList.add('done');setTimeout(()=>vendorEl.remove(),400);}
@@ -2839,7 +3071,7 @@ async function resolveReviewDirect(vendor,category,type){
   const cnt=transactions.filter(t=>t.desc===vendor&&t.cat==='Other'&&!t.reviewed).length;
   if(!confirm(`Classify ${cnt} "${vendor}" transaction${cnt!==1?'s':''} as:\n\nType: ${type.toUpperCase()}\nCategory: ${category}\n\nApply to all?`))return;
   try{
-    await fetch(`${API}/api/review-queue/resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,vendor,category,type})});
+    await apiPost('/api/review-queue/resolve',{vendor,category,type});
     transactions.filter(t=>t.desc===vendor).forEach(t=>{t.cat=category;t.type=type;t.reviewed=1;});
     const vendorEl=document.querySelector(`.review-vendor[data-vendor="${vendor.replace(/"/g,'\\"')}"]`);
     if(vendorEl){vendorEl.classList.add('done');setTimeout(()=>vendorEl.remove(),400);}
@@ -2854,7 +3086,7 @@ async function openVendorWizard(){
     const body=$('wizard-body');
     body.innerHTML='<div class="empty-msg">Loading vendors...</div>';
     try{
-      const res=await fetch(`${API}/api/vendor-summary?userId=${currentUser}`);
+      const res=await apiGet('/api/vendor-summary');
       const{vendors,stats}=await res.json();
       window._wizardAssignments={};
       window._wizardVendors=vendors;
@@ -2942,7 +3174,7 @@ async function expandWizardTxns(vendor,btn){
   if(existing){existing.remove();btn.textContent='View transactions';return;}
   btn.textContent='Loading...';
   try{
-    const res=await fetch(`${API}/api/transactions?userId=${currentUser}&vendor=${encodeURIComponent(vendor)}&limit=50`);
+    const res=await apiGet(`/api/transactions?vendor=${encodeURIComponent(vendor)}&limit=50`);
     const data=await res.json();
     const txs=data.transactions||data||[];
     if(!txs.length){btn.textContent='No transactions found';return;}
@@ -3014,7 +3246,7 @@ async function submitVendorWizard(){
   const btn=document.querySelector('#page-wizard .sht-btn.primary');
   if(btn){btn.disabled=true;btn.textContent='Saving...';}
   try{
-    const res=await fetch(`${API}/api/vendor-rules/bulk`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,assignments})});
+    const res=await apiPost('/api/vendor-rules/bulk',{assignments});
     const result=await res.json();
     if(!result.success)throw new Error(result.error||'Save failed');
     closePage('page-wizard');
@@ -3070,7 +3302,7 @@ async function openIncomeBreakdown(){
 let cfPeriod='6';
 async function renderCashFlowChart(container){
   try{
-    const res=await fetch(`${API}/api/trends/cashflow?userId=${currentUser}&months=${cfPeriod}`);
+    const res=await apiGet(`/api/trends/cashflow?months=${cfPeriod}`);
     const{data}=await res.json();
     if(!data.length){container.innerHTML='<div class="empty-msg">No data</div>';return;}
     const W=600,H=220,pad={t:20,r:15,b:30,l:55};
@@ -3134,9 +3366,9 @@ async function openRecurringModule(){
     body.innerHTML='<div class="empty-msg">Loading...</div>';
     try{
       const[recRes,subRes,detectRes]=await Promise.all([
-        fetch(`${API}/api/recurring?userId=${currentUser}`),
-        fetch(`${API}/api/subscriptions?userId=${currentUser}`),
-        fetch(`${API}/api/recurring/detect`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser})}),
+        apiGet('/api/recurring'),
+        apiGet('/api/subscriptions'),
+        apiPost('/api/recurring/detect',{}),
       ]);
       const{recurring}=await recRes.json();
       const{subscriptions,monthly_total}=await subRes.json();
@@ -3214,7 +3446,7 @@ function nextExpectedDate(lastSeen,frequency){
 
 async function confirmRecurring(vendor,category,amount,frequency,isSub,el){
   try{
-    await fetch(`${API}/api/recurring`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,vendor,category,expected_amount:amount,frequency,is_subscription:isSub})});
+    await apiPost('/api/recurring',{vendor,category,expected_amount:amount,frequency,is_subscription:isSub});
     const item=el.closest('.rec-item');
     if(item){item.style.opacity='.4';item.style.pointerEvents='none';
       const btn=item.querySelector('.sht-btn.gold');if(btn)btn.textContent='\u2713 Added';}
@@ -3223,7 +3455,7 @@ async function confirmRecurring(vendor,category,amount,frequency,isSub,el){
 
 async function dismissRecurring(vendor,el){
   try{
-    await fetch(`${API}/api/recurring/dismiss`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,vendor})});
+    await apiPost('/api/recurring/dismiss',{vendor});
     el.closest('.rec-item')?.remove();
   }catch(e){alert('Error: '+e.message);}
 }
@@ -3231,7 +3463,7 @@ async function dismissRecurring(vendor,el){
 // ─── GAMIFICATION ────────────────────────────────────────────────
 async function checkStreak(){
   try{
-    const res=await fetch(`${API}/api/streak/check-in?userId=${currentUser}`,{method:'POST'});
+    const res=await apiPost('/api/streak/check-in',{});
     const data=await res.json();
     window._streakData=data;
     if(data.streak>0){
@@ -3244,7 +3476,7 @@ async function checkStreak(){
 
 async function renderHealthScore(){
   try{
-    const res=await fetch(`${API}/api/health-score?userId=${currentUser}`);
+    const res=await apiGet('/api/health-score');
     const{score,color,breakdown}=await res.json();
     window._healthBreakdown={score,color,breakdown};
     const circ=2*Math.PI*42;
@@ -3292,7 +3524,7 @@ async function openHealthBreakdown(){
 
 async function renderWeeklyRecap(){
   try{
-    const res=await fetch(`${API}/api/weekly-recap?userId=${currentUser}`);
+    const res=await apiGet('/api/weekly-recap');
     const r=await res.json();
     if(!r.total_spent&&!r.transaction_count)return;
     const changeIcon=r.change_pct>0?'\u25B2':'\u25BC';
@@ -3313,7 +3545,7 @@ async function renderWeeklyRecap(){
 
 async function renderChallenges(){
   try{
-    const res=await fetch(`${API}/api/challenges?userId=${currentUser}`);
+    const res=await apiGet('/api/challenges');
     const{challenges}=await res.json();
     if(!challenges.length){$('challenge-cards').innerHTML='';return;}
     $('challenge-cards').innerHTML=challenges.map(c=>{
@@ -3345,7 +3577,7 @@ function plaidCallbacks(){
       localStorage.removeItem('plaid_link_token');
       showSync('Connecting bank\u2026');
       try{
-        const er=await fetch(`${API}/api/exchange_public_token`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({public_token:pt,userId:currentUser})});
+        const er=await apiPost('/api/exchange_public_token',{public_token:pt});
         if(er.ok){setConnected(true);await loadData();hideSync('\u2713 Bank connected and synced!');}
         else hideSync('\u2717 Connection failed');
       }catch(ex){hideSync('\u2717 '+ex.message);}
@@ -3359,7 +3591,7 @@ function plaidCallbacks(){
 
 async function initPlaidLink(){
   try{
-    const res=await fetch(`${API}/api/create_link_token`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser})});
+    const res=await apiPost('/api/create_link_token',{});
     if(!res.ok)throw new Error('Backend unreachable. Is server running?');
     const{link_token}=await res.json();
     localStorage.setItem('plaid_link_token',link_token);
@@ -3401,7 +3633,7 @@ async function submitTx(){
   if(!desc||!rawAmt||!date){alert('Please fill all fields.');return;}
   const amt=Math.abs(rawAmt); // always positive — type determines sign in stats
   try{
-    const res=await fetch(`${API}/api/transactions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,desc,amount:amt,type,cat,date})});
+    const res=await apiPost('/api/transactions',{desc,amount:amt,type,cat,date});
     if(!res.ok)throw new Error('Save failed');
     closeSheet('sheet');
     $('f-desc').value='';$('f-amt').value='';
@@ -3418,7 +3650,7 @@ async function submitTx(){
 }
 
 async function deleteTx(id){
-  try{await fetch(`${API}/api/transactions/${id}`,{method:'DELETE'});}catch{}
+  try{await apiDel(`/api/transactions/${id}`);}catch{}
   transactions=transactions.filter(t=>String(t.id)!==String(id));
   renderAll();
 }
@@ -3427,7 +3659,7 @@ async function deleteTx(id){
 window.addEventListener('online',async()=>{
   const queue=JSON.parse(localStorage.getItem('obsidian_queue')||'[]');
   for(const tx of queue){
-    try{await fetch(`${API}/api/transactions`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(tx)});}catch{}
+    try{await apiPost('/api/transactions',tx);}catch{}
   }
   localStorage.removeItem('obsidian_queue');
 });
@@ -3502,13 +3734,13 @@ async function saveBudget(){
   const amt=parseFloat($('fb-amt').value);
   if(!cat||isNaN(amt)||amt<=0){alert('Please enter a valid category and amount.');return;}
   try{
-    const res=await fetch(`${API}/api/budgets`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:cat,amount:amt})});
+    const res=await apiPut('/api/budgets',{category:cat,amount:amt});
     if(!res.ok)throw new Error('Save failed');
     budgets[cat]=amt;
     // Save emoji
     if(_budgetEmoji&&_budgetEmoji!=='📌'){
       CAT_ICONS[cat]=_budgetEmoji;
-      fetch(`${API}/api/categories/${encodeURIComponent(cat)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,icon:_budgetEmoji})});
+      apiPut(`/api/categories/${encodeURIComponent(cat)}`,{icon:_budgetEmoji});
     }
     if(!CAT_COLORS[cat])CAT_COLORS[cat]='#6E6C8E';
     if(!CAT_ICONS[cat])CAT_ICONS[cat]=_budgetEmoji||'📌';
@@ -3521,7 +3753,7 @@ async function saveBudget(){
 async function deleteBudget(cat){
   if(!confirm('Delete budget for "'+cat+'"?'))return;
   try{
-    const res=await fetch(`${API}/api/budgets`,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,category:cat})});
+    const res=await apiCall('DELETE','/api/budgets',{category:cat});
     if(!res.ok)throw new Error('Delete failed');
     delete budgets[cat];
     renderBudget();
@@ -3645,11 +3877,7 @@ async function sendChat(){
   scrollChat();
 
   try{
-    const res=await fetch(`${API}/api/chat`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({userId:currentUser,message:msg,history:chatHistory.slice(-10)})
-    });
+    const res=await apiPost('/api/chat',{message:msg,history:chatHistory.slice(-10)});
     // Remove typing
     $('chat-typing')?.remove();
 
@@ -3698,7 +3926,7 @@ async function confirmChatAction(){
   appendChatMsg('user','Yes, confirm.');
   const typing=document.createElement('div');typing.className='chat-typing';typing.id='chat-typing';$('chat-messages').appendChild(typing);scrollChat();
   try{
-    const res=await fetch(`${API}/api/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUser,confirmAction:action})});
+    const res=await apiPost('/api/chat',{confirmAction:action});
     $('chat-typing')?.remove();
     const data=await res.json();
     appendChatMsg('assistant',data.reply);
@@ -3744,7 +3972,7 @@ if('serviceWorker' in navigator){
 }
 
 // ─── INIT ────────────────────────────────────────────────────────
-loadData();
+initAuth();
 </script>
 </body>
 </html>
