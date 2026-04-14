@@ -264,7 +264,7 @@ async function requireAuth(req, res, next) {
   if (authHeader && authHeader.startsWith('Bearer ') && process.env.SUPABASE_JWT_SECRET) {
     try {
       const token = authHeader.slice(7);
-      const payload = jwt.verify(token, process.env.SUPABASE_JWT_SECRET);
+      const payload = jwt.verify(token, process.env.SUPABASE_JWT_SECRET, { algorithms: ['HS256', 'HS384', 'HS512', 'ES256'] });
       if (!payload.sub) return res.status(401).json({ error: 'Invalid token' });
 
       req.user = { id: payload.sub, email: payload.email };
