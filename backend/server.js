@@ -260,23 +260,21 @@ async function getHousehold(userId) {
 async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
 
-  // Try JWT auth first
-  if (authHeader && authHeader.startsWith('Bearer ') && process.env.SUPABASE_JWT_SECRET) {
+  // Try JWT auth first — use Supabase to verify the token
+  if (authHeader && authHeader.startsWith('Bearer ') && supabaseAdmin) {
     try {
       const token = authHeader.slice(7);
-      // Debug: log the JWT header to see which algorithm is used
-      try { const h = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString()); console.log('JWT header:', h); } catch(e2) {}
-      const payload = jwt.verify(token, process.env.SUPABASE_JWT_SECRET, { algorithms: ['HS256', 'HS384', 'HS512', 'ES256', 'RS256', 'EdDSA'] });
-      if (!payload.sub) return res.status(401).json({ error: 'Invalid token' });
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      if (error || !user) return res.status(401).json({ error: error?.message || 'Invalid token' });
 
-      req.user = { id: payload.sub, email: payload.email };
+      req.user = { id: user.id, email: user.email };
 
-      const hh = await get('SELECT household_id FROM household_members WHERE user_id = $1 LIMIT 1', [payload.sub]);
+      const hh = await get('SELECT household_id FROM household_members WHERE user_id = $1 LIMIT 1', [user.id]);
       req.household = hh?.household_id || null;
       req.needsOnboarding = !hh;
       return next();
     } catch (e) {
-      console.error('JWT verification failed:', e.message, '| JWT secret length:', process.env.SUPABASE_JWT_SECRET?.length);
+      console.error('Auth verification failed:', e.message);
       return res.status(401).json({ error: 'Authentication failed: ' + e.message });
     }
   }
