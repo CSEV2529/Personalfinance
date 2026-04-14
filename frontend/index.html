@@ -1400,15 +1400,13 @@ function apiHeaders(){
   if(accessToken)h['Authorization']=`Bearer ${accessToken}`;
   return h;
 }
+let _authInitialized=false;
+
 async function apiCall(method,path,body){
   const opts={method,headers:apiHeaders()};
   if(body)opts.body=JSON.stringify(body);
   const res=await fetch(`${API}${path}`,opts);
-  if(res.status===401&&supabaseClient){
-    await supabaseClient.auth.signOut();
-    showLogin();
-    throw new Error('Session expired');
-  }
+  // Don't auto-signout on 401 during init — let initAuth handle it
   return res;
 }
 async function apiGet(path){return apiCall('GET',path);}
@@ -1423,11 +1421,42 @@ async function initAuth(){
     showApp();
     return;
   }
+
+  // Register auth state listener only once
+  if(!_authInitialized){
+    _authInitialized=true;
+    supabaseClient.auth.onAuthStateChange((event,session)=>{
+      if(event==='SIGNED_IN'){
+        accessToken=session.access_token;
+        currentUser=session.user.id;
+        handleSignedIn();
+      }else if(event==='SIGNED_OUT'){
+        accessToken=null;currentUser=null;showLogin();
+      }else if(event==='TOKEN_REFRESHED'){
+        accessToken=session.access_token;
+      }
+    });
+  }
+
   const{data:{session}}=await supabaseClient.auth.getSession();
   if(session){
     accessToken=session.access_token;
     currentUser=session.user.id;
+    await handleSignedIn();
+  }else{
+    showLogin();
+  }
+}
+
+async function handleSignedIn(){
+  try{
     const meRes=await apiGet('/api/me');
+    if(meRes.status===401){
+      // JWT rejected by backend — sign out cleanly
+      console.error('Auth rejected by server — signing out');
+      await supabaseClient.auth.signOut();
+      return;
+    }
     if(meRes.ok){
       const me=await meRes.json();
       if(me.needsOnboarding){showOnboarding();return;}
@@ -1438,14 +1467,10 @@ async function initAuth(){
       }
     }
     showApp();
-  }else{
+  }catch(e){
+    console.error('initAuth error:',e);
     showLogin();
   }
-  supabaseClient.auth.onAuthStateChange((event,session)=>{
-    if(event==='SIGNED_IN'){accessToken=session.access_token;currentUser=session.user.id;initAuth();}
-    else if(event==='SIGNED_OUT'){accessToken=null;currentUser=null;showLogin();}
-    else if(event==='TOKEN_REFRESHED'){accessToken=session.access_token;}
-  });
 }
 
 function showLogin(){
