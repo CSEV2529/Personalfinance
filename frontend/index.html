@@ -1328,7 +1328,7 @@ const API = window.location.hostname === 'localhost' || window.location.hostname
   : ''; // Empty = same origin (when frontend is served by backend)
 
 // ─── CONSTANTS ───────────────────────────────────────────────────
-const CAT_COLORS={Housing:'#F5C518',Food:'#34D399',Transport:'#60A5FA',Health:'#F472B6',Entertainment:'#A78BFA',Shopping:'#FB923C',Utilities:'#2DD4BF',Income:'#34D399',Transfer:'#A78BFA',Other:'#6E6C8E'};
+const CAT_COLORS={Housing:'#F59E0B',Food:'#22C55E',Transport:'#3B82F6',Health:'#EC4899',Entertainment:'#8B5CF6',Shopping:'#F97316',Utilities:'#06B6D4',Income:'#10B981',Transfer:'#6366F1',Other:'#64748B',Vacation:'#EAB308',Subscriptions:'#818CF8',Pets:'#FB7185',Personal:'#A78BFA',Education:'#38BDF8',Insurance:'#94A3B8'};
 const CAT_ICONS={Housing:'\u{1F3E0}',Food:'\u{1F37D}\uFE0F',Transport:'\u{1F697}',Health:'\u{1F48A}',Entertainment:'\u{1F3AC}',Shopping:'\u{1F6CD}\uFE0F',Utilities:'\u26A1',Income:'\u{1F4B0}',Transfer:'\u{1F501}',Other:'\u{1F4CC}'};
 let budgets = {};
 const USER_COLORS={christian:'#F5C518',wife:'#60A5FA'};
@@ -1881,7 +1881,7 @@ function renderBudget(){
     const txCount=mtxs.filter(t=>t.cat===cat).length;
 
     return`<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;margin:0 14px 8px;">
-      <div onclick="event.stopPropagation();openEmojiForCategory('${esc}')" style="font-size:24px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:${CAT_COLORS[cat]||'#888'}15;cursor:pointer;flex-shrink:0;position:relative;">
+      <div onclick="event.stopPropagation();openEmojiForCategory('${esc}')" style="font-size:24px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:${CAT_COLORS[cat]||'#888'}25;cursor:pointer;flex-shrink:0;position:relative;">
         ${CAT_ICONS[cat]||'\u{1F4CC}'}
         <div style="position:absolute;bottom:-2px;right:-2px;width:16px;height:16px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:7px;color:var(--text-dim);">\u270E</div>
       </div>
@@ -2184,13 +2184,13 @@ function txRows(txs,deletable){
     const isIncome=t.type==='income';
     return`<div class="tx-row ${selectedTxIds.has(t.id)?'selected':''}" data-txid="${t.id}" onclick="onTxRowClick(event,'${t.id}')">
       <div class="tx-check">\u2713</div>
-      <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}22">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
+      <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}30">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
       <div class="tx-body">
         <div class="tx-desc">${t.desc}</div>
         ${t.notes?`<div class="tx-notes-preview">\u{1F4DD} ${truncate(t.notes,60)}</div>`:''}
         <div class="tx-meta">
           ${t.user_name?`<span class="tx-who" style="background:${USER_COLORS[t.user_id]||'#888'}22;color:${USER_COLORS[t.user_id]||'var(--text-dim)'}">${t.user_name}</span>`:''}
-          <span class="tx-cat">${t.cat}</span>
+          <span class="tx-cat" style="color:${CAT_COLORS[t.cat]||'var(--text-dim)'}">${t.cat}</span>
           ${t.status==='unsure'?'<span class="tx-unsure-badge">UNSURE</span>':''}
           ${t.pending?'<span class="tx-pending-badge">PENDING</span>':''}
           <span class="tx-date">\u00B7 ${t.date}</span>
@@ -2206,12 +2206,12 @@ function rankedTxRows(txs, startRank){
   return txs.map((t,i) => `
     <div class="tx-row" data-txid="${t.id}" onclick="openTxDetail('${t.id}')">
       <div class="tx-rank">${startRank+i+1}</div>
-      <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}22">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
+      <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}30">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
       <div class="tx-body">
         <div class="tx-desc">${t.desc}</div>
         <div class="tx-meta">
           ${t.user_name?`<span class="tx-who" style="background:${USER_COLORS[t.user_id]||'#888'}22;color:${USER_COLORS[t.user_id]||'var(--text-dim)'}">${t.user_name}</span>`:''}
-          <span class="tx-cat">${t.cat}</span>
+          <span class="tx-cat" style="color:${CAT_COLORS[t.cat]||'var(--text-dim)'}">${t.cat}</span>
           <span class="tx-date">\u00B7 ${t.date}</span>
         </div>
       </div>
@@ -2468,10 +2468,10 @@ async function openUnsurePage(){
         <div class="tx-list">${txs.map(t=>{
           const isIncome=t.type==='income';
           return`<div class="tx-row" data-txid="${t.id}" style="flex-wrap:wrap;">
-            <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}22">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
+            <div class="tx-ico" style="background:${CAT_COLORS[t.cat]||'#888'}30">${CAT_ICONS[t.cat]||'\u{1F4CC}'}</div>
             <div class="tx-body">
               <div class="tx-desc">${t.desc}</div>
-              <div class="tx-meta"><span class="tx-cat">${t.cat}</span><span class="tx-date">\u00B7 ${t.date}</span></div>
+              <div class="tx-meta"><span class="tx-cat" style="color:${CAT_COLORS[t.cat]||'var(--text-dim)'}">${t.cat}</span><span class="tx-date">\u00B7 ${t.date}</span></div>
             </div>
             <div class="tx-amt ${isIncome?'pos':'neg'}">${isIncome?'+':'-'}${money(t.amount)}</div>
             <div style="display:flex;gap:8px;width:100%;padding:8px 0 4px 0;margin-left:44px;">
@@ -2540,7 +2540,7 @@ function renderCatPicker(currentCat){
   const body=$('catpicker-body');
   body.innerHTML=allCats.map(cat=>`
     <div class="catp-row ${cat===currentCat?'selected':''}" onclick="selectCatFromPicker('${cat.replace(/'/g,"\\'")}')">
-      <div class="catp-emoji" style="background:${CAT_COLORS[cat]||'#888'}15">
+      <div class="catp-emoji" style="background:${CAT_COLORS[cat]||'#888'}25">
         ${CAT_ICONS[cat]||'📌'}
         <div class="catp-emoji-edit" onclick="event.stopPropagation();openEmojiPickerForCat('${cat.replace(/'/g,"\\'")}')">✎</div>
       </div>
@@ -2723,7 +2723,7 @@ function openCategorySheet(cat){
   const total = txs.filter(t=>t.type==='expense').reduce((a,t)=>a+t.amount,0);
   const budgetAmt = budgets[cat];
   $('cat-sheet-header').innerHTML = `
-    <div class="cat-sheet-icon" style="background:${CAT_COLORS[cat]||'#888'}22">${CAT_ICONS[cat]||'\u{1F4CC}'}</div>
+    <div class="cat-sheet-icon" style="background:${CAT_COLORS[cat]||'#888'}30">${CAT_ICONS[cat]||'\u{1F4CC}'}</div>
     <div class="cat-sheet-info">
       <div class="cat-sheet-name">${cat}</div>
       <div class="cat-sheet-stats">${txs.length} transactions \u00B7 ${money(total)} spent</div>
@@ -2942,7 +2942,7 @@ async function openCatDrill(cat){
 
     let html=`<div class="catd-summary">
       <div class="catd-header">
-        <div class="catd-icon" style="background:${CAT_COLORS[cat]||'#888'}22">${CAT_ICONS[cat]||'📌'}</div>
+        <div class="catd-icon" style="background:${CAT_COLORS[cat]||'#888'}30">${CAT_ICONS[cat]||'📌'}</div>
         <div class="catd-name">${cat}</div>
       </div>
       <div class="catd-stats">
@@ -3410,7 +3410,7 @@ async function openRecurringModule(){
           const status=daysSince<=35?'paid':daysSince<=45?'upcoming':'late';
           return`<div class="rec-item">
             <div class="rec-status ${status}"></div>
-            <div class="rec-item-icon" style="background:${CAT_COLORS[r.category]||'#888'}22">${CAT_ICONS[r.category]||'📌'}</div>
+            <div class="rec-item-icon" style="background:${CAT_COLORS[r.category]||'#888'}30">${CAT_ICONS[r.category]||'📌'}</div>
             <div class="rec-item-info">
               <div class="rec-item-vendor">${r.vendor}</div>
               <div class="rec-item-meta">${r.category||'Uncategorized'} \u00B7 Last: ${r.last_seen||'\u2014'} \u00B7 Next: ${nextExpectedDate(r.last_seen,r.frequency)||'\u2014'}</div>

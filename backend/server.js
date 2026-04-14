@@ -159,11 +159,11 @@ async function initDB() {
 
   // ── SEED CATEGORIES ──
   const defaultCats = {
-    Housing: { icon: '🏠', color: '#ffd700' }, Food: { icon: '🍽️', color: '#34d399' },
-    Transport: { icon: '🚗', color: '#60a5fa' }, Health: { icon: '💊', color: '#f472b6' },
-    Entertainment: { icon: '🎬', color: '#a78bfa' }, Shopping: { icon: '🛍️', color: '#fb923c' },
-    Utilities: { icon: '⚡', color: '#2dd4bf' }, Income: { icon: '💰', color: '#34d399' },
-    Transfer: { icon: '🔁', color: '#a78bfa' }, Other: { icon: '📌', color: '#6e6c8e' },
+    Housing: { icon: '🏠', color: '#F59E0B' }, Food: { icon: '🍽️', color: '#22C55E' },
+    Transport: { icon: '🚗', color: '#3B82F6' }, Health: { icon: '💊', color: '#EC4899' },
+    Entertainment: { icon: '🎬', color: '#8B5CF6' }, Shopping: { icon: '🛍️', color: '#F97316' },
+    Utilities: { icon: '⚡', color: '#06B6D4' }, Income: { icon: '💰', color: '#10B981' },
+    Transfer: { icon: '🔁', color: '#6366F1' }, Other: { icon: '📌', color: '#64748B' },
     Vacation: { icon: '🏖️', color: '#f59e0b' }, Subscriptions: { icon: '🔄', color: '#818cf8' },
     Pets: { icon: '🐾', color: '#fb7185' }, Personal: { icon: '💆', color: '#c084fc' },
     Education: { icon: '🎓', color: '#38bdf8' }, Insurance: { icon: '🛡️', color: '#94a3b8' }
