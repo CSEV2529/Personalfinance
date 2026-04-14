@@ -1887,7 +1887,7 @@ function renderBudget(){
       </div>
       <div style="flex:1;min-width:0;cursor:pointer;" onclick="openCatDrill('${esc}')">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-          <span style="font-size:14px;font-weight:500;">${cat}</span>
+          <span style="font-size:14px;font-weight:500;color:${CAT_COLORS[cat]||'var(--text)'}">${cat}</span>
           <span style="font-family:'JetBrains Mono',monospace;font-size:11px;">
             ${spent>0?`<span style="color:var(--red)">-${money(spent)}</span>`:''}
             ${income>0?`<span style="color:var(--green)">+${money(income)}</span>`:''}
@@ -1997,7 +1997,7 @@ function renderCatTrends(container){
   }).sort((a,b)=>b.curr-a.curr);
   if(!rows.length){container.innerHTML='<div class="empty-msg">No data</div>';return;}
   container.innerHTML=`<div style="display:flex;gap:8px;padding:0 0 8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted)"><div style="flex:1">Category</div><div style="width:80px;text-align:right">Current</div><div style="width:70px;text-align:right">Previous</div><div style="width:60px;text-align:right">Change</div></div>`+
-    rows.map(r=>`<div class="trend-row"><div class="trend-cat">${CAT_ICONS[r.cat]||'📌'} ${r.cat}</div><div class="trend-curr">${money(r.curr)}</div><div class="trend-prev">${money(r.prev)}</div><div class="trend-change ${r.change>0?'up':'down'}">${r.change>0?'▲':'▼'} ${Math.abs(r.change).toFixed(0)}%</div></div>`).join('');
+    rows.map(r=>`<div class="trend-row"><div class="trend-cat"><span style="display:inline-block;width:8px;height:8px;border-radius:3px;background:${CAT_COLORS[r.cat]||'#888'};margin-right:6px;flex-shrink:0"></span>${CAT_ICONS[r.cat]||'📌'} <span style="color:${CAT_COLORS[r.cat]||'var(--text)'}">${r.cat}</span></div><div class="trend-curr">${money(r.curr)}</div><div class="trend-prev">${money(r.prev)}</div><div class="trend-change ${r.change>0?'up':'down'}">${r.change>0?'▲':'▼'} ${Math.abs(r.change).toFixed(0)}%</div></div>`).join('');
 }
 
 function renderVendorTrends(container){
@@ -2544,7 +2544,7 @@ function renderCatPicker(currentCat){
         ${CAT_ICONS[cat]||'📌'}
         <div class="catp-emoji-edit" onclick="event.stopPropagation();openEmojiPickerForCat('${cat.replace(/'/g,"\\'")}')">✎</div>
       </div>
-      <div class="catp-name">${cat}</div>
+      <div class="catp-name" style="color:${CAT_COLORS[cat]||'var(--text)'}">${cat}</div>
       <div class="catp-check">✓</div>
     </div>`).join('')+`
     <button class="catp-add" onclick="addCatFromPicker()">+ New Category</button>`;
@@ -2782,7 +2782,7 @@ function renderDonut(bd,total){
     paths+=`<path d="M ${x1} ${y1} A ${r} ${r} 0 ${deg>180?1:0} 1 ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="butt" style="cursor:pointer" onclick="openCatDrill('${cat.replace(/'/g,"\\'")}')" />`;
     offset+=deg;
   });
-  const legend=chartEntries.map(([cat,amt])=>`<div class="dleg-row" onclick="openCatDrill('${cat.replace(/'/g,"\\'")}')"><div class="dleg-swatch" style="background:${cat==='All Other'?'#555':CAT_COLORS[cat]||'#888'}"></div><span class="dleg-name">${cat}</span><span class="dleg-pct">${((amt/total)*100).toFixed(0)}%</span></div>`).join('');
+  const legend=chartEntries.map(([cat,amt])=>`<div class="dleg-row" onclick="openCatDrill('${cat.replace(/'/g,"\\'")}')"><div class="dleg-swatch" style="background:${cat==='All Other'?'#555':CAT_COLORS[cat]||'#888'}"></div><span class="dleg-name" style="color:${cat==='All Other'?'var(--text-muted)':CAT_COLORS[cat]||'var(--text)'}">${cat}</span><span class="dleg-pct">${((amt/total)*100).toFixed(0)}%</span></div>`).join('');
   return`<div class="donut-inner">
     <svg viewBox="0 0 100 100" width="180" height="180" style="flex-shrink:0">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border2)" stroke-width="${sw}"/>
@@ -3300,7 +3300,7 @@ async function openIncomeBreakdown(){
       <div class="txd-label">By Category</div>
       ${catEntries.map(([cat,amt])=>`
         <div class="exp-bar-row" onclick="openCatDrill('${cat.replace(/'/g,"\\'")}')">
-          <div class="exp-bar-label">${CAT_ICONS[cat]||'📌'} ${cat}</div>
+          <div class="exp-bar-label"><span style="color:${CAT_COLORS[cat]||'var(--text)'}">${CAT_ICONS[cat]||'📌'} ${cat}</span></div>
           <div class="exp-bar-track"><div class="exp-bar-fill" style="width:${total>0?amt/total*100:0}%;background:var(--green)"></div></div>
           <div class="exp-bar-amt" style="color:var(--green)">+${money(amt)}</div>
         </div>`).join('')}
@@ -3369,7 +3369,7 @@ function renderExpenseBarChart(container){
   container.innerHTML=entries.map(([cat,amt])=>{
     const pct=total>0?(amt/total*100).toFixed(0):'0';
     return`<div class="exp-bar-row" onclick="openCatDrill('${cat.replace(/'/g,"\\'")}')">
-      <div class="exp-bar-label">${CAT_ICONS[cat]||'📌'} ${cat}</div>
+      <div class="exp-bar-label"><span style="color:${CAT_COLORS[cat]||'var(--text)'}">${CAT_ICONS[cat]||'📌'} ${cat}</span></div>
       <div class="exp-bar-track"><div class="exp-bar-fill" style="width:${pct}%;background:${CAT_COLORS[cat]||'#888'};color:${CAT_COLORS[cat]||'#888'}"></div></div>
       <div class="exp-bar-amt">-${money(amt)}</div>
       <div class="exp-bar-pct">${pct}%</div>
@@ -3428,7 +3428,7 @@ async function openRecurringModule(){
         html+=`<div class="txd-label" style="margin-top:20px">Suggested (${suggestions.length} detected)</div>`;
         html+=suggestions.map(s=>`
           <div class="rec-item" style="border-style:dashed">
-            <div class="rec-item-icon" style="background:${CAT_COLORS[s.category]||'#888'}22">${CAT_ICONS[s.category]||'📌'}</div>
+            <div class="rec-item-icon" style="background:${CAT_COLORS[s.category]||'#888'}30">${CAT_ICONS[s.category]||'📌'}</div>
             <div class="rec-item-info">
               <div class="rec-item-vendor">${s.vendor}</div>
               <div class="rec-item-meta">${s.frequency} · ${s.tx_count} charges${s.is_subscription?' · likely subscription':''}</div>

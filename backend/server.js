@@ -211,6 +211,17 @@ async function initDB() {
     ) RETURNING id`);
   if (stalePending.rowCount) console.log(`  DB: Cleaned up ${stalePending.rowCount} stale pending duplicates`);
 
+  // ── UPDATE CATEGORY COLORS (v10 redesign) ──
+  const colorUpdates = {
+    Housing:'#F59E0B',Food:'#22C55E',Transport:'#3B82F6',Health:'#EC4899',
+    Entertainment:'#8B5CF6',Shopping:'#F97316',Utilities:'#06B6D4',Income:'#10B981',
+    Transfer:'#6366F1',Other:'#64748B',Vacation:'#EAB308',Subscriptions:'#818CF8',
+    Pets:'#FB7185',Personal:'#A78BFA',Education:'#38BDF8',Insurance:'#94A3B8'
+  };
+  for (const [cat, color] of Object.entries(colorUpdates)) {
+    await pool.query('UPDATE categories SET color = $1 WHERE id = $2', [color, cat]);
+  }
+
   await pool.query(`INSERT INTO users (id, name, household) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, ['christian', 'Christian', 'spenziero']);
   await pool.query(`INSERT INTO users (id, name, household) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, ['wife', 'Marisol', 'spenziero']);
   const defaultBudgets = {Housing:2000,Food:800,Transport:400,Health:300,Entertainment:200,Shopping:400,Utilities:250};
