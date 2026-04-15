@@ -852,6 +852,68 @@ body::after{content:'';position:fixed;bottom:-20%;right:-10%;width:45%;height:45
   .reports-grid .report-panel,
   .reports-grid .chart-card{margin:0;}
 }
+
+/* ─── ONBOARDING ─────────────────────────────────────────── */
+.onb-progress{display:flex;gap:8px;justify-content:center;margin-bottom:28px;}
+.onb-dot{width:8px;height:8px;border-radius:50%;background:var(--border2);transition:all .3s;}
+.onb-dot.active{background:var(--accent);width:24px;border-radius:4px;}
+.onb-dot.complete{background:var(--green);}
+.onb-card{max-width:420px;width:100%;padding:32px 24px;text-align:center;}
+.onb-card.wide{max-width:500px;}
+.onb-title{font-family:'Inter',sans-serif;font-weight:700;font-size:28px;color:var(--text);margin-bottom:8px;letter-spacing:-0.5px;}
+.onb-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:28px;line-height:1.6;}
+.onb-options{display:flex;flex-direction:column;gap:8px;margin-bottom:24px;}
+.onb-option{display:flex;align-items:center;gap:12px;padding:16px;border-radius:14px;background:var(--surface);border:2px solid transparent;cursor:pointer;transition:all .15s;user-select:none;}
+.onb-option:active{transform:scale(.98);}
+.onb-option.selected{background:rgba(245,158,11,.08);border-color:var(--accent);}
+.onb-option-icon{font-size:22px;line-height:1;}
+.onb-option-label{font-family:'Inter',sans-serif;font-size:14px;color:var(--text);text-align:left;}
+.onb-btn{width:100%;padding:14px;border-radius:12px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;font-weight:600;cursor:pointer;border:none;margin-bottom:8px;transition:all .2s;}
+.onb-btn.primary{background:var(--accent);color:#0F172A;}
+.onb-btn.primary:active{transform:scale(.98);}
+.onb-btn.back{background:transparent;color:var(--text-muted);width:auto;padding:14px 24px;}
+.onb-btn.ghost{background:var(--surface);color:var(--text);border:1px solid var(--border2);}
+.onb-nav{display:flex;gap:8px;margin-top:16px;}
+.onb-features{display:flex;flex-direction:column;gap:10px;margin:24px 0;text-align:left;}
+.onb-feature{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);padding:10px 0;border-bottom:1px solid var(--border);}
+.onb-feature:last-child{border-bottom:none;}
+.onb-trust{display:flex;flex-direction:column;gap:14px;margin:20px 0;text-align:left;background:var(--surface);border-radius:14px;padding:16px;}
+.onb-trust-row{display:flex;gap:12px;align-items:flex-start;font-family:'Inter',sans-serif;font-size:13px;color:var(--text-muted);line-height:1.5;}
+.onb-trust-row strong{color:var(--text);}
+.onb-trust-icon{font-size:18px;flex-shrink:0;line-height:1;}
+.onb-cat-list{display:flex;flex-direction:column;gap:4px;max-height:320px;overflow-y:auto;margin-bottom:16px;}
+.onb-cat-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:10px;background:var(--surface);cursor:pointer;transition:background .15s;}
+.onb-cat-row:active{background:var(--surface2);}
+.onb-cat-icon{font-size:18px;line-height:1;}
+.onb-cat-name{flex:1;font-family:'Inter',sans-serif;font-size:14px;color:var(--text);text-align:left;}
+.onb-cat-edit{color:var(--text-muted);font-size:14px;}
+.ai-avatar{display:inline-block;position:relative;margin:0 auto 20px;}
+.ai-avatar::after{content:'';position:absolute;inset:-8px;background:radial-gradient(circle,rgba(245,158,11,0.2) 0%,transparent 70%);border-radius:50%;animation:ai-pulse 3s ease-in-out infinite;z-index:-1;}
+@keyframes ai-pulse{0%,100%{transform:scale(1);opacity:0.5;}50%{transform:scale(1.2);opacity:0.8;}}
+.ai-capabilities{background:var(--surface);border-radius:12px;padding:16px;margin-bottom:20px;text-align:left;}
+.ai-cap-title{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;}
+.ai-cap-row{font-family:'Inter',sans-serif;font-size:13px;color:var(--text);line-height:1.5;padding:4px 0;}
+.ai-closing{font-family:'Inter',sans-serif;font-size:13px;color:var(--text-muted);font-style:italic;margin-bottom:24px;line-height:1.5;}
+.ai-hint-bubble{position:fixed;top:20px;left:50%;transform:translateX(-50%);max-width:360px;width:calc(100% - 40px);background:var(--surface-solid);border:1px solid var(--accent);border-radius:14px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:ai-hint-slide-in .4s ease-out;z-index:500;}
+.ai-hint-icon{flex-shrink:0;margin-top:2px;}
+.ai-hint-text{flex:1;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);line-height:1.5;}
+.ai-hint-close{flex-shrink:0;font-size:18px;color:var(--text-muted);cursor:pointer;padding:0 4px;}
+@keyframes ai-hint-slide-in{from{transform:translate(-50%,-20px);opacity:0;}to{transform:translate(-50%,0);opacity:1;}}
+.wizard-celebration{position:fixed;inset:0;background:rgba(15,23,42,.7);display:flex;align-items:center;justify-content:center;padding:24px;z-index:600;backdrop-filter:blur(8px);animation:fade-in .3s;}
+.celebration-card{max-width:360px;width:100%;background:var(--surface-solid);border:1px solid var(--accent);border-radius:20px;padding:32px 24px;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.5);}
+.celebration-icon{font-size:48px;margin-bottom:16px;animation:celebration-pop .5s cubic-bezier(.2,.8,.2,1);}
+.celebration-title{font-family:'Inter',sans-serif;font-weight:700;font-size:24px;color:var(--accent);margin-bottom:8px;}
+.celebration-sub{font-family:'Inter',sans-serif;font-size:14px;color:var(--text);margin-bottom:4px;}
+.celebration-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:24px;line-height:1.5;}
+.celebration-buttons{display:flex;gap:8px;}
+@keyframes celebration-pop{0%{transform:scale(0);opacity:0;}70%{transform:scale(1.2);}100%{transform:scale(1);opacity:1;}}
+@keyframes fade-in{from{opacity:0;}to{opacity:1;}}
+.ai-first-bubble{position:fixed;top:80px;left:50%;transform:translateX(-50%);max-width:420px;width:calc(100% - 32px);z-index:500;animation:ai-bubble-drop .6s cubic-bezier(.2,.8,.2,1);}
+.ai-first-bubble-inner{background:var(--surface-solid);border:1px solid var(--accent);border-radius:18px;padding:20px;box-shadow:0 16px 48px rgba(0,0,0,.6),0 0 0 1px rgba(245,158,11,.15);}
+.ai-first-bubble-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.ai-first-bubble-text{font-family:'Inter',sans-serif;font-size:14px;color:var(--text);line-height:1.6;margin-bottom:18px;}
+.ai-first-bubble-actions{display:flex;gap:8px;}
+@keyframes ai-bubble-drop{from{transform:translate(-50%,-40px);opacity:0;}to{transform:translate(-50%,0);opacity:1;}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -876,7 +938,7 @@ body::after{content:'';position:fixed;bottom:-20%;right:-10%;width:45%;height:45
 
 <!-- ONBOARDING OVERLAY -->
 <div id="onboarding-overlay" style="position:fixed;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px;overflow-y:auto;">
-  <div style="max-width:400px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px 24px;text-align:center;" id="onboarding-body"></div>
+  <div id="onboarding-body" style="max-width:420px;width:100%;"></div>
 </div>
 
 <div class="app" id="app-container" style="display:none">
@@ -884,7 +946,7 @@ body::after{content:'';position:fixed;bottom:-20%;right:-10%;width:45%;height:45
   <!-- TOPBAR -->
   <div class="topbar">
     <div class="topbar-left">
-      <div class="logo-mark">Obsidian</div>
+      <div class="logo-mark" onclick="debugTapLogo()">Obsidian</div>
     </div>
     <div class="topbar-right">
       <div class="user-chip" id="user-chip" onclick="openUserPicker()">
@@ -1445,14 +1507,21 @@ async function handleSignedIn(){
   try{
     const meRes=await apiGet('/api/me');
     if(meRes.status===401){
-      // JWT rejected by backend — sign out cleanly
-      console.error('Auth rejected by server — signing out');
+      console.error('Auth rejected by server \u2014 signing out');
       await supabaseClient.auth.signOut();
       return;
     }
     if(meRes.ok){
       const me=await meRes.json();
-      if(me.needsOnboarding){showOnboarding();return;}
+      if(me.needsOnboarding){
+        // Restore lifestyle data if resuming
+        if(me.lifestyleData)Object.assign(lifestyleData,me.lifestyleData);
+        onboardingData.display_name=me.profile?.display_name||'';
+        onboardingData.avatar_color=me.profile?.avatar_color||'#F59E0B';
+        const stepMap={welcome:1,lifestyle:2,meet_ai:3,categories:4,bank:5,wizard:6,done:7};
+        showOnboarding(stepMap[me.onboardingStep]||1);
+        return;
+      }
       if(me.profile)currentUser=me.profile.id;
       if(me.members?.length){
         users=me.members.map(m=>({id:m.user_id,name:m.display_name||'User'}));
@@ -1531,74 +1600,390 @@ async function handleDeleteAccount(){
   }catch(e){alert('Error: '+e.message);}
 }
 
-// ─── ONBOARDING ─────────────────────────────────────────────────
-let onboardingData={display_name:'',household_name:'',avatar_color:'#E8A828'};
+// ─── ONBOARDING (7-stage with AI companion) ─────────────────
+let onboardingData={display_name:'',household_name:'',avatar_color:'#F59E0B'};
+let lifestyleData={living:null,transport:[],family:[],commitments:[],lifestyle:[]};
 
-function showOnboarding(){
+function showOnboarding(resumeStep){
   $('auth-overlay').style.display='none';
   $('onboarding-overlay').style.display='flex';
   $('app-container').style.display='none';
-  renderOnboardingStep(1);
+  renderOnboardingStep(resumeStep||1);
+}
+
+function renderProgressDots(active,total){
+  total=total||7;
+  return`<div class="onb-progress">${Array.from({length:total},(_,i)=>{
+    const n=i+1;
+    const cls=n<active?'complete':n===active?'active':'';
+    return`<div class="onb-dot ${cls}"></div>`;
+  }).join('')}</div>`;
 }
 
 function renderOnboardingStep(step){
   const body=$('onboarding-body');
-  if(step===1){
-    body.innerHTML=`<div style="font-family:'Inter',sans-serif;font-weight:700;font-size:28px;color:var(--gold);margin-bottom:8px">Welcome to Obsidian</div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:24px">Let's get you set up in 3 quick steps.</div>
-      <div style="text-align:left;margin:0 auto 24px;max-width:260px">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);padding:8px 0;border-bottom:1px solid var(--border)">\u{1F512} Bank-level security via Plaid</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);padding:8px 0;border-bottom:1px solid var(--border)">\u{1F3F7}\uFE0F Automatic transaction categorization</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);padding:8px 0">\u{1F916} AI-powered spending insights</div>
-      </div>
-      <button onclick="renderOnboardingStep(2)" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--gold);color:#000;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-weight:600;">Get Started</button>`;
-  }else if(step===2){
-    const colors=['#E8A828','#34D399','#60A5FA','#F472B6','#A78BFA','#FB923C','#2DD4BF'];
-    body.innerHTML=`<div style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;margin-bottom:16px">Tell us about you</div>
-      <input type="text" id="onb-name" placeholder="Your name" value="${onboardingData.display_name}" style="width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:16px;margin-bottom:16px;font-family:system-ui,sans-serif;box-sizing:border-box;">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:2px;margin-bottom:8px;text-transform:uppercase">Avatar color</div>
-      <div style="display:flex;gap:10px;justify-content:center;margin-bottom:24px">${colors.map(c=>
-        `<div onclick="onboardingData.avatar_color='${c}';renderOnboardingStep(2)" style="width:36px;height:36px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${onboardingData.avatar_color===c?'var(--text)':'transparent'};transition:border .15s"></div>`
-      ).join('')}</div>
-      <button onclick="saveOnboardingStep2()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--gold);color:#000;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-weight:600;">Continue</button>`;
-  }else if(step===3){
-    body.innerHTML=`<div style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;margin-bottom:8px">Create your household</div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:20px">A household is a shared space for you and your partner. You can invite them later.</div>
-      <input type="text" id="onb-household" placeholder="Household name (e.g. Smith Family)" value="${onboardingData.household_name}" style="width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:16px;margin-bottom:16px;font-family:system-ui,sans-serif;box-sizing:border-box;">
-      <button onclick="saveOnboardingStep3()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--gold);color:#000;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-weight:600;">Create Household</button>`;
-  }else if(step===4){
-    body.innerHTML=`<div style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;margin-bottom:8px">Connect your bank</div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:20px">Obsidian uses Plaid \u2014 the same technology trusted by Venmo, Coinbase, and thousands of other apps. We never see your bank password.</div>
-      <div style="text-align:left;margin:0 auto 24px;max-width:260px">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);padding:8px 0;border-bottom:1px solid var(--border)">\u{1F512} 256-bit encryption</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);padding:8px 0;border-bottom:1px solid var(--border)">\u{1F4D6} Read-only access</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);padding:8px 0">\u274C Disconnect anytime</div>
-      </div>
-      <button onclick="openPlaidLink()" style="width:100%;padding:14px;border-radius:12px;border:none;background:var(--gold);color:#000;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-weight:600;margin-bottom:8px;">Connect Bank</button>
-      <button onclick="finishOnboarding()" style="width:100%;padding:8px;border-radius:12px;border:none;background:transparent;color:var(--text-muted);font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;">Skip for now</button>`;
+  if(step===1) renderWelcomeStage(body);
+  else if(step===2) renderLifestyleStage(body,1);
+  else if(step===2.1) renderLifestyleStage(body,2);
+  else if(step===2.2) renderLifestyleStage(body,3);
+  else if(step===2.3) renderLifestyleStage(body,4);
+  else if(step===2.4) renderLifestyleStage(body,5);
+  else if(step===3) renderMeetAIStage(body);
+  else if(step===4) renderCategorySetupStage(body);
+  else if(step===5) renderBankConnectionStage(body);
+  else if(step===6) startOnboardingWizard();
+  else if(step===7) showDashboardReveal();
+}
+
+// ── STAGE 1: WELCOME ──
+function renderWelcomeStage(body){
+  body.innerHTML=`<div class="onb-card">
+    ${renderProgressDots(1)}
+    <div class="onb-title">Welcome to Obsidian</div>
+    <div class="onb-sub">Deep insight into your household finances.<br>Let's get you set up in a few quick steps.</div>
+    <div class="onb-features">
+      <div class="onb-feature">\u{1F512} Bank-level security via Plaid</div>
+      <div class="onb-feature">\u{1F3F7}\uFE0F Automatic transaction categorization</div>
+      <div class="onb-feature">\u{1F916} AI-powered spending insights</div>
+    </div>
+    <button class="onb-btn primary" onclick="renderOnboardingStep(2)">Get Started</button>
+  </div>`;
+}
+
+// ── STAGE 2: LIFESTYLE QUESTIONNAIRE (5 questions) ──
+function renderLifestyleStage(body,q){
+  const questions=[
+    {title:'Where do you live?',sub:'This helps us create the right categories for your housing costs.',type:'single',key:'living',
+     options:[{id:'own_home',icon:'\u{1F3E0}',label:'I own my home'},{id:'rent',icon:'\u{1F3E2}',label:'I rent'},{id:'other_living',icon:'\u{1F3D5}\uFE0F',label:'Living with family / other'}]},
+    {title:'How do you get around?',sub:'Pick all that apply.',type:'multi',key:'transport',
+     options:[{id:'has_car',icon:'\u{1F697}',label:'I own a car'},{id:'public_transit',icon:'\u{1F687}',label:'Public transit'},{id:'travels',icon:'\u2708\uFE0F',label:'I travel often'}]},
+    {title:'Who lives with you?',sub:'We\'ll tailor categories for your household.',type:'multi',key:'family',
+     options:[{id:'has_kids',icon:'\u{1F476}',label:'Kids'},{id:'has_pets',icon:'\u{1F43E}',label:'Pets'},{id:'has_partner',icon:'\u{1F491}',label:'Partner / spouse'},{id:'just_me',icon:'\u{1F64B}',label:'Just me'}]},
+    {title:'Any of these apply?',sub:'Pick all that apply.',type:'multi',key:'commitments',
+     options:[{id:'credit_cards',icon:'\u{1F4B3}',label:'Credit card debt'},{id:'student_loans',icon:'\u{1F393}',label:'Student loans'},{id:'health_insurance',icon:'\u{1F3E5}',label:'Medical / health costs'},{id:'self_employed',icon:'\u{1F4BC}',label:'Self-employed / business'}]},
+    {title:'What do you spend on for fun?',sub:'Last one \u2014 pick all that apply.',type:'multi',key:'lifestyle',
+     options:[{id:'entertainment',icon:'\u{1F3AC}',label:'Entertainment & streaming'},{id:'dining_out',icon:'\u{1F374}',label:'Dining out'},{id:'shopping',icon:'\u{1F6CD}\uFE0F',label:'Shopping'},{id:'personal_care',icon:'\u{1F486}',label:'Personal care'}]}
+  ];
+  const qData=questions[q-1];
+  const isLast=q===5;
+  const isSingle=qData.type==='single';
+  const current=isSingle?lifestyleData[qData.key]:(lifestyleData[qData.key]||[]);
+
+  body.innerHTML=`<div class="onb-card">
+    ${renderProgressDots(2)}
+    <div class="onb-title">${qData.title}</div>
+    <div class="onb-sub">${qData.sub}</div>
+    <div class="onb-options" id="onb-q-options">
+      ${qData.options.map(o=>{
+        const sel=isSingle?(current===o.id):current.includes(o.id);
+        return`<div class="onb-option ${sel?'selected':''}" onclick="toggleLifestyleOption('${qData.key}','${o.id}',${isSingle},this)">
+          <div class="onb-option-icon">${o.icon}</div>
+          <div class="onb-option-label">${o.label}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="onb-nav">
+      <button class="onb-btn back" onclick="renderOnboardingStep(${q===1?1:(q===2?2:2+(q-2)/10-.1)})">\u2190 Back</button>
+      <button class="onb-btn primary" style="flex:1" onclick="${isLast?'finishLifestyle()':'renderOnboardingStep(2.'+(q)+')'}">
+        ${isLast?'Continue \u2192':'Next \u2192'}
+      </button>
+    </div>
+  </div>`;
+}
+
+function toggleLifestyleOption(key,value,isSingle,el){
+  if(isSingle){
+    lifestyleData[key]=value;
+    el.closest('.onb-options').querySelectorAll('.onb-option').forEach(o=>o.classList.remove('selected'));
+    el.classList.add('selected');
+  }else{
+    const arr=lifestyleData[key]||[];
+    const idx=arr.indexOf(value);
+    if(idx>=0){arr.splice(idx,1);el.classList.remove('selected');}
+    else{arr.push(value);el.classList.add('selected');}
+    lifestyleData[key]=arr;
   }
 }
 
-async function saveOnboardingStep2(){
-  onboardingData.display_name=$('onb-name').value.trim();
-  if(!onboardingData.display_name){alert('Please enter your name');return;}
-  await apiPost('/api/me/profile',{display_name:onboardingData.display_name,avatar_color:onboardingData.avatar_color});
+async function finishLifestyle(){
+  // Save profile + lifestyle data
+  const name=onboardingData.display_name||currentUser?.email?.split('@')[0]||'User';
+  await apiPost('/api/me/profile',{display_name:name,avatar_color:onboardingData.avatar_color||'#F59E0B'});
+  await apiPost('/api/me/lifestyle',{lifestyle_data:lifestyleData});
+  await apiPost('/api/me/onboarding-step',{step:'meet_ai'});
+
+  // Auto-create household
+  if(!window._onboardingHouseholdId){
+    try{
+      const res=await apiPost('/api/households',{name:name+"'s Finances"});
+      if(res.ok){
+        const d=await res.json();
+        window._onboardingHouseholdId=d.household_id;
+        // Seed categories based on lifestyle
+        await apiPost(`/api/households/${d.household_id}/seed-categories`,{lifestyle_data:lifestyleData});
+      }
+    }catch(e){console.error('Household creation failed:',e);}
+  }
+
   renderOnboardingStep(3);
 }
 
-async function saveOnboardingStep3(){
-  onboardingData.household_name=$('onb-household').value.trim();
-  if(!onboardingData.household_name){alert('Please enter a household name');return;}
+// ── STAGE 2.5: MEET OBSIDIAN AI ──
+function renderMeetAIStage(body){
+  const name=onboardingData.display_name||currentUser?.email?.split('@')[0]||'there';
+  const intro=generateAIIntroMessage(lifestyleData,name);
+
+  body.innerHTML=`<div class="onb-card">
+    ${renderProgressDots(3)}
+    <div class="ai-avatar">
+      <svg viewBox="0 0 100 100" width="72" height="72">
+        <defs><linearGradient id="ai-grad-2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#1E293B"/><stop offset="50%" stop-color="#0F172A"/><stop offset="100%" stop-color="#334155"/>
+        </linearGradient></defs>
+        <polygon points="50,10 85,30 85,70 50,90 15,70 15,30" fill="url(#ai-grad-2)" stroke="#F59E0B" stroke-width="2"/>
+        <circle cx="50" cy="50" r="3" fill="#F59E0B"><animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite"/></circle>
+      </svg>
+    </div>
+    <div class="onb-title" style="font-size:22px;margin-bottom:20px">Meet Obsidian AI</div>
+    <div style="text-align:left;margin-bottom:24px">
+      ${intro.split('\n\n').map(p=>`<p style="font-family:'Inter',sans-serif;font-size:14px;color:var(--text);line-height:1.6;margin-bottom:12px">${p}</p>`).join('')}
+    </div>
+    <div class="ai-capabilities">
+      <div class="ai-cap-title">Here's what I can do:</div>
+      <div class="ai-cap-row">\u25B8 Answer questions about your spending in plain English</div>
+      <div class="ai-cap-row">\u25B8 Categorize new vendors automatically</div>
+      <div class="ai-cap-row">\u25B8 Set and adjust budgets on your behalf</div>
+      <div class="ai-cap-row">\u25B8 Flag unusual transactions</div>
+      <div class="ai-cap-row">\u25B8 Forecast your balance into the future</div>
+    </div>
+    <div class="ai-closing">I'll check in throughout the app. For now, let's finish setting up.</div>
+    <button class="onb-btn primary" onclick="apiPost('/api/me/onboarding-step',{step:'categories'});renderOnboardingStep(4)">Sounds good \u2192</button>
+  </div>`;
+}
+
+function generateAIIntroMessage(lifestyle,displayName){
+  const name=displayName?.split(' ')[0]||'there';
+  const living=lifestyle.living==='own_home'?'homeowner':lifestyle.living==='rent'?'renter':null;
+  const family=[];
+  if((lifestyle.family||[]).includes('has_kids'))family.push('kids');
+  if((lifestyle.family||[]).includes('has_pets'))family.push('pets');
+  if((lifestyle.family||[]).includes('has_partner'))family.push('a partner');
+  const transport=[];
+  if((lifestyle.transport||[]).includes('has_car'))transport.push('a car');
+  if((lifestyle.transport||[]).includes('public_transit'))transport.push('transit');
+  if((lifestyle.transport||[]).includes('travels'))transport.push('frequent travel');
+  const commitments=[];
+  if((lifestyle.commitments||[]).includes('credit_cards'))commitments.push('credit card debt');
+  if((lifestyle.commitments||[]).includes('student_loans'))commitments.push('student loans');
+  if((lifestyle.commitments||[]).includes('self_employed'))commitments.push('a business');
+  if((lifestyle.commitments||[]).includes('health_insurance'))commitments.push('health costs');
+
+  let intro=`Hi ${name}, I'm Obsidian AI.\n\n`;
+  let opener='Based on what you just told me, I\'ll help you track spending for ';
+  const parts=[];
+  if(living)parts.push(`a ${living}`);
+  if(family.length===1)parts.push(`with ${family[0]}`);
+  else if(family.length>=2)parts.push(`with ${family.slice(0,-1).join(', ')} and ${family[family.length-1]}`);
+  if(transport.length===1)parts.push(`who uses ${transport[0]}`);
+  else if(transport.length>1)parts.push(`who uses ${transport.slice(0,-1).join(', ')} and ${transport[transport.length-1]}`);
+  if(parts.length>0){opener+=parts.join(' ')+'.'}
+  else{opener='I\'ll help you track your spending and stay on top of your finances.';}
+  intro+=opener;
+  if(commitments.length===1)intro+=`\n\nI see you have ${commitments[0]} \u2014 I'll keep an eye on that too.`;
+  else if(commitments.length===2)intro+=`\n\nI see you have ${commitments[0]} and ${commitments[1]} \u2014 I'll watch for patterns in those.`;
+  else if(commitments.length>2)intro+=`\n\nI see you have ${commitments.slice(0,-1).join(', ')}, and ${commitments[commitments.length-1]} \u2014 I'll help you keep track of all of those.`;
+  return intro;
+}
+
+// ── STAGE 3: CATEGORY SETUP ──
+async function renderCategorySetupStage(body){
+  body.innerHTML=`<div class="onb-card wide">${renderProgressDots(4)}<div class="onb-sub">Loading categories...</div></div>`;
+  const catsRes=await apiGet('/api/categories');
+  const data=await catsRes.json();
+  const categories=(data.categories||[]).filter(c=>c.is_active!==false);
+  body.innerHTML=`<div class="onb-card wide">
+    ${renderProgressDots(4)}
+    <div class="onb-title">Your Categories</div>
+    <div class="onb-sub">Based on your answers, here's your starter kit. You can customize these anytime.</div>
+    <div class="onb-cat-list">${categories.map(c=>
+      `<div class="onb-cat-row"><div class="onb-cat-icon">${c.icon||'\u{1F4CC}'}</div><div class="onb-cat-name" style="color:${CAT_COLORS[c.id]||'var(--text)'}">${c.id}</div></div>`
+    ).join('')}</div>
+    <div class="onb-nav">
+      <button class="onb-btn back" onclick="renderOnboardingStep(3)">\u2190 Back</button>
+      <button class="onb-btn primary" style="flex:1" onclick="apiPost('/api/me/onboarding-step',{step:'bank'});renderOnboardingStep(5)">Looks good \u2192</button>
+    </div>
+  </div>`;
+  // Update CAT_ICONS/COLORS from fresh data
+  categories.forEach(c=>{if(c.icon)CAT_ICONS[c.id]=c.icon;if(c.color)CAT_COLORS[c.id]=c.color;});
+}
+
+// ── STAGE 4: BANK CONNECTION ──
+function renderBankConnectionStage(body){
+  body.innerHTML=`<div class="onb-card">
+    ${renderProgressDots(5)}
+    <div class="onb-title">Connect your bank</div>
+    <div class="onb-sub">Obsidian reads your transactions so you don't have to enter them manually. We use Plaid \u2014 the same tech Venmo, Coinbase, and Robinhood trust.</div>
+    <div class="onb-trust">
+      <div class="onb-trust-row"><div class="onb-trust-icon">\u{1F512}</div><div><strong>Bank-level security.</strong> 256-bit encryption, same as your bank.</div></div>
+      <div class="onb-trust-row"><div class="onb-trust-icon">\u{1F441}\uFE0F</div><div><strong>Read-only.</strong> Obsidian can't move money or change anything.</div></div>
+      <div class="onb-trust-row"><div class="onb-trust-icon">\u{1F511}</div><div><strong>You own it.</strong> Disconnect anytime from Settings.</div></div>
+      <div class="onb-trust-row"><div class="onb-trust-icon">\u{1F6AB}</div><div><strong>Never sold.</strong> Your data is not shared with advertisers.</div></div>
+    </div>
+    <button class="onb-btn primary" onclick="onboardingConnectBank()">Connect Bank \u2192</button>
+    <button class="onb-btn ghost" onclick="skipBankOnboarding()">I'll do this later</button>
+  </div>`;
+}
+
+async function onboardingConnectBank(){
+  window._onboardingPlaidFlow=true;
+  await initPlaidLink();
+}
+
+async function skipBankOnboarding(){
+  await apiPost('/api/me/onboarding-step',{step:'done'});
+  $('onboarding-overlay').style.display='none';
+  showApp();
+}
+
+// ── STAGE 5: VENDOR WIZARD (ONBOARDING MODE) ──
+async function startOnboardingWizard(){
+  $('onboarding-overlay').style.display='none';
+  window._wizardMode='onboarding';
+  openVendorWizard();
+}
+
+// ── STAGE 6: DASHBOARD REVEAL ──
+async function showDashboardReveal(){
+  $('onboarding-overlay').style.display='flex';
+  $('onboarding-body').innerHTML=`<div class="onb-card" style="text-align:center">
+    <div class="ai-avatar">
+      <svg viewBox="0 0 100 100" width="64" height="64">
+        <polygon points="50,10 85,30 85,70 50,90 15,70 15,30" fill="#0F172A" stroke="#F59E0B" stroke-width="3"/>
+        <circle cx="50" cy="50" r="3" fill="#F59E0B"><animate attributeName="r" values="2;5;2" dur="1.2s" repeatCount="indefinite"/></circle>
+      </svg>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-top:12px;letter-spacing:1.5px;text-transform:uppercase">Organizing your data</div>
+    <div style="font-family:'Inter',sans-serif;font-size:13px;color:var(--text-dim);margin-top:8px">Obsidian is thinking\u2026</div>
+  </div>`;
+
+  await loadData();
+  let aiReply;
   try{
-    const res=await apiPost('/api/households',{name:onboardingData.household_name});
-    if(!res.ok)throw new Error((await res.json()).error);
-    renderOnboardingStep(4);
-  }catch(e){alert('Error: '+e.message);}
+    const res=await apiPost('/api/chat',{message:'[ONBOARDING_FIRST_GREETING]',history:[]});
+    const d=await res.json();aiReply=d.reply;
+  }catch(e){aiReply='Welcome! Your data is set up. Ask me anything \u2014 like "how am I doing this month?"';}
+
+  await new Promise(r=>setTimeout(r,1500));
+
+  $('onboarding-overlay').style.transition='opacity .5s ease';
+  $('onboarding-overlay').style.opacity='0';
+  await new Promise(r=>setTimeout(r,500));
+  $('onboarding-overlay').style.display='none';
+  $('onboarding-overlay').style.opacity='1';
+  $('onboarding-overlay').style.transition='';
+
+  $('app-container').style.display='';
+  $('app-container').style.opacity='0';
+  $('app-container').style.transition='opacity .5s ease';
+  requestAnimationFrame(()=>{$('app-container').style.opacity='1';});
+
+  setTimeout(()=>showOnboardingAIBubble(aiReply),800);
+  await apiPost('/api/me/onboarding-step',{step:'done'});
+}
+
+function showOnboardingAIBubble(message){
+  const bubble=document.createElement('div');
+  bubble.className='ai-first-bubble';
+  bubble.innerHTML=`<div class="ai-first-bubble-inner">
+    <div class="ai-first-bubble-header">
+      <svg viewBox="0 0 100 100" width="28" height="28"><polygon points="50,10 85,30 85,70 50,90 15,70 15,30" fill="#0F172A" stroke="#F59E0B" stroke-width="4"/></svg>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase">Obsidian AI</div>
+    </div>
+    <div class="ai-first-bubble-text">${escapeHtml(message).replace(/\\n/g,'<br>').replace(/\n/g,'<br>')}</div>
+    <div class="ai-first-bubble-actions">
+      <button class="onb-btn primary" style="margin:0;flex:1" onclick="document.querySelector('.ai-first-bubble')?.remove();toggleChat();">Show me</button>
+      <button class="onb-btn ghost" style="margin:0;flex:1" onclick="document.querySelector('.ai-first-bubble')?.remove()">Not now</button>
+    </div>
+  </div>`;
+  document.body.appendChild(bubble);
+}
+
+// ── MID-WIZARD AI HINT ──
+function generateMidWizardHint(){
+  const catCounts={};
+  Object.values(window._wizardAssignments||{}).forEach(a=>{if(a.category)catCounts[a.category]=(catCounts[a.category]||0)+1;});
+  const sorted=Object.entries(catCounts).sort((a,b)=>b[1]-a[1]);
+  if(!sorted.length)return null;
+  const[topCat]=sorted[0];
+  const hints={
+    Food:'I see a lot of your spending is on Food. I\'ll pay extra attention to that when I\'m helping you with budgets later.',
+    Groceries:'Groceries are shaping up to be a big category. I can help you spot patterns week over week.',
+    Shopping:'Lots of Shopping so far. That\'s often where people find easy savings \u2014 I can flag unusual charges.',
+    Subscriptions:'Subscriptions are showing up a lot. I\'ll keep an eye out for recurring charges you might have forgotten.',
+    Entertainment:'Entertainment is a common category for hidden spending. I\'ll track it closely.',
+    Transport:'I see Transport is popping up often. Fuel and rideshare can add up \u2014 I\'ll help you watch the trend.',
+    'Dining Out':'Dining out is a big one so far. Classic place to find savings if you ever want to set a goal.',
+    Housing:'Housing is the biggest category so far. Totally normal \u2014 that\'s where most people\'s money goes.'
+  };
+  return hints[topCat]||'Good progress! I\'m already learning your spending patterns.';
+}
+
+function showMidWizardHint(){
+  const hint=generateMidWizardHint();
+  if(!hint||document.querySelector('.ai-hint-bubble'))return;
+  const bubble=document.createElement('div');
+  bubble.className='ai-hint-bubble';
+  bubble.innerHTML=`<div class="ai-hint-icon"><svg viewBox="0 0 100 100" width="24" height="24"><polygon points="50,10 85,30 85,70 50,90 15,70 15,30" fill="#0F172A" stroke="#F59E0B" stroke-width="4"/></svg></div>
+    <div class="ai-hint-text">${hint}</div>
+    <div class="ai-hint-close" onclick="this.parentElement.remove()">\u00D7</div>`;
+  document.body.appendChild(bubble);
+  setTimeout(()=>bubble.remove(),8000);
+}
+
+function showCelebrationOverlay(){
+  const overlay=document.createElement('div');
+  overlay.className='wizard-celebration';
+  overlay.innerHTML=`<div class="celebration-card">
+    <div class="celebration-icon">\u2728</div>
+    <div class="celebration-title">Nice work</div>
+    <div class="celebration-sub">10 vendors categorized. You can keep going or finish here.</div>
+    <div class="celebration-meta">Obsidian will learn from new vendors as they come in.</div>
+    <div class="celebration-buttons">
+      <button class="onb-btn ghost" style="flex:1" onclick="document.querySelector('.wizard-celebration').remove()">Keep going</button>
+      <button class="onb-btn primary" style="flex:1" onclick="finishOnboardingWizard()">I'm done</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function finishOnboardingWizard(){
+  await submitVendorWizard();
+  document.querySelector('.wizard-celebration')?.remove();
+  closePage('page-wizard');
+  window._wizardMode=null;
+  renderOnboardingStep(7);
 }
 
 function finishOnboarding(){
   $('onboarding-overlay').style.display='none';
   showApp();
+}
+
+// ─── DEBUG: 5-tap logo to reset onboarding (remove before prod) ──
+let _debugTaps=0,_debugTimer=null;
+async function debugTapLogo(){
+  _debugTaps++;
+  clearTimeout(_debugTimer);
+  _debugTimer=setTimeout(()=>{_debugTaps=0;},1500);
+  if(_debugTaps>=5){
+    _debugTaps=0;
+    if(!confirm('Reset onboarding? (Debug mode)'))return;
+    try{
+      const res=await apiPost('/api/debug/reset-onboarding',{});
+      if(res.ok){showToast('Onboarding reset — reloading...');setTimeout(()=>location.reload(),1000);}
+      else{const d=await res.json();alert('Error: '+(d.error||'Failed'));}
+    }catch(e){alert('Error: '+e.message);}
+  }
 }
 
 // ─── ONLINE/OFFLINE ───────────────────────────────────────────────
@@ -2073,6 +2458,13 @@ function renderAccounts(){
         </div>
         <button class="sbtn green" onclick="syncAll()">Sync</button>
       </div>
+      <div class="srow" onclick="openVendorRulesPage()" style="cursor:pointer">
+        <div class="srow-left">
+          <div class="sico" style="background:rgba(139,92,246,.1)">\u{1F4CB}</div>
+          <div><div class="sname">Vendor Rules</div><div class="ssub">View and manage auto-categorization</div></div>
+        </div>
+        <button class="sbtn gold">View</button>
+      </div>
       <div class="srow" onclick="openVendorWizard()">
         <div class="srow-left">
           <div class="sico" style="background:rgba(251,146,60,.1)">\u{1F3F7}\uFE0F</div>
@@ -2098,6 +2490,60 @@ function renderAccounts(){
     </div>
     <div class="spacer"></div>
   `;
+}
+
+async function openVendorRulesPage(){
+  openPage('page-vendors',async()=>{
+    const body=$('vendors-body');
+    body.innerHTML='<div class="empty-msg">Loading rules...</div>';
+    try{
+      const res=await apiGet('/api/vendor-rules');
+      const{rules}=await res.json();
+      if(!rules.length){body.innerHTML='<div class="empty-msg">No vendor rules yet. Use the Vendor Wizard to create some.</div>';return;}
+      body.innerHTML=`<div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);padding:0 4px 12px;letter-spacing:1px">${rules.length} active rules</div>
+        ${rules.map(r=>{
+          const esc=r.vendor.replace(/'/g,"\\'");
+          return`<div class="tx-row" style="flex-wrap:wrap;cursor:pointer" onclick="toggleVendorRuleEdit(this)">
+            <div class="tx-ico" style="background:${CAT_COLORS[r.category]||'#888'}30">${CAT_ICONS[r.category]||'\u{1F4CC}'}</div>
+            <div class="tx-body">
+              <div class="tx-desc">${r.vendor}</div>
+              <div class="tx-meta"><span class="tx-cat" style="color:${CAT_COLORS[r.category]||'var(--text-dim)'}">${r.category}</span><span class="tx-date">\u00B7 ${r.tx_count||0} txns \u00B7 ${r.type}</span></div>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--red)">${money(r.total_expense||0)}</div>
+            <div class="vendor-rule-edit" style="display:none;width:100%;padding:12px 0 4px;margin-left:0">
+              <div style="display:flex;gap:8px;margin-bottom:8px">
+                <button class="onb-btn ghost" style="flex:1;margin:0;padding:10px;font-size:9px" onclick="event.stopPropagation();editVendorRule('${esc}')">Change Category</button>
+                <button class="onb-btn ghost" style="flex:1;margin:0;padding:10px;font-size:9px;color:var(--red);border-color:rgba(239,68,68,.3)" onclick="event.stopPropagation();deleteVendorRule('${esc}',this)">Delete Rule</button>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}`;
+    }catch(e){body.innerHTML='<div class="empty-msg">Failed: '+e.message+'</div>';}
+  });
+}
+
+function toggleVendorRuleEdit(row){
+  const edit=row.querySelector('.vendor-rule-edit');
+  if(edit)edit.style.display=edit.style.display==='none'?'block':'none';
+}
+
+function editVendorRule(vendor){
+  openCatPicker(async(newCat)=>{
+    try{
+      const res=await apiPut('/api/vendor-rules/'+encodeURIComponent(vendor),{category:newCat});
+      if(res.ok){showToast('Rule updated');openVendorRulesPage();}
+    }catch(e){alert('Error: '+e.message);}
+  });
+}
+
+async function deleteVendorRule(vendor,btn){
+  if(!confirm('Delete rule for "'+vendor+'"? Existing transactions keep their category.'))return;
+  try{
+    await apiDel('/api/vendor-rules/'+encodeURIComponent(vendor));
+    showToast('Rule deleted');
+    const row=btn.closest('.tx-row');
+    if(row){row.style.transition='opacity .3s';row.style.opacity='0';setTimeout(()=>row.remove(),300);}
+  }catch(e){alert('Error: '+e.message);}
 }
 
 // ─── PAGE STACK NAVIGATION ───────────────────────────────────────
@@ -3241,6 +3687,10 @@ function wizardAssignVendor(vendor,category,el){
     if(el.classList)el.classList.add('selected');
   }
   updateWizardProgress();
+  // Onboarding mode: AI hint at 5, celebration at 10
+  const assignedCount=Object.keys(window._wizardAssignments).length;
+  if(window._wizardMode==='onboarding'&&assignedCount===5)setTimeout(showMidWizardHint,600);
+  if(window._wizardMode==='onboarding'&&assignedCount===10)setTimeout(showCelebrationOverlay,400);
 }
 
 function updateWizardProgress(){
@@ -3596,7 +4046,15 @@ function plaidCallbacks(){
       showSync('Connecting bank\u2026');
       try{
         const er=await apiPost('/api/exchange_public_token',{public_token:pt});
-        if(er.ok){setConnected(true);await loadData();hideSync('\u2713 Bank connected and synced!');}
+        if(er.ok){
+          setConnected(true);await loadData();hideSync('\u2713 Bank connected and synced!');
+          if(window._onboardingPlaidFlow){
+            window._onboardingPlaidFlow=false;
+            await apiPost('/api/me/onboarding-step',{step:'wizard'});
+            renderOnboardingStep(6);
+            return;
+          }
+        }
         else hideSync('\u2717 Connection failed');
       }catch(ex){hideSync('\u2717 '+ex.message);}
     },

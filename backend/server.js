@@ -153,9 +153,14 @@ async function initDB() {
     id TEXT PRIMARY KEY,
     display_name TEXT,
     avatar_color TEXT DEFAULT '#E8A828',
+    lifestyle_data JSONB DEFAULT '{}',
+    onboarding_step TEXT DEFAULT 'welcome',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
   )`);
+  // Ensure new columns exist for existing DBs
+  try { await pool.query("ALTER TABLE user_profiles ADD COLUMN lifestyle_data JSONB DEFAULT '{}'"); } catch(e) {}
+  try { await pool.query("ALTER TABLE user_profiles ADD COLUMN onboarding_step TEXT DEFAULT 'welcome'"); } catch(e) {}
 
   // ── SEED CATEGORIES ──
   const defaultCats = {
@@ -858,8 +863,40 @@ app.get('/api/categories/:id/transactions', requireAuth, async (req, res) => {
 app.get('/api/vendor-rules', requireAuth, async (req, res) => {
   try {
     const hh = req.household;
-    const rules = await all('SELECT vendor, category, type FROM vendor_rules WHERE household = ?', [hh]);
+    const rules = await all(`SELECT vr.vendor, vr.category, vr.type, vr.updated_at,
+      COUNT(t.id) as tx_count,
+      COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END), 0) as total_expense
+    FROM vendor_rules vr
+    LEFT JOIN transactions t ON t.household = vr.household AND t."desc" = vr.vendor
+    WHERE vr.household = $1
+    GROUP BY vr.vendor, vr.category, vr.type, vr.updated_at
+    ORDER BY COUNT(t.id) DESC`, [hh]);
     res.json({ rules });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/vendor-rules/:vendor', requireAuth, async (req, res) => {
+  try {
+    const hh = req.household;
+    const vendor = decodeURIComponent(req.params.vendor);
+    const result = await run('DELETE FROM vendor_rules WHERE household = $1 AND vendor = $2', [hh, vendor]);
+    res.json({ success: true, deleted: result.changes });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/vendor-rules/:vendor', requireAuth, async (req, res) => {
+  const { category, type } = req.body;
+  try {
+    const hh = req.household;
+    const vendor = decodeURIComponent(req.params.vendor);
+    const existing = await get('SELECT * FROM vendor_rules WHERE household = $1 AND vendor = $2', [hh, vendor]);
+    if (!existing) return res.status(404).json({ error: 'Vendor rule not found' });
+    const finalType = category === 'Transfer' ? 'transfer' : (type || existing.type || 'expense');
+    await run('UPDATE vendor_rules SET category = $1, type = $2, updated_at = NOW() WHERE household = $3 AND vendor = $4',
+      [category || existing.category, finalType, hh, vendor]);
+    const txResult = await run('UPDATE transactions SET cat = $1, type = $2, reviewed = TRUE WHERE household = $3 AND "desc" = $4',
+      [category || existing.category, finalType, hh, vendor]);
+    res.json({ success: true, vendor, category: category || existing.category, type: finalType, transactions_updated: txResult.changes });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1470,10 +1507,20 @@ const agentTools = [
       },
       required: ['primary_vendor', 'merge_vendors']
     }
+  },
+  {
+    name: 'list_vendor_rules',
+    description: 'List all active vendor rules. Use when user asks about rules or categorization settings.',
+    input_schema: { type: 'object', properties: { category: { type: 'string', description: 'Optional: filter by category' } } }
+  },
+  {
+    name: 'delete_vendor_rule',
+    description: 'Delete a vendor rule. Keeps existing transactions but stops future auto-categorization. ALWAYS confirm first.',
+    input_schema: { type: 'object', properties: { vendor: { type: 'string', description: 'Vendor name (partial match)' } }, required: ['vendor'] }
   }
 ];
 
-const WRITE_TOOLS = new Set(['recategorize_vendor', 'set_budget', 'create_category', 'add_note', 'add_tags', 'merge_vendors']);
+const WRITE_TOOLS = new Set(['recategorize_vendor', 'set_budget', 'create_category', 'add_note', 'add_tags', 'merge_vendors', 'delete_vendor_rule']);
 
 async function executeAgentTool(toolName, toolInput, hh) {
   const now = new Date();
@@ -1686,6 +1733,29 @@ async function executeAgentTool(toolName, toolInput, hh) {
       return { success: true, primary_vendor, merged: merge_vendors.length, transactions_updated: totalUpdated };
     }
 
+    case 'list_vendor_rules': {
+      let rules;
+      if (toolInput.category) {
+        rules = await all('SELECT vendor, category, type, updated_at FROM vendor_rules WHERE household=$1 AND category=$2 ORDER BY vendor', [hh, toolInput.category]);
+      } else {
+        rules = await all('SELECT vendor, category, type, updated_at FROM vendor_rules WHERE household=$1 ORDER BY vendor', [hh]);
+      }
+      return { rules, count: rules.length };
+    }
+
+    case 'delete_vendor_rule': {
+      const vendor = toolInput.vendor;
+      // Partial match to find the rule
+      const matchingRules = await all('SELECT vendor, category, type FROM vendor_rules WHERE household=$1 AND vendor ILIKE $2', [hh, `%${vendor}%`]);
+      if (matchingRules.length === 0) return { error: `No vendor rule found matching "${vendor}"` };
+      let totalDeleted = 0;
+      for (const rule of matchingRules) {
+        await run('DELETE FROM vendor_rules WHERE household=$1 AND vendor=$2', [hh, rule.vendor]);
+        totalDeleted++;
+      }
+      return { success: true, deleted: totalDeleted, vendors: matchingRules.map(r => r.vendor) };
+    }
+
     default:
       return { error: `Unknown tool: ${toolName}` };
   }
@@ -1727,11 +1797,45 @@ app.post('/api/chat', requireAuth, async (req, res) => {
         reply = `✅ Tagged ${result.tagged || 0} transactions with "${inp.tag}".`;
       } else if (t === 'merge_vendors') {
         reply = `✅ Merged ${result.merged || 0} vendor variants into "${inp.primary_vendor}". ${result.transactions_updated || 0} transactions updated.`;
+      } else if (t === 'delete_vendor_rule') {
+        if (result.deleted > 0) {
+          reply = `✅ Deleted ${result.deleted} vendor rule${result.deleted > 1 ? 's' : ''}: ${result.vendors.join(', ')}. Existing transactions unchanged, but future ones won't auto-categorize.`;
+        } else {
+          reply = `⚠️ No vendor rule found matching "${inp.vendor}".`;
+        }
       } else {
         reply = '✅ Done.';
       }
 
       return res.json({ reply, actionExecuted: true });
+    }
+
+    // ── ONBOARDING FIRST GREETING ──
+    if (message === '[ONBOARDING_FIRST_GREETING]') {
+      const profile = await get('SELECT display_name FROM user_profiles WHERE id = $1', [req.user.id]);
+      const displayName = profile?.display_name || 'there';
+
+      // Get top spending category from last month
+      const now2 = new Date();
+      const lastMonth = new Date(now2.getFullYear(), now2.getMonth() - 1, 1);
+      const lmStart = lastMonth.toISOString().split('T')[0];
+      const lmEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0).toISOString().split('T')[0];
+      const topCat = await get(`SELECT cat, SUM(amount) as total FROM transactions
+        WHERE household = $1 AND type = 'expense' AND date >= $2 AND date <= $3
+        GROUP BY cat ORDER BY SUM(amount) DESC LIMIT 1`, [hh, lmStart, lmEnd]);
+      const txCount = await get('SELECT COUNT(*) as cnt FROM transactions WHERE household = $1', [hh]);
+      const totalTxs = parseInt(txCount?.cnt) || 0;
+
+      let greeting;
+      if (totalTxs > 0 && topCat) {
+        greeting = `Hey ${displayName}! I'm your Obsidian AI assistant. I can see you have ${totalTxs} transactions loaded, and your top spending category last month was **${topCat.cat}** at $${parseFloat(topCat.total).toFixed(2)}. Ask me anything about your finances -- I can search transactions, analyze spending, set budgets, and more.`;
+      } else if (totalTxs > 0) {
+        greeting = `Hey ${displayName}! I'm your Obsidian AI assistant. You have ${totalTxs} transactions loaded. Ask me anything -- I can search transactions, analyze spending patterns, set budgets, and help you stay on top of your finances.`;
+      } else {
+        greeting = `Hey ${displayName}! I'm your Obsidian AI assistant. Once you connect your bank, I'll be able to analyze your spending, track budgets, categorize transactions, and answer any question about your finances. Let's get started!`;
+      }
+
+      return res.json({ reply: greeting });
     }
 
     const now = new Date();
@@ -1889,7 +1993,17 @@ app.get('/api/me', requireAuth, async (req, res) => {
       ? await all(`SELECT hm.user_id, hm.role, up.display_name, up.avatar_color FROM household_members hm
           LEFT JOIN user_profiles up ON up.id = hm.user_id WHERE hm.household_id = $1`, [req.household])
       : [];
-    res.json({ user: req.user, profile, household, members, needsOnboarding: req.needsOnboarding || !profile });
+    // Parse lifestyle_data (handle both string and object)
+    let lifestyleData = profile?.lifestyle_data || {};
+    if (typeof lifestyleData === 'string') {
+      try { lifestyleData = JSON.parse(lifestyleData); } catch(e) { lifestyleData = {}; }
+    }
+    res.json({
+      user: req.user, profile, household, members,
+      needsOnboarding: !profile || profile.onboarding_step !== 'done',
+      onboardingStep: profile?.onboarding_step || 'welcome',
+      lifestyleData
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1915,12 +2029,6 @@ app.post('/api/households', requireAuth, async (req, res) => {
     const householdId = result.rows[0].id;
     await run('INSERT INTO household_members (household_id, user_id, role) VALUES ($1, $2, $3)',
       [householdId, req.user.id, 'owner']);
-    const defaultCats = {Housing:'🏠',Food:'🍽️',Transport:'🚗',Health:'💊',Entertainment:'🎬',
-      Shopping:'🛍️',Utilities:'⚡',Income:'💰',Transfer:'🔁',Other:'📌',Subscriptions:'🔄',Personal:'💆'};
-    for (const [cat, icon] of Object.entries(defaultCats)) {
-      await pool.query('INSERT INTO categories (id, household, icon) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-        [cat, householdId, icon]);
-    }
     res.json({ success: true, household_id: householdId });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1962,6 +2070,136 @@ app.delete('/api/me', requireAuth, async (req, res) => {
     await run('DELETE FROM user_profiles WHERE id = $1', [req.user.id]);
     if (supabaseAdmin) await supabaseAdmin.auth.admin.deleteUser(req.user.id);
     res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── LIFESTYLE & ONBOARDING ────────────────────────────────────
+app.post('/api/me/lifestyle', requireAuth, async (req, res) => {
+  const { lifestyle_data } = req.body;
+  try {
+    await run(`INSERT INTO user_profiles (id, lifestyle_data, updated_at) VALUES ($1, $2, NOW())
+      ON CONFLICT (id) DO UPDATE SET lifestyle_data=$2, updated_at=NOW()`,
+      [req.user.id, JSON.stringify(lifestyle_data)]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/me/onboarding-step', requireAuth, async (req, res) => {
+  const { step } = req.body;
+  const validSteps = ['welcome', 'lifestyle', 'meet_ai', 'categories', 'bank', 'wizard', 'done'];
+  if (!step || !validSteps.includes(step)) return res.status(400).json({ error: 'Invalid step' });
+  try {
+    await run(`INSERT INTO user_profiles (id, onboarding_step, updated_at) VALUES ($1, $2, NOW())
+      ON CONFLICT (id) DO UPDATE SET onboarding_step=$2, updated_at=NOW()`,
+      [req.user.id, step]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/households/:id/seed-categories', requireAuth, async (req, res) => {
+  const { lifestyle_data } = req.body;
+  const householdId = req.params.id;
+  try {
+    // Verify user is owner
+    const member = await get('SELECT role FROM household_members WHERE household_id = $1 AND user_id = $2', [householdId, req.user.id]);
+    if (!member || member.role !== 'owner') return res.status(403).json({ error: 'Only household owners can seed categories' });
+
+    const CATEGORY_MAP = {
+      universal: [
+        { id: 'Groceries', icon: '🛒', color: '#22C55E' },
+        { id: 'Food', icon: '🍽️', color: '#22C55E' },
+        { id: 'Income', icon: '💰', color: '#10B981' },
+        { id: 'Transfer', icon: '🔁', color: '#6366F1' },
+        { id: 'Other', icon: '📌', color: '#64748B' }
+      ],
+      own_home: [
+        { id: 'Housing', icon: '🏠', color: '#F59E0B' },
+        { id: 'Utilities', icon: '⚡', color: '#06B6D4' },
+        { id: 'Home Improvement', icon: '🔨', color: '#F97316' }
+      ],
+      rent: [
+        { id: 'Rent', icon: '🏢', color: '#F59E0B' },
+        { id: 'Utilities', icon: '⚡', color: '#06B6D4' }
+      ],
+      has_car: [
+        { id: 'Auto', icon: '🚗', color: '#3B82F6' },
+        { id: 'Gas', icon: '⛽', color: '#EF4444' },
+        { id: 'Auto Insurance', icon: '🛡️', color: '#94A3B8' }
+      ],
+      public_transit: [{ id: 'Transit', icon: '🚇', color: '#3B82F6' }],
+      travels: [{ id: 'Travel', icon: '✈️', color: '#F59E0B' }],
+      has_kids: [
+        { id: 'Kids & Childcare', icon: '👶', color: '#EC4899' },
+        { id: 'Education', icon: '🎓', color: '#38BDF8' }
+      ],
+      has_pets: [{ id: 'Pets', icon: '🐾', color: '#FB7185' }],
+      credit_cards: [{ id: 'Credit Card Payments', icon: '💳', color: '#8B5CF6' }],
+      student_loans: [{ id: 'Student Loans', icon: '📚', color: '#38BDF8' }],
+      health_insurance: [
+        { id: 'Health', icon: '💊', color: '#EC4899' },
+        { id: 'Insurance', icon: '🛡️', color: '#94A3B8' }
+      ],
+      self_employed: [{ id: 'Business Expenses', icon: '💼', color: '#F97316' }],
+      entertainment: [
+        { id: 'Entertainment', icon: '🎬', color: '#8B5CF6' },
+        { id: 'Subscriptions', icon: '🔄', color: '#818CF8' }
+      ],
+      dining_out: [{ id: 'Dining Out', icon: '🍴', color: '#EF4444' }],
+      shopping: [{ id: 'Shopping', icon: '🛍️', color: '#F97316' }],
+      personal_care: [{ id: 'Personal Care', icon: '💆', color: '#A78BFA' }]
+    };
+
+    // Build category list based on lifestyle answers
+    let cats = [...CATEGORY_MAP.universal];
+
+    // Living situation
+    if (lifestyle_data?.living === 'own_home') cats.push(...CATEGORY_MAP.own_home);
+    if (lifestyle_data?.living === 'rent') cats.push(...CATEGORY_MAP.rent);
+
+    // Array-based fields: transport, family, commitments, lifestyle
+    const arrayFields = ['transport', 'family', 'commitments', 'lifestyle'];
+    for (const field of arrayFields) {
+      if (Array.isArray(lifestyle_data?.[field])) {
+        for (const key of lifestyle_data[field]) {
+          if (CATEGORY_MAP[key]) cats.push(...CATEGORY_MAP[key]);
+        }
+      }
+    }
+
+    // Dedupe by ID
+    const seen = new Set();
+    const dedupedCats = [];
+    for (const cat of cats) {
+      if (!seen.has(cat.id)) {
+        seen.add(cat.id);
+        dedupedCats.push(cat);
+      }
+    }
+
+    // Insert with sort_order
+    for (let i = 0; i < dedupedCats.length; i++) {
+      const c = dedupedCats[i];
+      await pool.query(
+        `INSERT INTO categories (id, household, icon, color, sort_order) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
+        [c.id, householdId, c.icon, c.color, i + 1]
+      );
+    }
+
+    res.json({ success: true, categories_seeded: dedupedCats.length, categories: dedupedCats.map(c => c.id) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── DEBUG: Reset onboarding (remove before production) ────────
+app.post('/api/debug/reset-onboarding', requireAuth, async (req, res) => {
+  try {
+    await run("UPDATE user_profiles SET onboarding_step = 'welcome', lifestyle_data = '{}' WHERE id = $1", [req.user.id]);
+    // Delete household + all seeded categories so it starts fresh
+    if (req.household) {
+      await run('DELETE FROM categories WHERE household = $1', [req.household]);
+      await run('DELETE FROM household_members WHERE user_id = $1', [req.user.id]);
+      await run('DELETE FROM households WHERE id = $1', [req.household]);
+    }
+    res.json({ success: true, message: 'Onboarding reset. Refresh the app.' });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -2051,11 +2289,14 @@ app.post('/api/vendor-rules/bulk', requireAuth, async (req, res) => {
       for (const a of assignments) {
         // Transfer category always forces transfer type
         const finalType = a.category === 'Transfer' ? 'transfer' : (a.type || 'expense');
-        await client.query(
-          `INSERT INTO vendor_rules (household, vendor, category, type, updated_at) VALUES ($1, $2, $3, $4, NOW())
-           ON CONFLICT (household, vendor) DO UPDATE SET category = EXCLUDED.category, type = EXCLUDED.type, updated_at = NOW()`,
-          [hh, a.vendor, a.category, finalType]
-        );
+        const createRule = a.create_rule !== false; // default true
+        if (createRule) {
+          await client.query(
+            `INSERT INTO vendor_rules (household, vendor, category, type, updated_at) VALUES ($1, $2, $3, $4, NOW())
+             ON CONFLICT (household, vendor) DO UPDATE SET category = EXCLUDED.category, type = EXCLUDED.type, updated_at = NOW()`,
+            [hh, a.vendor, a.category, finalType]
+          );
+        }
         // Update BOTH cat and type on existing transactions
         const result = await client.query(
           'UPDATE transactions SET cat = $1, type = $2, reviewed = TRUE WHERE household = $3 AND "desc" = $4',
