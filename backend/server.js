@@ -445,6 +445,35 @@ async function fetchAndStorePlaidTransactions(accessToken, userId, itemId) {
       );
     }
 
+    // ── DEDUP DUPLICATE ACCOUNTS (re-linked Plaid Items create parallel rows) ──
+    // Plaid assigns a new account_id each time an Item is linked. If a user
+    // reconnects the same bank, we get duplicate rows. This consolidates them.
+
+    // Step 1: Repoint transactions from older duplicate account_ids to the newest
+    const repointResult = await client.query(`
+      WITH ranked_accts AS (
+        SELECT account_id,
+               ROW_NUMBER() OVER (PARTITION BY household, name, mask ORDER BY updated_at DESC) as rn,
+               FIRST_VALUE(account_id) OVER (PARTITION BY household, name, mask ORDER BY updated_at DESC) as canonical_id
+        FROM accounts WHERE household = $1
+      )
+      UPDATE transactions SET account_id = ra.canonical_id
+      FROM ranked_accts ra
+      WHERE transactions.account_id = ra.account_id AND ra.rn > 1 AND transactions.household = $1
+    `, [household]);
+    if (repointResult.rowCount) console.log(`  Repointed ${repointResult.rowCount} transactions to canonical account_ids`);
+
+    // Step 2: Delete the duplicate (non-canonical) account rows
+    const acctDedup = await client.query(`
+      DELETE FROM accounts WHERE account_id IN (
+        SELECT account_id FROM (
+          SELECT account_id, ROW_NUMBER() OVER (PARTITION BY household, name, mask ORDER BY updated_at DESC) as rn
+          FROM accounts WHERE household = $1
+        ) ranked WHERE rn > 1
+      ) RETURNING account_id
+    `, [household]);
+    if (acctDedup.rowCount) console.log(`  Removed ${acctDedup.rowCount} duplicate account rows`);
+
     // Remove pending transactions that Plaid explicitly replaced (pending_transaction_id)
     let pendingRemoved = 0;
     for (const t of allTransactions) {
@@ -1517,10 +1546,15 @@ const agentTools = [
     name: 'delete_vendor_rule',
     description: 'Delete a vendor rule. Keeps existing transactions but stops future auto-categorization. ALWAYS confirm first.',
     input_schema: { type: 'object', properties: { vendor: { type: 'string', description: 'Vendor name (partial match)' } }, required: ['vendor'] }
+  },
+  {
+    name: 'cleanup_duplicate_accounts',
+    description: 'Find and remove duplicate account rows. Use when user reports seeing the same account twice or account totals look inflated. Safe to run anytime. ALWAYS confirm first.',
+    input_schema: { type: 'object', properties: {} }
   }
 ];
 
-const WRITE_TOOLS = new Set(['recategorize_vendor', 'set_budget', 'create_category', 'add_note', 'add_tags', 'merge_vendors', 'delete_vendor_rule']);
+const WRITE_TOOLS = new Set(['recategorize_vendor', 'set_budget', 'create_category', 'add_note', 'add_tags', 'merge_vendors', 'delete_vendor_rule', 'cleanup_duplicate_accounts']);
 
 async function executeAgentTool(toolName, toolInput, hh) {
   const now = new Date();
@@ -1756,6 +1790,31 @@ async function executeAgentTool(toolName, toolInput, hh) {
       return { success: true, deleted: totalDeleted, vendors: matchingRules.map(r => r.vendor) };
     }
 
+    case 'cleanup_duplicate_accounts': {
+      const client2 = await pool.connect();
+      try {
+        await client2.query('BEGIN');
+        const beforeCount = await client2.query('SELECT COUNT(*) as total FROM accounts WHERE household = $1', [hh]);
+        const beforeTotal = parseInt(beforeCount.rows[0].total);
+        const repointResult2 = await client2.query(`
+          WITH ranked_accts AS (
+            SELECT account_id, ROW_NUMBER() OVER (PARTITION BY household, name, mask ORDER BY updated_at DESC) as rn,
+              FIRST_VALUE(account_id) OVER (PARTITION BY household, name, mask ORDER BY updated_at DESC) as canonical_id
+            FROM accounts WHERE household = $1
+          ) UPDATE transactions SET account_id = ra.canonical_id
+          FROM ranked_accts ra WHERE transactions.account_id = ra.account_id AND ra.rn > 1 AND transactions.household = $1`, [hh]);
+        const acctDedup2 = await client2.query(`
+          DELETE FROM accounts WHERE account_id IN (
+            SELECT account_id FROM (
+              SELECT account_id, ROW_NUMBER() OVER (PARTITION BY household, name, mask ORDER BY updated_at DESC) as rn
+              FROM accounts WHERE household = $1
+            ) ranked WHERE rn > 1
+          ) RETURNING account_id`, [hh]);
+        await client2.query('COMMIT');
+        return { success: true, duplicates_removed: acctDedup2.rowCount, transactions_repointed: repointResult2.rowCount, accounts_remaining: beforeTotal - acctDedup2.rowCount };
+      } catch (e) { await client2.query('ROLLBACK'); throw e; } finally { client2.release(); }
+    }
+
     default:
       return { error: `Unknown tool: ${toolName}` };
   }
@@ -1802,6 +1861,12 @@ app.post('/api/chat', requireAuth, async (req, res) => {
           reply = `✅ Deleted ${result.deleted} vendor rule${result.deleted > 1 ? 's' : ''}: ${result.vendors.join(', ')}. Existing transactions unchanged, but future ones won't auto-categorize.`;
         } else {
           reply = `⚠️ No vendor rule found matching "${inp.vendor}".`;
+        }
+      } else if (t === 'cleanup_duplicate_accounts') {
+        if (result.duplicates_removed === 0) {
+          reply = `✅ All clean — no duplicate accounts found. You have ${result.accounts_remaining} account${result.accounts_remaining !== 1 ? 's' : ''}.`;
+        } else {
+          reply = `✅ Cleaned up ${result.duplicates_removed} duplicate account row${result.duplicates_removed !== 1 ? 's' : ''}. ${result.transactions_repointed} transaction${result.transactions_repointed !== 1 ? 's were' : ' was'} repointed. You now have ${result.accounts_remaining} unique account${result.accounts_remaining !== 1 ? 's' : ''}.`;
         }
       } else {
         reply = '✅ Done.';
