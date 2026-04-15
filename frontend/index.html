@@ -1623,6 +1623,7 @@ function renderProgressDots(active,total){
 function renderOnboardingStep(step){
   const body=$('onboarding-body');
   if(step===1) renderWelcomeStage(body);
+  else if(step===1.5) renderNameStage(body);
   else if(step===2) renderLifestyleStage(body,1);
   else if(step===2.1) renderLifestyleStage(body,2);
   else if(step===2.2) renderLifestyleStage(body,3);
@@ -1646,8 +1647,32 @@ function renderWelcomeStage(body){
       <div class="onb-feature">\u{1F3F7}\uFE0F Automatic transaction categorization</div>
       <div class="onb-feature">\u{1F916} AI-powered spending insights</div>
     </div>
-    <button class="onb-btn primary" onclick="renderOnboardingStep(2)">Get Started</button>
+    <button class="onb-btn primary" onclick="renderOnboardingStep(1.5)">Get Started</button>
   </div>`;
+}
+
+// ── STAGE 1.5: NAME + AVATAR ──
+function renderNameStage(body){
+  const colors=['#F59E0B','#34D399','#3B82F6','#EC4899','#8B5CF6','#F97316','#14B8A6'];
+  body.innerHTML=`<div class="onb-card">
+    ${renderProgressDots(1)}
+    <div class="onb-title">Tell us about you</div>
+    <div class="onb-sub">What should we call you?</div>
+    <input type="text" id="onb-name" placeholder="Your name" value="${onboardingData.display_name||''}" style="width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:16px;margin-bottom:20px;font-family:'Inter',sans-serif;box-sizing:border-box;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:2px;margin-bottom:10px;text-transform:uppercase">Pick your color</div>
+    <div style="display:flex;gap:10px;justify-content:center;margin-bottom:28px">${colors.map(c=>
+      `<div onclick="onboardingData.avatar_color='${c}';renderOnboardingStep(1.5)" style="width:36px;height:36px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${(onboardingData.avatar_color||'#F59E0B')===c?'var(--text)':'transparent'};transition:border .15s"></div>`
+    ).join('')}</div>
+    <button class="onb-btn primary" onclick="saveNameStep()">Continue \u2192</button>
+  </div>`;
+  setTimeout(()=>$('onb-name')?.focus(),100);
+}
+
+function saveNameStep(){
+  const name=$('onb-name')?.value.trim();
+  if(!name){$('onb-name')?.focus();return;}
+  onboardingData.display_name=name;
+  renderOnboardingStep(2);
 }
 
 // ── STAGE 2: LIFESTYLE QUESTIONNAIRE (5 questions) ──
@@ -1683,7 +1708,7 @@ function renderLifestyleStage(body,q){
       }).join('')}
     </div>
     <div class="onb-nav">
-      <button class="onb-btn back" onclick="renderOnboardingStep(${q===1?1:(q===2?2:2+(q-2)/10-.1)})">\u2190 Back</button>
+      <button class="onb-btn back" onclick="renderOnboardingStep(${q===1?1.5:(q===2?2:2+(q-2)/10-.1)})">\u2190 Back</button>
       <button class="onb-btn primary" style="flex:1" onclick="${isLast?'finishLifestyle()':'renderOnboardingStep(2.'+(q)+')'}">
         ${isLast?'Continue \u2192':'Next \u2192'}
       </button>
