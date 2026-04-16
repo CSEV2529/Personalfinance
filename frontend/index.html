@@ -2093,24 +2093,50 @@ async function showPlaidSyncScreen(){
 }
 
 async function closeWizardPage(){
-  closePage('page-wizard');
   if(window._wizardMode==='onboarding'){
+    // Show loading screen immediately before closing wizard
+    $('onboarding-overlay').style.display='flex';
+    $('onboarding-body').innerHTML=`<div class="onb-card" style="text-align:center">
+      <div class="ai-avatar">
+        <svg viewBox="0 0 100 100" width="64" height="64">
+          <polygon points="50,10 85,30 85,70 50,90 15,70 15,30" fill="#0F172A" stroke="#F59E0B" stroke-width="3"/>
+          <circle cx="50" cy="50" r="3" fill="#F59E0B"><animate attributeName="r" values="2;5;2" dur="1.2s" repeatCount="indefinite"/></circle>
+        </svg>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-top:12px;letter-spacing:1.5px;text-transform:uppercase">Wrapping up</div>
+      <div style="font-family:'Inter',sans-serif;font-size:13px;color:var(--text-dim);margin-top:8px">Almost ready\u2026</div>
+    </div>`;
+    closePage('page-wizard');
     window._wizardMode=null;
-    // Save any assignments made so far
     const hasAssignments=Object.keys(window._wizardAssignments||{}).length>0;
     if(hasAssignments)await submitVendorWizard();
     await apiPost('/api/me/onboarding-step',{step:'done'});
-    renderOnboardingStep(7); // Go to dashboard reveal
+    showDashboardReveal();
     return;
   }
+  closePage('page-wizard');
 }
 
 async function finishOnboardingWizard(){
-  await submitVendorWizard();
+  // Show the loading screen IMMEDIATELY so there's no dark gap
   document.querySelector('.wizard-celebration')?.remove();
+  $('onboarding-overlay').style.display='flex';
+  $('onboarding-body').innerHTML=`<div class="onb-card" style="text-align:center">
+    <div class="ai-avatar">
+      <svg viewBox="0 0 100 100" width="64" height="64">
+        <polygon points="50,10 85,30 85,70 50,90 15,70 15,30" fill="#0F172A" stroke="#F59E0B" stroke-width="3"/>
+        <circle cx="50" cy="50" r="3" fill="#F59E0B"><animate attributeName="r" values="2;5;2" dur="1.2s" repeatCount="indefinite"/></circle>
+      </svg>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-top:12px;letter-spacing:1.5px;text-transform:uppercase">Saving your choices</div>
+    <div style="font-family:'Inter',sans-serif;font-size:13px;color:var(--text-dim);margin-top:8px">Almost ready\u2026</div>
+  </div>`;
   closePage('page-wizard');
   window._wizardMode=null;
-  renderOnboardingStep(7);
+  // Save wizard assignments in background while loading screen shows
+  await submitVendorWizard();
+  // Now transition to the full dashboard reveal
+  showDashboardReveal();
 }
 
 function finishOnboarding(){
