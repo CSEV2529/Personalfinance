@@ -2010,7 +2010,12 @@ function showCelebrationOverlay(){
 
 // ── BRANDED PLAID SYNC SCREEN ──
 async function showPlaidSyncScreen(){
-  // Show the branded loading screen
+  // Hide onboarding overlay IMMEDIATELY to prevent bank page flash
+  $('onboarding-overlay').style.display='none';
+
+  const name=onboardingData.display_name?.split(' ')[0]||'there';
+
+  // Show branded AI loading screen
   const screen=document.createElement('div');
   screen.className='sync-screen';
   screen.id='plaid-sync-screen';
@@ -2027,32 +2032,37 @@ async function showPlaidSyncScreen(){
       </svg>
     </div>
     <div class="sync-title">Obsidian AI</div>
-    <div class="sync-msg" id="sync-ai-msg">Connecting to your bank\u2026</div>
-    <div class="sync-dots"><span></span><span></span><span></span></div>
+    <div id="sync-chat" style="max-width:320px;width:100%;margin-top:24px;text-align:left"></div>
+    <div class="sync-dots" style="margin-top:20px"><span></span><span></span><span></span></div>
   `;
   document.body.appendChild(screen);
 
-  const msgEl=$('sync-ai-msg');
+  const chatEl=$('sync-chat');
+
+  // AI-style chat messages that appear one by one
+  function addAIMsg(text){
+    const msg=document.createElement('div');
+    msg.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:14px 14px 14px 4px;padding:12px 16px;margin-bottom:10px;font-family:"Inter",sans-serif;font-size:13px;color:var(--text);line-height:1.5;opacity:0;transform:translateY(8px);transition:all .3s ease;';
+    msg.textContent=text;
+    chatEl.appendChild(msg);
+    requestAnimationFrame(()=>{msg.style.opacity='1';msg.style.transform='translateY(0)';});
+  }
+
   const messages=[
-    {text:'Pulling in your transactions\u2026',delay:3000},
-    {text:'Your bank is preparing the data. This can take a moment on first connect.',delay:5000},
-    {text:'Almost there \u2014 organizing your spending history\u2026',delay:8000},
-    {text:'Still working on it. Some banks take up to 30 seconds.',delay:10000},
+    `Hey ${name}, I\u2019m pulling in your transaction history now.`,
+    'Talking to your bank\u2026 this usually takes a few seconds.',
+    'Your bank is getting everything ready. Almost there.',
+    'Still waiting on your bank \u2014 some take up to 30 seconds on first connect.',
+    'Hang tight \u2014 I\u2019ll have your data organized in just a moment.'
   ];
 
-  // Retry sync in the background with conversational messages
+  // Show first message immediately
+  addAIMsg(messages[0]);
+
+  // Retry sync in background with conversational AI messages
   let synced=false;
   for(let i=0;i<5;i++){
-    // Update message
-    if(i<messages.length){
-      msgEl.style.opacity='0';
-      await new Promise(r=>setTimeout(r,300));
-      msgEl.textContent=messages[i].text;
-      msgEl.style.opacity='1';
-    }
-
-    // Wait before attempting sync
-    const delay=i===0?2000:messages[Math.min(i-1,messages.length-1)].delay;
+    const delay=[3000,5000,7000,10000,10000][i];
     await new Promise(r=>setTimeout(r,delay));
 
     // Try sync
@@ -2061,21 +2071,24 @@ async function showPlaidSyncScreen(){
       const syncData=await syncRes.json();
       if(syncData.synced>0){synced=true;break;}
     }catch(e){}
+
+    // Add next AI message if not synced yet
+    if(!synced&&i+1<messages.length){
+      addAIMsg(messages[i+1]);
+    }
   }
 
   // Final load
   await loadData();
 
-  // Show result message
-  msgEl.style.opacity='0';
-  await new Promise(r=>setTimeout(r,300));
+  // Success message
+  await new Promise(r=>setTimeout(r,400));
   if(synced&&transactions.length>0){
-    msgEl.textContent=`Found ${transactions.length} transactions. Let\u2019s organize them!`;
+    addAIMsg(`Done! I found ${transactions.length} transactions. Let\u2019s teach me what they are.`);
   }else{
-    msgEl.textContent='Your bank is connected! Data will arrive shortly.';
+    addAIMsg('Your bank is connected! It might take a minute for all your data to come through.');
   }
-  msgEl.style.opacity='1';
-  await new Promise(r=>setTimeout(r,1500));
+  await new Promise(r=>setTimeout(r,2000));
 
   // Fade out and advance
   screen.style.transition='opacity .5s ease';
@@ -4226,8 +4239,9 @@ function plaidCallbacks(){
           // If onboarding, do a full sync + wait before advancing
           if(window._onboardingPlaidFlow){
             window._onboardingPlaidFlow=false;
+            // Show branded screen BEFORE hiding sync banner to avoid flash
+            showPlaidSyncScreen();
             hideSync('');
-            await showPlaidSyncScreen();
             return;
           }
           await loadData();hideSync('\u2713 Bank connected and synced!');
