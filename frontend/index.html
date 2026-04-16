@@ -2048,50 +2048,42 @@ async function showPlaidSyncScreen(){
     requestAnimationFrame(()=>{msg.style.opacity='1';msg.style.transform='translateY(0)';});
   }
 
-  const messages=[
-    `Hey ${name}, I\u2019m pulling in your transaction history now.`,
-    'Talking to your bank\u2026 this usually takes a few seconds.',
-    'Your bank is getting everything ready. Almost there.',
-  ];
-
   // Show first message immediately
-  addAIMsg(messages[0]);
+  addAIMsg(`Hey ${name}, I\u2019m pulling in your transaction history now.`);
 
-  // Flag to allow skip button to abort the loop
-  let aborted=false;
-  window._syncScreenAbort=()=>{aborted=true;};
+  // Schedule messages on FIXED timers — independent of sync response
+  const msgTimers=[];
+  msgTimers.push(setTimeout(()=>addAIMsg('Talking to your bank\u2026 this usually takes a few seconds.'),3000));
+  msgTimers.push(setTimeout(()=>addAIMsg('Your bank is getting everything ready. Hang tight.'),7000));
+  msgTimers.push(setTimeout(()=>{
+    addAIMsg('Some banks need extra time on first connect. You can keep waiting, or skip and I\u2019ll finish in the background.');
+    const skipDiv=document.createElement('div');
+    skipDiv.style.cssText='margin-top:12px;opacity:0;transform:translateY(8px);transition:all .3s ease;';
+    skipDiv.innerHTML=`<button class="onb-btn ghost" onclick="advanceFromSyncScreen(false)" style="width:100%;font-size:10px">Skip \u2014 I\u2019ll sync later</button>`;
+    chatEl.appendChild(skipDiv);
+    requestAnimationFrame(()=>{skipDiv.style.opacity='1';skipDiv.style.transform='translateY(0)';});
+  },12000));
+  msgTimers.push(setTimeout(()=>addAIMsg('Still working on it\u2026 your bank is being slow today. The skip button is there if you need it.'),20000));
 
-  // Retry sync in background with conversational AI messages
+  // Run sync attempts in the background with timeouts so they can't hang forever
   let synced=false;
-  for(let i=0;i<4&&!aborted;i++){
-    const delay=[3000,4000,5000,6000][i];
-    await new Promise(r=>setTimeout(r,delay));
-    if(aborted)break;
-
-    // Try sync
-    try{
-      const syncRes=await apiPost('/api/sync',{});
-      const syncData=await syncRes.json();
-      if(syncData.synced>0){synced=true;break;}
-    }catch(e){}
-
-    // Add next AI message if not synced yet
-    if(!synced&&!aborted&&i+1<messages.length){
-      addAIMsg(messages[i+1]);
-    }
-
-    // After second attempt, show a skip option
-    if(i===1&&!synced&&!aborted){
-      addAIMsg('Some banks need a little extra time on the first connection. You can wait, or skip and I\u2019ll sync in the background.');
-      const skipDiv=document.createElement('div');
-      skipDiv.style.cssText='margin-top:12px;opacity:0;transform:translateY(8px);transition:all .3s ease;';
-      skipDiv.innerHTML=`<button class="onb-btn ghost" onclick="window._syncScreenAbort();advanceFromSyncScreen(false)" style="width:100%;font-size:10px">Skip \u2014 I\u2019ll sync later</button>`;
-      chatEl.appendChild(skipDiv);
-      requestAnimationFrame(()=>{skipDiv.style.opacity='1';skipDiv.style.transform='translateY(0)';});
-    }
+  function syncWithTimeout(ms){
+    return Promise.race([
+      apiPost('/api/sync',{}).then(r=>r.json()).catch(()=>({synced:0})),
+      new Promise(r=>setTimeout(()=>r({synced:0}),ms))
+    ]);
   }
 
-  if(aborted)return;
+  for(let i=0;i<4;i++){
+    await new Promise(r=>setTimeout(r,i===0?2000:5000));
+    try{
+      const data=await syncWithTimeout(10000); // 10s max per attempt
+      if(data.synced>0){synced=true;break;}
+    }catch(e){}
+  }
+
+  // Clear scheduled messages
+  msgTimers.forEach(t=>clearTimeout(t));
 
   // Final load
   await loadData();
