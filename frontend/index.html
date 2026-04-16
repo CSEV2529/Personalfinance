@@ -914,6 +914,22 @@ body::after{content:'';position:fixed;bottom:-20%;right:-10%;width:45%;height:45
 .ai-first-bubble-text{font-family:'Inter',sans-serif;font-size:14px;color:var(--text);line-height:1.6;margin-bottom:18px;}
 .ai-first-bubble-actions{display:flex;gap:8px;}
 @keyframes ai-bubble-drop{from{transform:translate(-50%,-40px);opacity:0;}to{transform:translate(-50%,0);opacity:1;}}
+
+/* ─── PLAID SYNC LOADING SCREEN ──────────────────────────── */
+.sync-screen{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;text-align:center;}
+.sync-hex{position:relative;margin-bottom:32px;}
+.sync-hex svg{filter:drop-shadow(0 0 24px rgba(245,158,11,.25));}
+@keyframes hex-spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+@keyframes hex-pulse{0%,100%{opacity:.4;transform:scale(1);}50%{opacity:.8;transform:scale(1.15);}}
+.sync-hex-ring{position:absolute;inset:-16px;border:2px solid transparent;border-top-color:var(--accent);border-radius:50%;animation:hex-spin 2s linear infinite;}
+.sync-hex-glow{position:absolute;inset:-20px;background:radial-gradient(circle,rgba(245,158,11,.15) 0%,transparent 70%);border-radius:50%;animation:hex-pulse 3s ease-in-out infinite;}
+.sync-title{font-family:'Inter',sans-serif;font-weight:600;font-size:18px;color:var(--text);margin-bottom:8px;}
+.sync-msg{font-family:'Inter',sans-serif;font-size:14px;color:var(--text-muted);line-height:1.6;max-width:300px;min-height:48px;transition:opacity .3s;}
+.sync-dots{display:flex;gap:6px;justify-content:center;margin-top:24px;}
+.sync-dots span{width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:.3;animation:sync-dot-bounce 1.4s ease-in-out infinite;}
+.sync-dots span:nth-child(2){animation-delay:.2s;}
+.sync-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes sync-dot-bounce{0%,80%,100%{opacity:.3;transform:scale(1);}40%{opacity:1;transform:scale(1.3);}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1979,6 +1995,90 @@ function showCelebrationOverlay(){
     </div>
   </div>`;
   document.body.appendChild(overlay);
+}
+
+// ── BRANDED PLAID SYNC SCREEN ──
+async function showPlaidSyncScreen(){
+  // Show the branded loading screen
+  const screen=document.createElement('div');
+  screen.className='sync-screen';
+  screen.id='plaid-sync-screen';
+  screen.innerHTML=`
+    <div class="sync-hex">
+      <div class="sync-hex-glow"></div>
+      <div class="sync-hex-ring"></div>
+      <svg viewBox="0 0 100 100" width="80" height="80">
+        <defs><linearGradient id="sync-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#1E293B"/><stop offset="50%" stop-color="#0F172A"/><stop offset="100%" stop-color="#334155"/>
+        </linearGradient></defs>
+        <polygon points="50,8 88,28 88,72 50,92 12,72 12,28" fill="url(#sync-grad)" stroke="#F59E0B" stroke-width="2.5"/>
+        <circle cx="50" cy="50" r="4" fill="#F59E0B"><animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/></circle>
+      </svg>
+    </div>
+    <div class="sync-title">Obsidian AI</div>
+    <div class="sync-msg" id="sync-ai-msg">Connecting to your bank\u2026</div>
+    <div class="sync-dots"><span></span><span></span><span></span></div>
+  `;
+  document.body.appendChild(screen);
+
+  const msgEl=$('sync-ai-msg');
+  const messages=[
+    {text:'Pulling in your transactions\u2026',delay:3000},
+    {text:'Your bank is preparing the data. This can take a moment on first connect.',delay:5000},
+    {text:'Almost there \u2014 organizing your spending history\u2026',delay:8000},
+    {text:'Still working on it. Some banks take up to 30 seconds.',delay:10000},
+  ];
+
+  // Retry sync in the background with conversational messages
+  let synced=false;
+  for(let i=0;i<5;i++){
+    // Update message
+    if(i<messages.length){
+      msgEl.style.opacity='0';
+      await new Promise(r=>setTimeout(r,300));
+      msgEl.textContent=messages[i].text;
+      msgEl.style.opacity='1';
+    }
+
+    // Wait before attempting sync
+    const delay=i===0?2000:messages[Math.min(i-1,messages.length-1)].delay;
+    await new Promise(r=>setTimeout(r,delay));
+
+    // Try sync
+    try{
+      const syncRes=await apiPost('/api/sync',{});
+      const syncData=await syncRes.json();
+      if(syncData.synced>0){synced=true;break;}
+    }catch(e){}
+  }
+
+  // Final load
+  await loadData();
+
+  // Show result message
+  msgEl.style.opacity='0';
+  await new Promise(r=>setTimeout(r,300));
+  if(synced&&transactions.length>0){
+    msgEl.textContent=`Found ${transactions.length} transactions. Let\u2019s organize them!`;
+  }else{
+    msgEl.textContent='Your bank is connected! Data will arrive shortly.';
+  }
+  msgEl.style.opacity='1';
+  await new Promise(r=>setTimeout(r,1500));
+
+  // Fade out and advance
+  screen.style.transition='opacity .5s ease';
+  screen.style.opacity='0';
+  await new Promise(r=>setTimeout(r,500));
+  screen.remove();
+
+  if(transactions.length>0){
+    await apiPost('/api/me/onboarding-step',{step:'wizard'});
+    renderOnboardingStep(6);
+  }else{
+    await apiPost('/api/me/onboarding-step',{step:'done'});
+    renderOnboardingStep(7);
+  }
 }
 
 async function closeWizardPage(){
@@ -4089,32 +4189,8 @@ function plaidCallbacks(){
           // If onboarding, do a full sync + wait before advancing
           if(window._onboardingPlaidFlow){
             window._onboardingPlaidFlow=false;
-            showSync('Syncing your transactions\u2026');
-            // Plaid often returns PRODUCT_NOT_READY on first connection.
-            // Retry up to 4 times with increasing delays.
-            let synced=false;
-            for(let attempt=0;attempt<4;attempt++){
-              try{
-                const syncRes=await apiPost('/api/sync',{});
-                const syncData=await syncRes.json();
-                if(syncData.synced>0){synced=true;break;}
-              }catch(e){}
-              // Wait before retry: 3s, 5s, 8s, 12s
-              const delay=[3000,5000,8000,12000][attempt];
-              showSync(`Waiting for bank data\u2026 (attempt ${attempt+2}/5)`);
-              await new Promise(r=>setTimeout(r,delay));
-            }
-            await loadData();
-            hideSync(synced?'\u2713 Bank connected and synced!':'\u2713 Bank connected! Data may take a few minutes.');
-            await new Promise(r=>setTimeout(r,800));
-            if(transactions.length>0){
-              await apiPost('/api/me/onboarding-step',{step:'wizard'});
-              renderOnboardingStep(6);
-            }else{
-              // No transactions yet — go to dashboard, data arrives via webhook
-              await apiPost('/api/me/onboarding-step',{step:'done'});
-              renderOnboardingStep(7);
-            }
+            hideSync('');
+            await showPlaidSyncScreen();
             return;
           }
           await loadData();hideSync('\u2713 Bank connected and synced!');
