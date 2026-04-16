@@ -1278,9 +1278,9 @@ body::after{content:'';position:fixed;bottom:-20%;right:-10%;width:45%;height:45
 <!-- VENDOR WIZARD PAGE -->
 <div class="page-overlay" id="page-wizard">
   <div class="page-header">
-    <button class="page-back" onclick="closePage('page-wizard')">&larr; Back</button>
+    <button class="page-back" onclick="closeWizardPage()">&larr; Back</button>
     <div class="page-title">Categorize Vendors</div>
-    <div class="page-close" onclick="closePage('page-wizard')">&times;</div>
+    <div class="page-close" onclick="closeWizardPage()">&times;</div>
   </div>
   <div class="page-body" id="wizard-body"></div>
 </div>
@@ -1979,6 +1979,19 @@ function showCelebrationOverlay(){
     </div>
   </div>`;
   document.body.appendChild(overlay);
+}
+
+async function closeWizardPage(){
+  closePage('page-wizard');
+  if(window._wizardMode==='onboarding'){
+    window._wizardMode=null;
+    // Save any assignments made so far
+    const hasAssignments=Object.keys(window._wizardAssignments||{}).length>0;
+    if(hasAssignments)await submitVendorWizard();
+    await apiPost('/api/me/onboarding-step',{step:'done'});
+    renderOnboardingStep(7); // Go to dashboard reveal
+    return;
+  }
 }
 
 async function finishOnboardingWizard(){
@@ -4072,13 +4085,29 @@ function plaidCallbacks(){
       try{
         const er=await apiPost('/api/exchange_public_token',{public_token:pt});
         if(er.ok){
-          setConnected(true);await loadData();hideSync('\u2713 Bank connected and synced!');
+          setConnected(true);
+          // If onboarding, do a full sync + wait before advancing
           if(window._onboardingPlaidFlow){
             window._onboardingPlaidFlow=false;
-            await apiPost('/api/me/onboarding-step',{step:'wizard'});
-            renderOnboardingStep(6);
+            showSync('Syncing your transactions\u2026');
+            // Trigger an explicit sync to ensure all transactions are fetched
+            await apiPost('/api/sync',{});
+            await loadData();
+            hideSync('\u2713 Bank connected and synced!');
+            // Brief pause so user sees the success message
+            await new Promise(r=>setTimeout(r,800));
+            // Check if we actually got transactions
+            if(transactions.length>0){
+              await apiPost('/api/me/onboarding-step',{step:'wizard'});
+              renderOnboardingStep(6);
+            }else{
+              // No transactions yet — skip wizard, go to dashboard
+              await apiPost('/api/me/onboarding-step',{step:'done'});
+              renderOnboardingStep(7);
+            }
             return;
           }
+          await loadData();hideSync('\u2713 Bank connected and synced!');
         }
         else hideSync('\u2717 Connection failed');
       }catch(ex){hideSync('\u2717 '+ex.message);}
