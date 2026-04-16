@@ -1676,12 +1676,23 @@ function renderNameStage(body){
     <div class="onb-sub">What should we call you?</div>
     <input type="text" id="onb-name" placeholder="Your name" value="${onboardingData.display_name||''}" style="width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:16px;margin-bottom:20px;font-family:'Inter',sans-serif;box-sizing:border-box;">
     <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted);letter-spacing:2px;margin-bottom:10px;text-transform:uppercase">Pick your color</div>
-    <div style="display:flex;gap:10px;justify-content:center;margin-bottom:28px">${colors.map(c=>
-      `<div onclick="onboardingData.avatar_color='${c}';renderOnboardingStep(1.5)" style="width:36px;height:36px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${(onboardingData.avatar_color||'#F59E0B')===c?'var(--text)':'transparent'};transition:border .15s"></div>`
+    <div id="onb-color-picker" style="display:flex;gap:10px;justify-content:center;margin-bottom:28px">${colors.map(c=>
+      `<div onclick="pickAvatarColor('${c}')" style="width:36px;height:36px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${(onboardingData.avatar_color||'#F59E0B')===c?'var(--text)':'transparent'};transition:border .15s" data-color="${c}"></div>`
     ).join('')}</div>
     <button class="onb-btn primary" onclick="saveNameStep()">Continue \u2192</button>
   </div>`;
   setTimeout(()=>$('onb-name')?.focus(),100);
+}
+
+function pickAvatarColor(color){
+  onboardingData.avatar_color=color;
+  // Save current name so it's not lost
+  const nameInput=$('onb-name');
+  if(nameInput)onboardingData.display_name=nameInput.value;
+  // Update dot borders without re-rendering
+  document.querySelectorAll('#onb-color-picker div').forEach(d=>{
+    d.style.borderColor=d.dataset.color===color?'var(--text)':'transparent';
+  });
 }
 
 function saveNameStep(){
@@ -4201,6 +4212,17 @@ function plaidCallbacks(){
     onExit:(err,metadata)=>{
       if(err)console.error('Plaid error:',err);
       console.log('Plaid exit:',metadata?.status);
+      // During onboarding, if Plaid exits without success, show a retry prompt
+      if(window._onboardingPlaidFlow){
+        window._onboardingPlaidFlow=false;
+        // If they completed institution selection but it errored, auto-retry
+        if(metadata?.status==='requires_credentials'||err){
+          showToast('Bank connection interrupted \u2014 please try again');
+        }
+        // Re-show the bank connection stage so they can try again
+        $('onboarding-overlay').style.display='flex';
+        renderOnboardingStep(5);
+      }
     }
   };
 }
