@@ -2052,18 +2052,21 @@ async function showPlaidSyncScreen(){
     `Hey ${name}, I\u2019m pulling in your transaction history now.`,
     'Talking to your bank\u2026 this usually takes a few seconds.',
     'Your bank is getting everything ready. Almost there.',
-    'Still waiting on your bank \u2014 some take up to 30 seconds on first connect.',
-    'Hang tight \u2014 I\u2019ll have your data organized in just a moment.'
   ];
 
   // Show first message immediately
   addAIMsg(messages[0]);
 
+  // Flag to allow skip button to abort the loop
+  let aborted=false;
+  window._syncScreenAbort=()=>{aborted=true;};
+
   // Retry sync in background with conversational AI messages
   let synced=false;
-  for(let i=0;i<5;i++){
-    const delay=[3000,5000,7000,10000,10000][i];
+  for(let i=0;i<4&&!aborted;i++){
+    const delay=[3000,4000,5000,6000][i];
     await new Promise(r=>setTimeout(r,delay));
+    if(aborted)break;
 
     // Try sync
     try{
@@ -2073,10 +2076,22 @@ async function showPlaidSyncScreen(){
     }catch(e){}
 
     // Add next AI message if not synced yet
-    if(!synced&&i+1<messages.length){
+    if(!synced&&!aborted&&i+1<messages.length){
       addAIMsg(messages[i+1]);
     }
+
+    // After second attempt, show a skip option
+    if(i===1&&!synced&&!aborted){
+      addAIMsg('Some banks need a little extra time on the first connection. You can wait, or skip and I\u2019ll sync in the background.');
+      const skipDiv=document.createElement('div');
+      skipDiv.style.cssText='margin-top:12px;opacity:0;transform:translateY(8px);transition:all .3s ease;';
+      skipDiv.innerHTML=`<button class="onb-btn ghost" onclick="window._syncScreenAbort();advanceFromSyncScreen(false)" style="width:100%;font-size:10px">Skip \u2014 I\u2019ll sync later</button>`;
+      chatEl.appendChild(skipDiv);
+      requestAnimationFrame(()=>{skipDiv.style.opacity='1';skipDiv.style.transform='translateY(0)';});
+    }
   }
+
+  if(aborted)return;
 
   // Final load
   await loadData();
@@ -4256,9 +4271,8 @@ function plaidCallbacks(){
           // If onboarding, do a full sync + wait before advancing
           if(window._onboardingPlaidFlow){
             window._onboardingPlaidFlow=false;
-            // Show branded screen BEFORE hiding sync banner to avoid flash
-            showPlaidSyncScreen();
             hideSync('');
+            await showPlaidSyncScreen();
             return;
           }
           await loadData();hideSync('\u2713 Bank connected and synced!');
