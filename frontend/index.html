@@ -2081,22 +2081,39 @@ async function showPlaidSyncScreen(){
   // Final load
   await loadData();
 
-  // Success message
+  // Hide the bouncing dots
+  screen.querySelector('.sync-dots').style.display='none';
+
+  // Success message + action button
   await new Promise(r=>setTimeout(r,400));
   if(synced&&transactions.length>0){
-    addAIMsg(`Done! I found ${transactions.length} transactions. Let\u2019s teach me what they are.`);
+    addAIMsg(`I found ${transactions.length} transactions across your accounts. Now I need your help \u2014 let\u2019s go through your top vendors so I know how to categorize them going forward.`);
+    await new Promise(r=>setTimeout(r,600));
+    const btn=document.createElement('div');
+    btn.style.cssText='margin-top:16px;opacity:0;transform:translateY(8px);transition:all .3s ease;';
+    btn.innerHTML=`<button class="onb-btn primary" onclick="advanceFromSyncScreen(true)" style="width:100%">Let\u2019s do it \u2192</button>`;
+    chatEl.appendChild(btn);
+    requestAnimationFrame(()=>{btn.style.opacity='1';btn.style.transform='translateY(0)';});
   }else{
-    addAIMsg('Your bank is connected! It might take a minute for all your data to come through.');
+    addAIMsg('Your bank is connected! It can take a few minutes for your bank to send over all the data. I\u2019ll have everything ready for you when you come back.');
+    await new Promise(r=>setTimeout(r,600));
+    const btn=document.createElement('div');
+    btn.style.cssText='margin-top:16px;opacity:0;transform:translateY(8px);transition:all .3s ease;';
+    btn.innerHTML=`<button class="onb-btn primary" onclick="advanceFromSyncScreen(false)" style="width:100%">Got it \u2192</button>`;
+    chatEl.appendChild(btn);
+    requestAnimationFrame(()=>{btn.style.opacity='1';btn.style.transform='translateY(0)';});
   }
-  await new Promise(r=>setTimeout(r,2000));
+}
 
-  // Fade out and advance
-  screen.style.transition='opacity .5s ease';
-  screen.style.opacity='0';
-  await new Promise(r=>setTimeout(r,500));
-  screen.remove();
-
-  if(transactions.length>0){
+async function advanceFromSyncScreen(hasData){
+  const screen=$('plaid-sync-screen');
+  if(screen){
+    screen.style.transition='opacity .5s ease';
+    screen.style.opacity='0';
+    await new Promise(r=>setTimeout(r,500));
+    screen.remove();
+  }
+  if(hasData){
     await apiPost('/api/me/onboarding-step',{step:'wizard'});
     renderOnboardingStep(6);
   }else{
