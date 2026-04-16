@@ -4090,18 +4090,28 @@ function plaidCallbacks(){
           if(window._onboardingPlaidFlow){
             window._onboardingPlaidFlow=false;
             showSync('Syncing your transactions\u2026');
-            // Trigger an explicit sync to ensure all transactions are fetched
-            await apiPost('/api/sync',{});
+            // Plaid often returns PRODUCT_NOT_READY on first connection.
+            // Retry up to 4 times with increasing delays.
+            let synced=false;
+            for(let attempt=0;attempt<4;attempt++){
+              try{
+                const syncRes=await apiPost('/api/sync',{});
+                const syncData=await syncRes.json();
+                if(syncData.synced>0){synced=true;break;}
+              }catch(e){}
+              // Wait before retry: 3s, 5s, 8s, 12s
+              const delay=[3000,5000,8000,12000][attempt];
+              showSync(`Waiting for bank data\u2026 (attempt ${attempt+2}/5)`);
+              await new Promise(r=>setTimeout(r,delay));
+            }
             await loadData();
-            hideSync('\u2713 Bank connected and synced!');
-            // Brief pause so user sees the success message
+            hideSync(synced?'\u2713 Bank connected and synced!':'\u2713 Bank connected! Data may take a few minutes.');
             await new Promise(r=>setTimeout(r,800));
-            // Check if we actually got transactions
             if(transactions.length>0){
               await apiPost('/api/me/onboarding-step',{step:'wizard'});
               renderOnboardingStep(6);
             }else{
-              // No transactions yet — skip wizard, go to dashboard
+              // No transactions yet — go to dashboard, data arrives via webhook
               await apiPost('/api/me/onboarding-step',{step:'done'});
               renderOnboardingStep(7);
             }

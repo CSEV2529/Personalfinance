@@ -650,15 +650,29 @@ app.get('/api/accounts', requireAuth, async (req, res) => {
 app.post('/api/sync', requireAuth, async (req, res) => {
   try {
     const household = req.household;
-    const members = await all('SELECT id FROM users WHERE household = ?', [household]);
     let totalTx = 0;
-    for (const member of members) {
-      const items = await all('SELECT * FROM plaid_items WHERE user_id = ?', [member.id]);
+
+    // Find Plaid items: check both new auth (household_members) and legacy (users) tables
+    const memberIds = new Set();
+    const newMembers = await all('SELECT user_id FROM household_members WHERE household_id = $1', [household]);
+    newMembers.forEach(m => memberIds.add(m.user_id));
+    const legacyMembers = await all('SELECT id FROM users WHERE household = ?', [household]);
+    legacyMembers.forEach(m => memberIds.add(m.id));
+
+    for (const userId of memberIds) {
+      const items = await all('SELECT * FROM plaid_items WHERE user_id = $1', [userId]);
       for (const item of items) {
         try {
-          const r = await fetchAndStorePlaidTransactions(item.access_token, member.id, item.item_id);
+          const r = await fetchAndStorePlaidTransactions(item.access_token, userId, item.item_id);
           totalTx += r.count;
-        } catch (err) { console.error(`Sync failed: ${err.message}`); }
+        } catch (err) {
+          const code = err.response?.data?.error_code;
+          if (code === 'PRODUCT_NOT_READY') {
+            console.log(`  Sync: transactions not ready yet for item ${item.item_id} — will retry`);
+          } else {
+            console.error(`Sync failed for item ${item.item_id}:`, err.message);
+          }
+        }
       }
     }
     res.json({ success: true, synced: totalTx });
