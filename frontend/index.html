@@ -1901,6 +1901,8 @@ async function skipBankOnboarding(){
 // ── STAGE 5: VENDOR WIZARD (ONBOARDING MODE) ──
 async function startOnboardingWizard(){
   $('onboarding-overlay').style.display='none';
+  // App container must be visible for the wizard page overlay to show
+  $('app-container').style.display='';
   window._wizardMode='onboarding';
   openVendorWizard();
 }
