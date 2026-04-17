@@ -2074,11 +2074,11 @@ async function showPlaidSyncScreen(){
     },400);
   },8000);
 
-  // Show skip button after 15 seconds
+  // Show skip button after 15 seconds — but if data exists by then, go to wizard not dashboard
   setTimeout(()=>{
     const skipArea=$('sync-skip-area');
-    if(skipArea){
-      skipArea.innerHTML=`<button class="onb-btn ghost" onclick="advanceFromSyncScreen(false)" style="width:100%;font-size:10px">Skip \u2014 I\u2019ll finish syncing in the background</button>`;
+    if(skipArea&&!window._syncScreenDone){
+      skipArea.innerHTML=`<button class="onb-btn ghost" onclick="advanceFromSyncScreenSmart()" style="width:100%;font-size:10px">Skip \u2014 I\u2019ll finish syncing in the background</button>`;
       skipArea.style.opacity='1';
     }
   },15000);
@@ -2116,6 +2116,7 @@ async function showPlaidSyncScreen(){
   }
 
   clearInterval(tipInterval);
+  window._syncScreenDone=true;
   await loadData();
 
   // Show completion state
@@ -2148,7 +2149,14 @@ async function showPlaidSyncScreen(){
   }
 }
 
+async function advanceFromSyncScreenSmart(){
+  // Load latest data and decide — if we got transactions, go to wizard
+  await loadData();
+  advanceFromSyncScreen(transactions.length>0);
+}
+
 async function advanceFromSyncScreen(hasData){
+  window._syncScreenDone=true;
   const screen=$('plaid-sync-screen');
   if(screen){
     screen.style.transition='opacity .5s ease';
