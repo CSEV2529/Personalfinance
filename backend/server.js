@@ -2382,6 +2382,13 @@ app.post('/api/vendor-rules/bulk', requireAuth, async (req, res) => {
           [a.category, finalType, hh, a.vendor]
         );
         totalUpdated += result.rowCount;
+        // If marked unsure, update transaction status
+        if (a.status === 'unsure') {
+          await client.query(
+            'UPDATE transactions SET status = $1 WHERE household = $2 AND "desc" = $3',
+            ['unsure', hh, a.vendor]
+          );
+        }
         await client.query(
           'INSERT INTO categories (id, household) VALUES ($1, $2) ON CONFLICT DO NOTHING',
           [a.category, hh]

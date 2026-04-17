@@ -302,6 +302,7 @@ body::after{content:'';position:fixed;bottom:-20%;right:-10%;width:45%;height:45
 /* ─── VENDOR WIZARD ──────────────────────────────────────── */
 .wizard-vendor-row{padding:14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);margin-bottom:8px;transition:all .2s;}
 .wizard-vendor-row.done{border-color:rgba(52,211,153,.3);background:linear-gradient(135deg,rgba(52,211,153,.05),var(--surface));}
+.wizard-vendor-row.unsure{border-color:rgba(251,191,36,.25);background:rgba(251,191,36,.03);}
 .wizard-pill{padding:6px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--surface2);color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:10px;white-space:nowrap;cursor:pointer;transition:all .15s;flex-shrink:0;}
 .wizard-pill:active{transform:scale(.95);}
 .wizard-pill.selected{background:rgba(245,158,11,.12);border-color:var(--accent);color:var(--accent);font-weight:500;}
@@ -2010,12 +2011,9 @@ function showCelebrationOverlay(){
 
 // ── BRANDED PLAID SYNC SCREEN ──
 async function showPlaidSyncScreen(){
-  // Hide onboarding overlay IMMEDIATELY to prevent bank page flash
   $('onboarding-overlay').style.display='none';
-
   const name=onboardingData.display_name?.split(' ')[0]||'there';
 
-  // Show branded AI loading screen
   const screen=document.createElement('div');
   screen.className='sync-screen';
   screen.id='plaid-sync-screen';
@@ -2023,7 +2021,7 @@ async function showPlaidSyncScreen(){
     <div class="sync-hex">
       <div class="sync-hex-glow"></div>
       <div class="sync-hex-ring"></div>
-      <svg viewBox="0 0 100 100" width="80" height="80">
+      <svg viewBox="0 0 100 100" width="72" height="72">
         <defs><linearGradient id="sync-grad" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="#1E293B"/><stop offset="50%" stop-color="#0F172A"/><stop offset="100%" stop-color="#334155"/>
         </linearGradient></defs>
@@ -2031,42 +2029,76 @@ async function showPlaidSyncScreen(){
         <circle cx="50" cy="50" r="4" fill="#F59E0B"><animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/></circle>
       </svg>
     </div>
-    <div class="sync-title">Obsidian AI</div>
-    <div id="sync-chat" style="max-width:320px;width:100%;margin-top:24px;text-align:left"></div>
-    <div class="sync-dots" style="margin-top:20px"><span></span><span></span><span></span></div>
+    <div style="max-width:340px;width:100%;text-align:center">
+      <div id="sync-ai-bubble" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:16px;text-align:left;min-height:80px;transition:opacity .3s">
+        <div style="font-family:'Inter',sans-serif;font-size:14px;color:var(--text);line-height:1.6" id="sync-ai-text">Hey ${name}, I'm importing your transaction history. This usually takes about 60 seconds \u2014 worth the wait so I get everything right.</div>
+      </div>
+      <div id="sync-tip-area" style="background:var(--surface);border:1px solid var(--accent);border-radius:16px;padding:16px 18px;margin-bottom:16px;text-align:left;opacity:0;transition:opacity .4s">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">\u2728 Did you know?</div>
+        <div style="font-family:'Inter',sans-serif;font-size:13px;color:var(--text);line-height:1.5" id="sync-tip-text"></div>
+      </div>
+      <div class="sync-dots"><span></span><span></span><span></span></div>
+      <div id="sync-skip-area" style="margin-top:16px;opacity:0;transition:opacity .4s"></div>
+    </div>
   `;
   document.body.appendChild(screen);
 
-  const chatEl=$('sync-chat');
+  const tips=[
+    {text:'\u{1F4AC} Ask me anything in plain English \u2014 like "how much did I spend on food this month?" and I\u2019ll pull exact numbers from your data.'},
+    {text:'\u{1F3F7}\uFE0F I can recategorize vendors for you. Just say "move all Amazon to Shopping" and I\u2019ll update every transaction at once.'},
+    {text:'\u{1F4CA} Your dashboard updates in real-time with spending breakdowns, cash flow charts, and budget tracking \u2014 all based on how you categorize.'},
+    {text:'\u{1F4B0} I can set and adjust budgets on your behalf. Try "set my food budget to $800" and I\u2019ll handle it.'},
+    {text:'\u{1F52E} Want to know if you\u2019ll stay under budget? Ask me to forecast your balance to any future date.'},
+    {text:'\u{1F504} I automatically detect recurring charges and subscriptions, so you never lose track of what you\u2019re paying for monthly.'},
+    {text:'\u{1F3AF} After setup, I\u2019ll give you a financial health score based on your savings rate, budget adherence, and spending patterns.'},
+    {text:'\u{1F46A} Obsidian supports shared households \u2014 invite your partner from the Accounts tab and both of you see the same data.'}
+  ];
 
-  // AI-style chat messages that appear one by one
-  function addAIMsg(text){
-    const msg=document.createElement('div');
-    msg.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:14px 14px 14px 4px;padding:12px 16px;margin-bottom:10px;font-family:"Inter",sans-serif;font-size:13px;color:var(--text);line-height:1.5;opacity:0;transform:translateY(8px);transition:all .3s ease;';
-    msg.textContent=text;
-    chatEl.appendChild(msg);
-    requestAnimationFrame(()=>{msg.style.opacity='1';msg.style.transform='translateY(0)';});
-  }
+  let tipIdx=0;
+  const tipArea=$('sync-tip-area');
+  const tipText=$('sync-tip-text');
 
-  // Show first message immediately
-  addAIMsg(`Hey ${name}, I\u2019m pulling in your transaction history now.`);
+  // Show first tip after 4 seconds
+  setTimeout(()=>{
+    tipText.textContent=tips[0].text;
+    tipArea.style.opacity='1';
+  },4000);
 
-  // Schedule messages on FIXED timers — independent of sync response
-  const msgTimers=[];
-  msgTimers.push(setTimeout(()=>addAIMsg('Talking to your bank\u2026 this usually takes a few seconds.'),3000));
-  msgTimers.push(setTimeout(()=>addAIMsg('Your bank is getting everything ready. Hang tight.'),7000));
-  msgTimers.push(setTimeout(()=>{
-    addAIMsg('Some banks need extra time on first connect. You can keep waiting, or skip and I\u2019ll finish in the background.');
-    const skipDiv=document.createElement('div');
-    skipDiv.style.cssText='margin-top:12px;opacity:0;transform:translateY(8px);transition:all .3s ease;';
-    skipDiv.innerHTML=`<button class="onb-btn ghost" onclick="advanceFromSyncScreen(false)" style="width:100%;font-size:10px">Skip \u2014 I\u2019ll sync later</button>`;
-    chatEl.appendChild(skipDiv);
-    requestAnimationFrame(()=>{skipDiv.style.opacity='1';skipDiv.style.transform='translateY(0)';});
-  },12000));
-  msgTimers.push(setTimeout(()=>addAIMsg('Still working on it\u2026 your bank is being slow today. The skip button is there if you need it.'),20000));
+  // Rotate tips every 8 seconds
+  const tipInterval=setInterval(()=>{
+    tipIdx=(tipIdx+1)%tips.length;
+    tipArea.style.opacity='0';
+    setTimeout(()=>{
+      tipText.textContent=tips[tipIdx].text;
+      tipArea.style.opacity='1';
+    },400);
+  },8000);
 
-  // Run sync attempts in the background with timeouts so they can't hang forever
-  let synced=false;
+  // Show skip button after 15 seconds
+  setTimeout(()=>{
+    const skipArea=$('sync-skip-area');
+    if(skipArea){
+      skipArea.innerHTML=`<button class="onb-btn ghost" onclick="advanceFromSyncScreen(false)" style="width:100%;font-size:10px">Skip \u2014 I\u2019ll finish syncing in the background</button>`;
+      skipArea.style.opacity='1';
+    }
+  },15000);
+
+  // Update the main AI message periodically
+  const aiText=$('sync-ai-text');
+  setTimeout(()=>{
+    aiText.style.opacity='0';
+    setTimeout(()=>{aiText.textContent='Still talking to your bank. While we wait, check out what I can do for you \u2193';aiText.style.opacity='1';},300);
+  },12000);
+  setTimeout(()=>{
+    aiText.style.opacity='0';
+    setTimeout(()=>{aiText.textContent='Almost there \u2014 I want to make sure I grab your full transaction history so your dashboard is complete.';aiText.style.opacity='1';},300);
+  },30000);
+  setTimeout(()=>{
+    aiText.style.opacity='0';
+    setTimeout(()=>{aiText.textContent='Your bank is taking a bit longer than usual, but we\u2019re still connected. Hang tight or skip below.';aiText.style.opacity='1';},300);
+  },50000);
+
+  // Run sync attempts with timeouts in background
   function syncWithTimeout(ms){
     return Promise.race([
       apiPost('/api/sync',{}).then(r=>r.json()).catch(()=>({synced:0})),
@@ -2074,41 +2106,45 @@ async function showPlaidSyncScreen(){
     ]);
   }
 
-  for(let i=0;i<4;i++){
-    await new Promise(r=>setTimeout(r,i===0?2000:5000));
+  let synced=false;
+  for(let i=0;i<8;i++){
+    await new Promise(r=>setTimeout(r,i===0?3000:8000));
     try{
-      const data=await syncWithTimeout(10000); // 10s max per attempt
+      const data=await syncWithTimeout(12000);
       if(data.synced>0){synced=true;break;}
     }catch(e){}
   }
 
-  // Clear scheduled messages
-  msgTimers.forEach(t=>clearTimeout(t));
-
-  // Final load
+  clearInterval(tipInterval);
   await loadData();
 
-  // Hide the bouncing dots
+  // Show completion state
   screen.querySelector('.sync-dots').style.display='none';
+  tipArea.style.display='none';
+  const skipArea=$('sync-skip-area');
+  if(skipArea)skipArea.style.display='none';
 
-  // Success message + action button
-  await new Promise(r=>setTimeout(r,400));
+  aiText.style.opacity='0';
+  await new Promise(r=>setTimeout(r,300));
+
   if(synced&&transactions.length>0){
-    addAIMsg(`I found ${transactions.length} transactions across your accounts. Now I need your help \u2014 let\u2019s go through your top vendors so I know how to categorize them going forward.`);
+    aiText.textContent=`Done! I found ${transactions.length} transactions across your accounts. Now I need your help \u2014 let\u2019s go through your top vendors so I know how to categorize them going forward.`;
+    aiText.style.opacity='1';
     await new Promise(r=>setTimeout(r,600));
-    const btn=document.createElement('div');
-    btn.style.cssText='margin-top:16px;opacity:0;transform:translateY(8px);transition:all .3s ease;';
-    btn.innerHTML=`<button class="onb-btn primary" onclick="advanceFromSyncScreen(true)" style="width:100%">Let\u2019s do it \u2192</button>`;
-    chatEl.appendChild(btn);
-    requestAnimationFrame(()=>{btn.style.opacity='1';btn.style.transform='translateY(0)';});
+    const btnDiv=document.createElement('div');
+    btnDiv.style.cssText='margin-top:16px;opacity:0;transform:translateY(8px);transition:all .3s ease;';
+    btnDiv.innerHTML=`<button class="onb-btn primary" onclick="advanceFromSyncScreen(true)" style="width:100%">Let\u2019s do it \u2192</button>`;
+    screen.querySelector('[style*="max-width:340px"]').appendChild(btnDiv);
+    requestAnimationFrame(()=>{btnDiv.style.opacity='1';btnDiv.style.transform='translateY(0)';});
   }else{
-    addAIMsg('Your bank is connected! It can take a few minutes for your bank to send over all the data. I\u2019ll have everything ready for you when you come back.');
+    aiText.textContent='Your bank is connected! It can take a few minutes for all your data to come through. I\u2019ll have everything organized when you\u2019re back.';
+    aiText.style.opacity='1';
     await new Promise(r=>setTimeout(r,600));
-    const btn=document.createElement('div');
-    btn.style.cssText='margin-top:16px;opacity:0;transform:translateY(8px);transition:all .3s ease;';
-    btn.innerHTML=`<button class="onb-btn primary" onclick="advanceFromSyncScreen(false)" style="width:100%">Got it \u2192</button>`;
-    chatEl.appendChild(btn);
-    requestAnimationFrame(()=>{btn.style.opacity='1';btn.style.transform='translateY(0)';});
+    const btnDiv=document.createElement('div');
+    btnDiv.style.cssText='margin-top:16px;opacity:0;transform:translateY(8px);transition:all .3s ease;';
+    btnDiv.innerHTML=`<button class="onb-btn primary" onclick="advanceFromSyncScreen(false)" style="width:100%">Got it \u2192</button>`;
+    screen.querySelector('[style*="max-width:340px"]').appendChild(btnDiv);
+    requestAnimationFrame(()=>{btnDiv.style.opacity='1';btnDiv.style.transform='translateY(0)';});
   }
 }
 
@@ -3783,6 +3819,15 @@ async function openVendorWizard(){
         <div class="bar-track" style="margin:12px 20px 0"><div class="bar-fill" id="wizard-progress" style="width:${initialPct}%;background:var(--gold)"></div></div>
         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold);margin-top:6px" id="wizard-progress-label">${initialPct}% categorized</div>
       </div>`;
+      if(window._wizardMode==='onboarding'){
+        html+=`<div style="background:var(--surface);border:1px solid var(--accent);border-radius:14px;padding:16px 18px;margin-bottom:16px;text-align:left">
+          <div style="font-family:'Inter',sans-serif;font-size:14px;color:var(--text);line-height:1.5;margin-bottom:8px">\u{1F4A1} <strong>How this works</strong></div>
+          <div style="font-family:'Inter',sans-serif;font-size:12px;color:var(--text-muted);line-height:1.6">
+            For each vendor below, tell Obsidian what type of transaction it is and which category it belongs to. This teaches me how to automatically categorize future transactions.<br><br>
+            <strong style="color:var(--text)">Not sure about one?</strong> Tap "Not sure" and it'll go into your review queue for later. No pressure to get everything perfect right now.
+          </div>
+        </div>`;
+      }
       if(highPriority.length){html+=`<div class="txd-label">${highPriority.length} vendors need your input</div>`;html+=highPriority.map(v=>wizardVendorRow(v,cats)).join('');}
       if(preAccepted.length){html+=`<div class="txd-label" style="color:var(--green);margin-top:16px">\u2713 ${preAccepted.length} auto-categorized</div>`;html+=preAccepted.map(v=>wizardVendorRow(v,cats,true)).join('');}
       if(lowPriority.length){html+=`<div class="txd-label" style="margin-top:16px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">${lowPriority.length} small vendors \u25BE</div><div style="display:none">${lowPriority.map(v=>wizardVendorRow(v,cats)).join('')}</div>`;}
@@ -3797,24 +3842,36 @@ function wizardVendorRow(v,cats,preAccepted,hasRule){
   const existing=window._wizardAssignments[v.vendor];
   const currentCat=existing?.category||(hasRule?v.rule_category:null)||(preAccepted?mapCategoryFrontend(v.plaid_category):null);
   const currentType=existing?.type||v.inferred_type||'expense';
+  const isUnsure=existing?.unsure||false;
   const esc=v.vendor.replace(/'/g,"\\'");
   const escHtml=v.vendor.replace(/"/g,'&quot;');
   const pillsHidden=hasRule&&!existing;
-  return`<div class="wizard-vendor-row ${currentCat?'done':''}" data-vendor="${escHtml}">
+  return`<div class="wizard-vendor-row ${currentCat?'done':''} ${isUnsure?'unsure':''}" data-vendor="${escHtml}">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;cursor:pointer" onclick="toggleWizardPills(this)">
       <div><div style="font-size:14px;font-weight:500">${v.vendor}</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted)">${v.tx_count} txn${v.tx_count!==1?'s':''}${currentCat?' \u00B7 '+currentCat:''}${currentType!=='expense'?' \u00B7 '+currentType:''}${v.plaid_category&&v.plaid_category!=='Other'&&!currentCat?' \u00B7 Plaid: '+v.plaid_category:''}</div></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-muted)">${v.tx_count} txn${v.tx_count!==1?'s':''}${currentCat?' \u00B7 '+currentCat:''}${isUnsure?' \u00B7 \u26A0 Unsure':''}${currentType!=='expense'&&!isUnsure?' \u00B7 '+currentType:''}${v.plaid_category&&v.plaid_category!=='Other'&&!currentCat?' \u00B7 Plaid: '+v.plaid_category:''}</div></div>
       <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:var(--red)">${money(v.total_spend)}</div>
     </div>
     <div class="wizard-pills-wrap" style="${pillsHidden?'display:none':'display:flex'};flex-direction:column;gap:10px">
-      <div style="display:flex;gap:4px">
+      <div style="display:flex;gap:4px;align-items:center">
         <div class="wizard-type-btn ${currentType==='expense'?'selected':''}" onclick="wizardSetType('${esc}','expense',this)">Expense</div>
         <div class="wizard-type-btn ${currentType==='income'?'selected':''}" onclick="wizardSetType('${esc}','income',this)">Income</div>
         <div class="wizard-type-btn ${currentType==='transfer'?'selected':''}" onclick="wizardSetType('${esc}','transfer',this)">Transfer</div>
+        <div style="font-size:14px;cursor:pointer;padding:4px 8px;color:var(--text-muted)" onclick="toggleWizardHelp(this)" title="What do these mean?">\u2753</div>
+      </div>
+      <div class="wizard-help-text" style="display:none;font-family:'Inter',sans-serif;font-size:12px;color:var(--text-muted);line-height:1.5;padding:10px 14px;background:var(--surface);border-radius:10px;border:1px solid var(--border)">
+        <div style="margin-bottom:6px"><strong style="color:var(--text)">Expense</strong> \u2014 Money you spent (groceries, bills, shopping). Shows as spending on your dashboard.</div>
+        <div style="margin-bottom:6px"><strong style="color:var(--green)">Income</strong> \u2014 Money coming in (paychecks, refunds). Tracked separately and used for savings rate.</div>
+        <div style="margin-bottom:6px"><strong style="color:var(--blue)">Transfer</strong> \u2014 Money moving between your own accounts (credit card payments, savings transfers). Not counted as spending or income.</div>
+        <div style="color:var(--text-dim);font-size:11px;margin-top:8px">\u{1F4A1} Getting this right helps your dashboard show accurate spending totals and savings rates.</div>
       </div>
       <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;flex-wrap:wrap">
         ${cats.map(c=>`<div class="wizard-pill ${currentCat===c?'selected':''}" onclick="wizardAssignVendor('${esc}','${c}',this)">${CAT_ICONS[c]||'\u{1F4CC}'} ${c}</div>`).join('')}
         <div class="wizard-pill" onclick="wizardNewCategory('${esc}',this)" style="border-style:dashed">+ New</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;padding-top:4px;border-top:1px solid var(--border)">
+        <button class="wizard-pill ${isUnsure?'selected':''}" onclick="wizardMarkUnsure('${esc}',this)" style="background:${isUnsure?'rgba(251,191,36,.12)':'var(--surface)'};border-color:${isUnsure?'var(--unsure)':'var(--border2)'};color:${isUnsure?'var(--unsure)':'var(--text-muted)'}">\u26A0 Not sure</button>
+        <div style="font-family:'Inter',sans-serif;font-size:11px;color:var(--text-dim);flex:1">Marks all transactions from this vendor for later review</div>
       </div>
     </div>
     <div style="margin-top:8px"><span class="wizard-expand-btn" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);cursor:pointer;text-decoration:underline" onclick="expandWizardTxns('${esc}',this)">View ${v.tx_count} transactions</span></div>
@@ -3825,6 +3882,36 @@ function toggleWizardPills(header){
   const wrap=header.parentElement.querySelector('.wizard-pills-wrap');
   if(!wrap)return;
   wrap.style.display=(wrap.style.display==='none')?'flex':'none';
+}
+
+function toggleWizardHelp(el){
+  const help=el.closest('.wizard-pills-wrap').querySelector('.wizard-help-text');
+  if(help)help.style.display=help.style.display==='none'?'block':'none';
+}
+
+function wizardMarkUnsure(vendor,el){
+  const v=window._wizardVendors?.find(x=>x.vendor===vendor);
+  const existing=window._wizardAssignments[vendor];
+  if(existing&&existing.unsure){
+    // Toggle off
+    existing.unsure=false;
+    el.style.background='var(--surface)';
+    el.style.borderColor='var(--border2)';
+    el.style.color='var(--text-muted)';
+    const row=el.closest('.wizard-vendor-row');
+    if(row)row.classList.remove('unsure');
+  }else{
+    // Mark as unsure
+    window._wizardAssignments[vendor]={category:'Other',type:v?.inferred_type||'expense',unsure:true};
+    el.style.background='rgba(251,191,36,.12)';
+    el.style.borderColor='var(--unsure)';
+    el.style.color='var(--unsure)';
+    const row=el.closest('.wizard-vendor-row');
+    if(row){row.classList.add('done');row.classList.add('unsure');}
+    // Deselect category pills
+    row?.querySelectorAll('.wizard-pill.selected').forEach(p=>{if(!p.textContent.includes('Not sure'))p.classList.remove('selected');});
+  }
+  updateWizardProgress();
 }
 
 function wizardSetType(vendor,type,el){
@@ -3920,7 +4007,7 @@ async function submitVendorWizard(){
     .filter(([,d])=>d.category)
     .map(([vendor,d])=>{
       const finalType=d.category==='Transfer'?'transfer':(d.type||'expense');
-      return{vendor,category:d.category,type:finalType};
+      return{vendor,category:d.category,type:finalType,status:d.unsure?'unsure':'confirmed'};
     });
   if(!assignments.length){alert('No assignments to save. Pick a category for at least one vendor.');return;}
   const btn=document.querySelector('#page-wizard .sht-btn.primary');
