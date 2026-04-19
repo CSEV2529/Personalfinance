@@ -2538,6 +2538,49 @@ app.get('/api/challenges', requireAuth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ─── AI NARRATIVE INSIGHT ────────────────────────────────────────
+app.get('/api/insights/narrative', requireAuth, async (req, res) => {
+  try {
+    const hh = req.household;
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+    const monthEnd = new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().split('T')[0];
+
+    const topCat = await get(`SELECT cat, SUM(amount) as total FROM transactions
+      WHERE household=$1 AND type='expense' AND date>=$2 AND date<=$3
+      GROUP BY cat ORDER BY total DESC LIMIT 1`, [hh, monthStart, monthEnd]);
+    const totalSpent = await get(`SELECT SUM(amount) as total FROM transactions
+      WHERE household=$1 AND type='expense' AND date>=$2 AND date<=$3`, [hh, monthStart, monthEnd]);
+    const totalIncome = await get(`SELECT SUM(amount) as total FROM transactions
+      WHERE household=$1 AND type='income' AND date>=$2 AND date<=$3`, [hh, monthStart, monthEnd]);
+    const biggestTx = await get(`SELECT "desc", amount, date FROM transactions
+      WHERE household=$1 AND type='expense' AND date>=$2 AND date<=$3
+      ORDER BY amount DESC LIMIT 1`, [hh, monthStart, monthEnd]);
+
+    const spent = parseFloat(totalSpent?.total || 0);
+    const income = parseFloat(totalIncome?.total || 0);
+    const biggest = biggestTx ? parseFloat(biggestTx.amount) : 0;
+    const topCategory = topCat?.cat || 'Other';
+    const topAmount = parseFloat(topCat?.total || 0);
+    let narrative = '';
+
+    if (spent === 0) {
+      narrative = 'No spending data yet this month. Connect a bank or wait for your transactions to sync.';
+    } else if (biggest > spent * 0.3 && biggestTx) {
+      const bigF = biggest >= 1000 ? `$${(biggest/1000).toFixed(1)}k` : `$${biggest.toFixed(0)}`;
+      const withoutBig = spent - biggest;
+      narrative = `Your expenses ran hot this month. A <strong style="color:#F87171">${bigF} ${biggestTx.desc}</strong> payment on ${new Date(biggestTx.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})} drove most of the overspend. Without it, you'd be at $${withoutBig.toFixed(0)}.`;
+    } else if (income > 0 && spent < income * 0.9) {
+      const savedPct = Math.round(((income - spent) / income) * 100);
+      narrative = `Looking solid this month. You've saved <strong style="color:#34D399">${savedPct}%</strong> of your income so far. Your top category is ${topCategory} at $${topAmount.toFixed(0)}.`;
+    } else {
+      const topF = topAmount >= 1000 ? `$${(topAmount/1000).toFixed(1)}k` : `$${topAmount.toFixed(0)}`;
+      narrative = `Your top spending category is <strong>${topCategory}</strong> at <strong style="color:#F87171">${topF}</strong> this month. That's ${Math.round((topAmount/spent)*100)}% of your total spending.`;
+    }
+    res.json({ narrative });
+  } catch (e) { res.json({ narrative: 'Ask me anything about your spending this month.' }); }
+});
+
 // ─── WEEKLY RECAP ───────────────────────────────────────────────
 app.get('/api/weekly-recap', requireAuth, async (req, res) => {
   try {
