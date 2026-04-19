@@ -1530,19 +1530,24 @@ async function handleSignedIn(){
     }
     if(meRes.ok){
       const me=await meRes.json();
+      // Always populate user data (needed for topbar even after onboarding)
+      if(me.profile)currentUser=me.profile.id;
+      if(me.members?.length){
+        users=me.members.map(m=>({id:m.user_id,name:m.display_name||'User'}));
+        me.members.forEach(m=>{
+          if(m.display_name){
+            USER_INITIALS[m.user_id]=m.display_name[0].toUpperCase();
+            if(m.avatar_color)USER_COLORS[m.user_id]=m.avatar_color;
+          }
+        });
+      }
       if(me.needsOnboarding){
-        // Restore lifestyle data if resuming
         if(me.lifestyleData)Object.assign(lifestyleData,me.lifestyleData);
         onboardingData.display_name=me.profile?.display_name||'';
         onboardingData.avatar_color=me.profile?.avatar_color||'#F59E0B';
         const stepMap={welcome:1,lifestyle:2,meet_ai:3,categories:4,bank:5,wizard:6,done:7};
         showOnboarding(stepMap[me.onboardingStep]||1);
         return;
-      }
-      if(me.profile)currentUser=me.profile.id;
-      if(me.members?.length){
-        users=me.members.map(m=>({id:m.user_id,name:m.display_name||'User'}));
-        me.members.forEach(m=>{if(m.display_name)USER_INITIALS[m.user_id]=m.display_name[0].toUpperCase();});
       }
     }
     showApp();
@@ -1922,6 +1927,25 @@ async function showDashboardReveal(){
   </div>`;
 
   await loadData();
+
+  // Re-fetch user profile so topbar shows display name, not UUID
+  try{
+    const meRes2=await apiGet('/api/me');
+    if(meRes2.ok){
+      const me2=await meRes2.json();
+      if(me2.profile)currentUser=me2.profile.id;
+      if(me2.members?.length){
+        users=me2.members.map(m=>({id:m.user_id,name:m.display_name||'User'}));
+        me2.members.forEach(m=>{
+          if(m.display_name){
+            USER_INITIALS[m.user_id]=m.display_name[0].toUpperCase();
+            if(m.avatar_color)USER_COLORS[m.user_id]=m.avatar_color;
+          }
+        });
+      }
+    }
+  }catch(e){}
+
   let aiReply;
   try{
     const res=await apiPost('/api/chat',{message:'[ONBOARDING_FIRST_GREETING]',history:[]});
@@ -2118,7 +2142,38 @@ async function showPlaidSyncScreen(){
   }
 
   clearInterval(tipInterval);
-  window._syncScreenDone=true;
+
+  // If sync loop didn't find data, start background retry — Plaid can take 1-3 min
+  if(!synced){
+    const bgRetry=setInterval(async()=>{
+      try{
+        const data=await syncWithTimeout(12000);
+        if(data.synced>0){
+          synced=true;
+          clearInterval(bgRetry);
+          await loadData();
+          // Update the UI if still on this screen
+          if(!window._syncScreenDone){
+            const at=$('sync-ai-text');
+            if(at){
+              at.style.opacity='0';
+              await new Promise(r=>setTimeout(r,300));
+              at.textContent=`Found ${transactions.length} transactions! Let\u2019s go through your top vendors.`;
+              at.style.opacity='1';
+            }
+            const existingBtn=document.querySelector('#plaid-sync-screen .onb-btn');
+            if(existingBtn){
+              existingBtn.textContent="Let\u2019s do it \u2192";
+              existingBtn.setAttribute('onclick','advanceFromSyncScreen(true)');
+            }
+          }
+        }
+      }catch(e){}
+    },10000);
+    setTimeout(()=>clearInterval(bgRetry),300000); // stop after 5 min
+  }
+
+  window._syncScreenDone=false; // not done yet — user hasn't tapped button
   await loadData();
 
   // Show completion state
@@ -2140,12 +2195,12 @@ async function showPlaidSyncScreen(){
     screen.querySelector('[style*="max-width:340px"]').appendChild(btnDiv);
     requestAnimationFrame(()=>{btnDiv.style.opacity='1';btnDiv.style.transform='translateY(0)';});
   }else{
-    aiText.textContent='Your bank is connected! It can take a few minutes for all your data to come through. I\u2019ll have everything organized when you\u2019re back.';
+    aiText.textContent='Your bank is connected! It can take a few minutes for all your data to come through. Let\u2019s continue \u2014 I\u2019ll keep syncing in the background.';
     aiText.style.opacity='1';
     await new Promise(r=>setTimeout(r,600));
     const btnDiv=document.createElement('div');
     btnDiv.style.cssText='margin-top:16px;opacity:0;transform:translateY(8px);transition:all .3s ease;';
-    btnDiv.innerHTML=`<button class="onb-btn primary" onclick="advanceFromSyncScreen(false)" style="width:100%">Got it \u2192</button>`;
+    btnDiv.innerHTML=`<button class="onb-btn primary" onclick="advanceFromSyncScreen(false)" style="width:100%">Continue \u2192</button>`;
     screen.querySelector('[style*="max-width:340px"]').appendChild(btnDiv);
     requestAnimationFrame(()=>{btnDiv.style.opacity='1';btnDiv.style.transform='translateY(0)';});
   }
@@ -2166,7 +2221,10 @@ async function advanceFromSyncScreen(hasData){
     await new Promise(r=>setTimeout(r,500));
     screen.remove();
   }
-  if(hasData){
+  // ALWAYS re-check for data — it may have arrived after the sync loop gave up
+  await loadData();
+  const actuallyHasData=hasData||transactions.length>0;
+  if(actuallyHasData){
     await apiPost('/api/me/onboarding-step',{step:'wizard'});
     renderOnboardingStep(6);
   }else{
